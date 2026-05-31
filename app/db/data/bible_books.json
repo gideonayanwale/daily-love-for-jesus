@@ -1,0 +1,596 @@
+[
+  {
+    "book_number": 1,
+    "name": "Genesis",
+    "short_name": "Gen",
+    "testament": "old",
+    "genre": "Law",
+    "chapters": 50,
+    "order": 1
+  },
+  {
+    "book_number": 2,
+    "name": "Exodus",
+    "short_name": "Exod",
+    "testament": "old",
+    "genre": "Law",
+    "chapters": 40,
+    "order": 2
+  },
+  {
+    "book_number": 3,
+    "name": "Leviticus",
+    "short_name": "Lev",
+    "testament": "old",
+    "genre": "Law",
+    "chapters": 27,
+    "order": 3
+  },
+  {
+    "book_number": 4,
+    "name": "Numbers",
+    "short_name": "Num",
+    "testament": "old",
+    "genre": "Law",
+    "chapters": 36,
+    "order": 4
+  },
+  {
+    "book_number": 5,
+    "name": "Deuteronomy",
+    "short_name": "Deut",
+    "testament": "old",
+    "genre": "Law",
+    "chapters": 34,
+    "order": 5
+  },
+  {
+    "book_number": 6,
+    "name": "Joshua",
+    "short_name": "Josh",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 24,
+    "order": 6
+  },
+  {
+    "book_number": 7,
+    "name": "Judges",
+    "short_name": "Judg",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 21,
+    "order": 7
+  },
+  {
+    "book_number": 8,
+    "name": "Ruth",
+    "short_name": "Ruth",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 4,
+    "order": 8
+  },
+  {
+    "book_number": 9,
+    "name": "1 Samuel",
+    "short_name": "1Sam",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 31,
+    "order": 9
+  },
+  {
+    "book_number": 10,
+    "name": "2 Samuel",
+    "short_name": "2Sam",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 24,
+    "order": 10
+  },
+  {
+    "book_number": 11,
+    "name": "1 Kings",
+    "short_name": "1Kgs",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 22,
+    "order": 11
+  },
+  {
+    "book_number": 12,
+    "name": "2 Kings",
+    "short_name": "2Kgs",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 25,
+    "order": 12
+  },
+  {
+    "book_number": 13,
+    "name": "1 Chronicles",
+    "short_name": "1Chr",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 29,
+    "order": 13
+  },
+  {
+    "book_number": 14,
+    "name": "2 Chronicles",
+    "short_name": "2Chr",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 36,
+    "order": 14
+  },
+  {
+    "book_number": 15,
+    "name": "Ezra",
+    "short_name": "Ezra",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 10,
+    "order": 15
+  },
+  {
+    "book_number": 16,
+    "name": "Nehemiah",
+    "short_name": "Neh",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 13,
+    "order": 16
+  },
+  {
+    "book_number": 17,
+    "name": "Esther",
+    "short_name": "Esth",
+    "testament": "old",
+    "genre": "History",
+    "chapters": 10,
+    "order": 17
+  },
+  {
+    "book_number": 18,
+    "name": "Job",
+    "short_name": "Job",
+    "testament": "old",
+    "genre": "Poetry",
+    "chapters": 42,
+    "order": 18
+  },
+  {
+    "book_number": 19,
+    "name": "Psalms",
+    "short_name": "Ps",
+    "testament": "old",
+    "genre": "Poetry",
+    "chapters": 150,
+    "order": 19
+  },
+  {
+    "book_number": 20,
+    "name": "Proverbs",
+    "short_name": "Prov",
+    "testament": "old",
+    "genre": "Poetry",
+    "chapters": 31,
+    "order": 20
+  },
+  {
+    "book_number": 21,
+    "name": "Ecclesiastes",
+    "short_name": "Eccl",
+    "testament": "old",
+    "genre": "Poetry",
+    "chapters": 12,
+    "order": 21
+  },
+  {
+    "book_number": 22,
+    "name": "Song of Solomon",
+    "short_name": "Song",
+    "testament": "old",
+    "genre": "Poetry",
+    "chapters": 8,
+    "order": 22
+  },
+  {
+    "book_number": 23,
+    "name": "Isaiah",
+    "short_name": "Isa",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 66,
+    "order": 23
+  },
+  {
+    "book_number": 24,
+    "name": "Jeremiah",
+    "short_name": "Jer",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 52,
+    "order": 24
+  },
+  {
+    "book_number": 25,
+    "name": "Lamentations",
+    "short_name": "Lam",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 5,
+    "order": 25
+  },
+  {
+    "book_number": 26,
+    "name": "Ezekiel",
+    "short_name": "Ezek",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 48,
+    "order": 26
+  },
+  {
+    "book_number": 27,
+    "name": "Daniel",
+    "short_name": "Dan",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 12,
+    "order": 27
+  },
+  {
+    "book_number": 28,
+    "name": "Hosea",
+    "short_name": "Hos",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 14,
+    "order": 28
+  },
+  {
+    "book_number": 29,
+    "name": "Joel",
+    "short_name": "Joel",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 3,
+    "order": 29
+  },
+  {
+    "book_number": 30,
+    "name": "Amos",
+    "short_name": "Amos",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 9,
+    "order": 30
+  },
+  {
+    "book_number": 31,
+    "name": "Obadiah",
+    "short_name": "Obad",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 1,
+    "order": 31
+  },
+  {
+    "book_number": 32,
+    "name": "Jonah",
+    "short_name": "Jonah",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 4,
+    "order": 32
+  },
+  {
+    "book_number": 33,
+    "name": "Micah",
+    "short_name": "Mic",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 7,
+    "order": 33
+  },
+  {
+    "book_number": 34,
+    "name": "Nahum",
+    "short_name": "Nah",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 3,
+    "order": 34
+  },
+  {
+    "book_number": 35,
+    "name": "Habakkuk",
+    "short_name": "Hab",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 3,
+    "order": 35
+  },
+  {
+    "book_number": 36,
+    "name": "Zephaniah",
+    "short_name": "Zeph",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 3,
+    "order": 36
+  },
+  {
+    "book_number": 37,
+    "name": "Haggai",
+    "short_name": "Hag",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 2,
+    "order": 37
+  },
+  {
+    "book_number": 38,
+    "name": "Zechariah",
+    "short_name": "Zech",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 14,
+    "order": 38
+  },
+  {
+    "book_number": 39,
+    "name": "Malachi",
+    "short_name": "Mal",
+    "testament": "old",
+    "genre": "Prophecy",
+    "chapters": 4,
+    "order": 39
+  },
+  {
+    "book_number": 40,
+    "name": "Matthew",
+    "short_name": "Matt",
+    "testament": "new",
+    "genre": "Gospel",
+    "chapters": 28,
+    "order": 40
+  },
+  {
+    "book_number": 41,
+    "name": "Mark",
+    "short_name": "Mark",
+    "testament": "new",
+    "genre": "Gospel",
+    "chapters": 16,
+    "order": 41
+  },
+  {
+    "book_number": 42,
+    "name": "Luke",
+    "short_name": "Luke",
+    "testament": "new",
+    "genre": "Gospel",
+    "chapters": 24,
+    "order": 42
+  },
+  {
+    "book_number": 43,
+    "name": "John",
+    "short_name": "John",
+    "testament": "new",
+    "genre": "Gospel",
+    "chapters": 21,
+    "order": 43
+  },
+  {
+    "book_number": 44,
+    "name": "Acts",
+    "short_name": "Acts",
+    "testament": "new",
+    "genre": "History",
+    "chapters": 28,
+    "order": 44
+  },
+  {
+    "book_number": 45,
+    "name": "Romans",
+    "short_name": "Rom",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 16,
+    "order": 45
+  },
+  {
+    "book_number": 46,
+    "name": "1 Corinthians",
+    "short_name": "1Cor",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 16,
+    "order": 46
+  },
+  {
+    "book_number": 47,
+    "name": "2 Corinthians",
+    "short_name": "2Cor",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 13,
+    "order": 47
+  },
+  {
+    "book_number": 48,
+    "name": "Galatians",
+    "short_name": "Gal",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 6,
+    "order": 48
+  },
+  {
+    "book_number": 49,
+    "name": "Ephesians",
+    "short_name": "Eph",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 6,
+    "order": 49
+  },
+  {
+    "book_number": 50,
+    "name": "Philippians",
+    "short_name": "Phil",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 4,
+    "order": 50
+  },
+  {
+    "book_number": 51,
+    "name": "Colossians",
+    "short_name": "Col",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 4,
+    "order": 51
+  },
+  {
+    "book_number": 52,
+    "name": "1 Thessalonians",
+    "short_name": "1Thess",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 5,
+    "order": 52
+  },
+  {
+    "book_number": 53,
+    "name": "2 Thessalonians",
+    "short_name": "2Thess",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 3,
+    "order": 53
+  },
+  {
+    "book_number": 54,
+    "name": "1 Timothy",
+    "short_name": "1Tim",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 6,
+    "order": 54
+  },
+  {
+    "book_number": 55,
+    "name": "2 Timothy",
+    "short_name": "2Tim",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 4,
+    "order": 55
+  },
+  {
+    "book_number": 56,
+    "name": "Titus",
+    "short_name": "Titus",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 3,
+    "order": 56
+  },
+  {
+    "book_number": 57,
+    "name": "Philemon",
+    "short_name": "Phlm",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 1,
+    "order": 57
+  },
+  {
+    "book_number": 58,
+    "name": "Hebrews",
+    "short_name": "Heb",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 13,
+    "order": 58
+  },
+  {
+    "book_number": 59,
+    "name": "James",
+    "short_name": "Jas",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 5,
+    "order": 59
+  },
+  {
+    "book_number": 60,
+    "name": "1 Peter",
+    "short_name": "1Pet",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 5,
+    "order": 60
+  },
+  {
+    "book_number": 61,
+    "name": "2 Peter",
+    "short_name": "2Pet",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 3,
+    "order": 61
+  },
+  {
+    "book_number": 62,
+    "name": "1 John",
+    "short_name": "1John",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 5,
+    "order": 62
+  },
+  {
+    "book_number": 63,
+    "name": "2 John",
+    "short_name": "2John",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 1,
+    "order": 63
+  },
+  {
+    "book_number": 64,
+    "name": "3 John",
+    "short_name": "3John",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 1,
+    "order": 64
+  },
+  {
+    "book_number": 65,
+    "name": "Jude",
+    "short_name": "Jude",
+    "testament": "new",
+    "genre": "Epistle",
+    "chapters": 1,
+    "order": 65
+  },
+  {
+    "book_number": 66,
+    "name": "Revelation",
+    "short_name": "Rev",
+    "testament": "new",
+    "genre": "Prophecy",
+    "chapters": 22,
+    "order": 66
+  }
+]
