@@ -1,0 +1,27 @@
+{
+  "name": "daily-love-for-jesus",
+  "version": "1.0.0",
+  "description": "Daily Devotional By Love Fellowship Christian International",
+  "keywords": [
+    "Daily",
+    "Devotional"
+  ],
+  "homepage": "https://github.com/gideonayanwale/daily-love-for-jesus#readme",
+  "bugs": {
+    "url": "https://github.com/gideonayanwale/daily-love-for-jesus/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gideonayanwale/daily-love-for-jesus.git"
+  },
+  "license": "ISC",
+  "author": "Gideon Inioluwa Ayanwale",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "date-fns": "^2.30.0"
+  }
+}
