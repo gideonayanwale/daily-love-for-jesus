@@ -1,5 +1,5 @@
 export const Session = {
-  cookieName: "kimi_sid",
+  cookieName: "sb-access-token",
   maxAgeMs: 365 * 24 * 60 * 60 * 1000,
 } as const;
 

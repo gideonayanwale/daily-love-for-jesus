@@ -1,19 +1,34 @@
+import { z } from "zod";
 import * as cookie from "cookie";
-import { Session } from "@contracts/constants";
-import { getSessionCookieOptions } from "./lib/cookies";
 import { createRouter, authedQuery } from "./middleware";
+import { upsertUser } from "./queries/users";
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
+
+  updateProfile: authedQuery
+    .input(
+      z.object({
+        name: z.string().min(1).max(255).optional(),
+        avatar: z.string().url().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const updated = await upsertUser({
+        id: ctx.user.id,
+        email: ctx.user.email,
+        name: input.name ?? ctx.user.name,
+        avatar: input.avatar ?? ctx.user.avatar,
+        role: ctx.user.role,
+      });
+      return updated ?? ctx.user;
+    }),
+
   logout: authedQuery.mutation(async ({ ctx }) => {
-    const opts = getSessionCookieOptions(ctx.req.headers);
     ctx.resHeaders.append(
       "set-cookie",
-      cookie.serialize(Session.cookieName, "", {
-        httpOnly: opts.httpOnly,
-        path: opts.path,
-        sameSite: opts.sameSite?.toLowerCase() as "lax" | "none",
-        secure: opts.secure,
+      cookie.serialize("sb-access-token", "", {
+        path: "/",
         maxAge: 0,
       }),
     );

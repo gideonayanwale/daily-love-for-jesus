@@ -2,13 +2,13 @@ import { z } from "zod";
 import { createRouter, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { userFavorites } from "@db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 export const favoritesRouter = createRouter({
   list: publicQuery
     .input(
       z.object({
-        userId: z.number(),
+        userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]).optional(),
       })
     )
@@ -25,20 +25,20 @@ export const favoritesRouter = createRouter({
               eq(userFavorites.type, input.type)
             )
           )
-          .orderBy(sql`${userFavorites.createdAt} DESC`);
+          .orderBy(desc(userFavorites.createdAt));
       }
 
       return db
         .select()
         .from(userFavorites)
         .where(eq(userFavorites.userId, input.userId))
-        .orderBy(sql`${userFavorites.createdAt} DESC`);
+        .orderBy(desc(userFavorites.createdAt));
     }),
 
   add: publicQuery
     .input(
       z.object({
-        userId: z.number(),
+        userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]),
         itemId: z.number(),
         reference: z.string().optional(),
@@ -72,17 +72,15 @@ export const favoritesRouter = createRouter({
           itemId: input.itemId,
           reference: input.reference ?? null,
         })
-        .$returningId();
+        .returning();
 
-      return db.query.userFavorites.findFirst({
-        where: eq(userFavorites.id, result[0].id),
-      });
+      return result[0] ?? null;
     }),
 
   remove: publicQuery
     .input(
       z.object({
-        userId: z.number(),
+        userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]),
         itemId: z.number(),
       })

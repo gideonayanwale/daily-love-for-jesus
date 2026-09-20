@@ -4,8 +4,6 @@ import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
-import { env } from "./lib/env";
-import { createOAuthCallbackHandler } from "./kimi/auth";
 import { Paths } from "@contracts/constants";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
@@ -14,7 +12,6 @@ import { eq, sql } from "drizzle-orm";
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
-app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 
 // Telegram webhook endpoint - receives bot updates directly
 app.post("/api/telegram/webhook", async (c) => {

@@ -75,6 +75,8 @@
     "@hono/node-server": "^1.14.3",
     "superjson": "^2.2.6",
     "drizzle-orm": "^0.45.1",
+    "@supabase/supabase-js": "^2.49.1",
+    "postgres": "^3.4.5",
     "mysql2": "^3.14.1",
     "@aws-sdk/client-s3": "^3.965.0",
     "@aws-sdk/s3-request-presigner": "^3.965.0",

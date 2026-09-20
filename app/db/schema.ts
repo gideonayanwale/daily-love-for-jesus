@@ -1,99 +1,106 @@
 import {
-  mysqlTable,
-  mysqlEnum,
+  pgTable,
   serial,
   varchar,
   text,
   timestamp,
-  int,
+  integer,
   bigint,
-  json,
+  jsonb,
   index,
   boolean,
-} from "drizzle-orm/mysql-core";
+  uuid,
+} from "drizzle-orm/pg-core";
 
-// ─── Users ───────────────────────────────────────────────────────────
-export const users = mysqlTable("users", {
-  id: serial("id").primaryKey(),
-  unionId: varchar("unionId", { length: 255 }).notNull().unique(),
-  name: varchar("name", { length: 255 }),
-  email: varchar("email", { length: 320 }),
-  avatar: text("avatar"),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date()),
-  lastSignInAt: timestamp("lastSignInAt").defaultNow().notNull(),
-});
+// ─── Users (Synced with Supabase Auth auth.users) ────────────────────────────
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey(), // Matches auth.users.id
+    email: varchar("email", { length: 320 }),
+    name: varchar("name", { length: 255 }),
+    avatar: text("avatar"),
+    role: varchar("role", { length: 50 }).default("user").notNull(), // 'user' | 'admin'
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_users_role").on(table.role),
+  ]
+);
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// ─── Bible Books ─────────────────────────────────────────────────────
-export const bibleBooks = mysqlTable("bible_books", {
-  id: serial("id").primaryKey(),
-  bookNumber: int("book_number").notNull().unique(),
-  name: varchar("name", { length: 100 }).notNull(),
-  shortName: varchar("short_name", { length: 20 }).notNull(),
-  testament: mysqlEnum("testament", ["old", "new"]).notNull(),
-  genre: varchar("genre", { length: 50 }),
-  chapters: int("chapters").notNull(),
-  order: int("order").notNull(),
-}, (table) => ({
-  testamentIdx: index("testament_idx").on(table.testament),
-}));
+// ─── Bible Books ─────────────────────────────────────────────────────────────
+export const bibleBooks = pgTable(
+  "bible_books",
+  {
+    id: serial("id").primaryKey(),
+    bookNumber: integer("book_number").notNull().unique(),
+    name: varchar("name", { length: 100 }).notNull(),
+    shortName: varchar("short_name", { length: 20 }).notNull(),
+    testament: varchar("testament", { length: 10 }).notNull(), // 'old' | 'new'
+    genre: varchar("genre", { length: 50 }),
+    chapters: integer("chapters").notNull(),
+    order: integer("order").notNull(),
+  },
+  (table) => [
+    index("idx_bible_books_testament").on(table.testament),
+    index("idx_bible_books_order").on(table.order),
+  ]
+);
 
 export type BibleBook = typeof bibleBooks.$inferSelect;
 export type InsertBibleBook = typeof bibleBooks.$inferInsert;
 
-// ─── Bible Verses ────────────────────────────────────────────────────
-export const bibleVerses = mysqlTable(
+// ─── Bible Verses ────────────────────────────────────────────────────────────
+export const bibleVerses = pgTable(
   "bible_verses",
   {
     id: serial("id").primaryKey(),
-    bookId: bigint("book_id", { mode: "number", unsigned: true }).notNull(),
-    bookNumber: int("book_number").notNull(),
-    chapter: int("chapter").notNull(),
-    verse: int("verse").notNull(),
+    bookId: bigint("book_id", { mode: "number" }).notNull(),
+    bookNumber: integer("book_number").notNull(),
+    chapter: integer("chapter").notNull(),
+    verse: integer("verse").notNull(),
     text: text("text").notNull(),
   },
-  (table) => ({
-    bookChapterIdx: index("book_chapter_idx").on(table.bookNumber, table.chapter),
-    bookIdIdx: index("book_id_idx").on(table.bookId),
-  }),
+  (table) => [
+    index("idx_bible_verses_book_chapter").on(table.bookNumber, table.chapter),
+    index("idx_bible_verses_book_id").on(table.bookId),
+  ]
 );
 
 export type BibleVerse = typeof bibleVerses.$inferSelect;
 export type InsertBibleVerse = typeof bibleVerses.$inferInsert;
 
-// ─── Hymns ───────────────────────────────────────────────────────────
-export const hymns = mysqlTable(
+// ─── Hymns ───────────────────────────────────────────────────────────────────
+export const hymns = pgTable(
   "hymns",
   {
     id: serial("id").primaryKey(),
-    hymnNumber: int("hymn_number").notNull(),
+    hymnNumber: integer("hymn_number").notNull(),
     title: varchar("title", { length: 255 }).notNull(),
     author: varchar("author", { length: 255 }),
     composer: varchar("composer", { length: 255 }),
     meter: varchar("meter", { length: 100 }),
     key: varchar("key", { length: 50 }),
-    stanzas: json("stanzas").notNull(), // array of { number, text }
+    stanzas: jsonb("stanzas").notNull(), // array of { number: number, text: string }
     chorus: text("chorus"),
     category: varchar("category", { length: 100 }),
   },
-  (table) => ({
-    numberIdx: index("hymn_number_idx").on(table.hymnNumber),
-    categoryIdx: index("category_idx").on(table.category),
-  }),
+  (table) => [
+    index("idx_hymns_number").on(table.hymnNumber),
+    index("idx_hymns_category").on(table.category),
+  ]
 );
 
 export type Hymn = typeof hymns.$inferSelect;
 export type InsertHymn = typeof hymns.$inferInsert;
 
-// ─── Devotionals ─────────────────────────────────────────────────────
-export const devotionals = mysqlTable(
+// ─── Devotionals ─────────────────────────────────────────────────────────────
+export const devotionals = pgTable(
   "devotionals",
   {
     id: serial("id").primaryKey(),
@@ -104,24 +111,24 @@ export const devotionals = mysqlTable(
     reflection: text("reflection"),
     prayer: text("prayer"),
     author: varchar("author", { length: 255 }),
-    source: mysqlEnum("source", ["telegram", "manual", "api"]).default("manual").notNull(),
+    source: varchar("source", { length: 50 }).default("manual").notNull(), // 'telegram' | 'manual' | 'api'
     telegramMessageId: bigint("telegram_message_id", { mode: "number" }),
-    devotionalDate: timestamp("devotional_date").defaultNow().notNull(),
+    devotionalDate: timestamp("devotional_date", { withTimezone: true }).defaultNow().notNull(),
     isPublished: boolean("is_published").default(true).notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => ({
-    dateIdx: index("devotional_date_idx").on(table.devotionalDate),
-    sourceIdx: index("source_idx").on(table.source),
-  }),
+  (table) => [
+    index("idx_devotionals_date").on(table.devotionalDate),
+    index("idx_devotionals_published").on(table.isPublished),
+  ]
 );
 
 export type Devotional = typeof devotionals.$inferSelect;
 export type InsertDevotional = typeof devotionals.$inferInsert;
 
-// ─── Telegram Messages ───────────────────────────────────────────────
-export const telegramMessages = mysqlTable(
+// ─── Telegram Messages ───────────────────────────────────────────────────────
+export const telegramMessages = pgTable(
   "telegram_messages",
   {
     id: serial("id").primaryKey(),
@@ -133,54 +140,54 @@ export const telegramMessages = mysqlTable(
     text: text("text").notNull(),
     mediaUrl: text("media_url"),
     processed: boolean("processed").default(false).notNull(),
-    devotionalId: bigint("devotional_id", { mode: "number", unsigned: true }),
-    receivedAt: timestamp("received_at").defaultNow().notNull(),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    devotionalId: bigint("devotional_id", { mode: "number" }),
+    receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => ({
-    messageIdx: index("telegram_message_idx").on(table.messageId, table.chatId),
-    processedIdx: index("processed_idx").on(table.processed),
-  }),
+  (table) => [
+    index("idx_telegram_msg").on(table.messageId, table.chatId),
+    index("idx_telegram_processed").on(table.processed),
+  ]
 );
 
 export type TelegramMessage = typeof telegramMessages.$inferSelect;
 export type InsertTelegramMessage = typeof telegramMessages.$inferInsert;
 
-// ─── User Favorites ──────────────────────────────────────────────────
-export const userFavorites = mysqlTable(
+// ─── User Favorites ──────────────────────────────────────────────────────────
+export const userFavorites = pgTable(
   "user_favorites",
   {
     id: serial("id").primaryKey(),
-    userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-    type: mysqlEnum("type", ["verse", "hymn", "devotional"]).notNull(),
-    itemId: bigint("item_id", { mode: "number", unsigned: true }).notNull(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 50 }).notNull(), // 'verse' | 'hymn' | 'devotional'
+    itemId: bigint("item_id", { mode: "number" }).notNull(),
     reference: varchar("reference", { length: 500 }),
-    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => ({
-    userTypeIdx: index("user_type_idx").on(table.userId, table.type),
-    userItemIdx: index("user_item_idx").on(table.userId, table.itemId),
-  }),
+  (table) => [
+    index("idx_user_favorites_user_type").on(table.userId, table.type),
+    index("idx_user_favorites_user_item").on(table.userId, table.itemId),
+  ]
 );
 
 export type UserFavorite = typeof userFavorites.$inferSelect;
 export type InsertUserFavorite = typeof userFavorites.$inferInsert;
 
-// ─── User Reading Progress ───────────────────────────────────────────
-export const userReadingProgress = mysqlTable(
+// ─── User Reading Progress ───────────────────────────────────────────────────
+export const userReadingProgress = pgTable(
   "user_reading_progress",
   {
     id: serial("id").primaryKey(),
-    userId: bigint("user_id", { mode: "number", unsigned: true }).notNull(),
-    bookId: bigint("book_id", { mode: "number", unsigned: true }).notNull(),
-    chapter: int("chapter").notNull(),
-    lastVerse: int("last_verse").default(0),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    bookId: bigint("book_id", { mode: "number" }).notNull().references(() => bibleBooks.id, { onDelete: "cascade" }),
+    chapter: integer("chapter").notNull(),
+    lastVerse: integer("last_verse").default(0),
     completed: boolean("completed").default(false).notNull(),
-    updatedAt: timestamp("updatedAt").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => ({
-    userBookIdx: index("user_book_idx").on(table.userId, table.bookId),
-  }),
+  (table) => [
+    index("idx_reading_progress_user_book").on(table.userId, table.bookId),
+  ]
 );
 
 export type UserReadingProgress = typeof userReadingProgress.$inferSelect;
