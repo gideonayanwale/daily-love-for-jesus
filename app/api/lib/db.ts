@@ -16,24 +16,38 @@ export function getNeonDb(): any {
   if (neonInstance) return neonInstance;
 
   if (!env.neonDatabaseUrl) {
-    console.warn("[db] NEON_DATABASE_URL not set — Neon DB unavailable.");
     return null;
   }
 
+  // 1. Try @neondatabase/serverless (HTTP / WebSocket driver)
   try {
     const { neon } = require("@neondatabase/serverless");
-    // Use neon-serverless adapter (works with @neondatabase/serverless HTTP client)
     const { drizzle } = require("drizzle-orm/neon-serverless");
     const sql = neon(env.neonDatabaseUrl);
     neonInstance = drizzle({ client: sql, schema: fullSchema });
-    console.log("[db] ✅ Neon serverless DB connected");
+    console.log("[db] ✅ Neon serverless DB connected via @neondatabase/serverless");
+    return neonInstance;
+  } catch {
+    // If @neondatabase/serverless is not installed, fall through to postgres.js
+  }
+
+  // 2. Fallback to standard postgres.js driver (Neon supports standard PostgreSQL wire protocol)
+  try {
+    const postgres = require("postgres");
+    const { drizzle } = require("drizzle-orm/postgres-js");
+    const client = postgres(env.neonDatabaseUrl, {
+      ssl: "require",
+      max: 10,
+    });
+    neonInstance = drizzle(client, { schema: fullSchema });
+    console.log("[db] ✅ Neon serverless DB connected via postgres.js");
+    return neonInstance;
   } catch (err: any) {
     console.error("[db] Neon connection error:", err.message);
     return null;
   }
-
-  return neonInstance;
 }
+
 
 // ─── Supabase PostgreSQL DB (Fallback / Auth writes) ──────────────────────────
 let supabaseInstance: any = null;
