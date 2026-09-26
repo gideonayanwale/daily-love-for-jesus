@@ -1,3 +1,5 @@
+y
+
 # Daily Love For Jesus - System Architecture & Roadmap
 
 **Project Status**: Transitioning from Web to Native-First Cross-Platform
@@ -17,14 +19,14 @@ Your current app is built as a **web-first React application**, but you want a *
 
 ## 🏗️ Current Architecture Problems
 
-| Issue | Impact | Solution |
-|-------|--------|----------|
-| Web-first design | Not optimized for mobile | Restructure to React Native |
-| TSConfig errors | Build failures | ✅ Fixed |
-| No offline capability | Requires internet for all content | Add SQLite local database |
-| AWS S3 for storage | Costs accumulate | Use Cloudinary free tier |
-| Centralized updates | App needs rebuilding for content changes | Implement OTA (Over-the-Air) updates |
-| Web UI framework | Not native-feeling on mobile | Glassmorphism with native styling |
+| Issue                 | Impact                                   | Solution                             |
+| --------------------- | ---------------------------------------- | ------------------------------------ |
+| Web-first design      | Not optimized for mobile                 | Restructure to React Native          |
+| TSConfig errors       | Build failures                           | ✅ Fixed                             |
+| No offline capability | Requires internet for all content        | Add SQLite local database            |
+| AWS S3 for storage    | Costs accumulate                         | Use Cloudinary free tier             |
+| Centralized updates   | App needs rebuilding for content changes | Implement OTA (Over-the-Air) updates |
+| Web UI framework      | Not native-feeling on mobile             | Glassmorphism with native styling    |
 
 ---
 
@@ -101,6 +103,7 @@ Your current app is built as a **web-first React application**, but you want a *
 ```
 
 **Distribution**:
+
 - iOS: TestFlight (free beta) → App Store
 - Android: EAS Build (free tier) → Google Play
 - Web: Vercel (automatic deployment)
@@ -110,6 +113,7 @@ Your current app is built as a **web-first React application**, but you want a *
 ## 🔄 Weekly Update Mechanism
 
 ### Current Problem
+
 - Need to rebuild app for any content changes
 - Users must update from app store
 
@@ -136,6 +140,7 @@ Tuesday 12:30 AM - Everyone has latest content
 ```
 
 **Benefits**:
+
 - No app rebuild needed
 - Zero app store delays
 - Users always have latest content
@@ -172,6 +177,7 @@ colors: {
 ```
 
 ### Premium Components
+
 1. **Glass Card**: Frosted background with blur effect
 2. **Gradient Overlay**: Multi-color gradients
 3. **Soft Shadows**: Depth without harshness
@@ -184,17 +190,18 @@ colors: {
 
 ### Monthly Cost: **$0 (Completely Free)**
 
-| Service | Free Tier | Monthly Cost |
-|---------|-----------|--------------|
-| Expo | 3 projects, unlimited builds | $0 |
-| Vercel | 100 serverless functions | $0 |
-| Neon PostgreSQL | 5GB storage, 1 project | $0 |
-| Vercel Blob | 100GB total | $0 |
-| Firebase FCM | 1M notifications/month | $0 |
-| GitHub Actions | 2000 CI/CD minutes | $0 |
-| **TOTAL** | | **$0** |
+| Service         | Free Tier                    | Monthly Cost |
+| --------------- | ---------------------------- | ------------ |
+| Expo            | 3 projects, unlimited builds | $0           |
+| Vercel          | 100 serverless functions     | $0           |
+| Neon PostgreSQL | 5GB storage, 1 project       | $0           |
+| Vercel Blob     | 100GB total                  | $0           |
+| Firebase FCM    | 1M notifications/month       | $0           |
+| GitHub Actions  | 2000 CI/CD minutes           | $0           |
+| **TOTAL** |                              | **$0** |
 
 ### When to Upgrade (Optional at $100+/month)
+
 - If app reaches 10M+ active users
 - Then: $29 Expo subscription + $20 Vercel Pro
 - Database upgrades as needed
@@ -251,30 +258,35 @@ daily-love-for-jesus/
 ## 📋 Migration Roadmap
 
 ### Phase 1: Setup (1-2 hours)
+
 - [ ] Initialize Expo project
 - [ ] Setup Nativewind + Tailwind
 - [ ] Configure TypeScript & path aliases
 - [ ] Setup development environment
 
 ### Phase 2: UI Components (2-3 hours)
+
 - [ ] Create glassmorphism component library
 - [ ] Port essential UI components
 - [ ] Setup theme system
 - [ ] Create design tokens
 
 ### Phase 3: Core Features (3-4 hours)
+
 - [ ] Implement offline-first architecture
 - [ ] Setup SQLite local database
 - [ ] Create data sync engine
 - [ ] Implement authentication
 
 ### Phase 4: Backend Restructure (2-3 hours)
+
 - [ ] Move to Vercel functions
 - [ ] Setup Neon PostgreSQL
 - [ ] Implement weekly export jobs
 - [ ] Create OTA update system
 
 ### Phase 5: Distribution (1-2 hours)
+
 - [ ] Setup EAS Build & Submit
 - [ ] Configure App Store & Play Store
 - [ ] Setup CI/CD with GitHub Actions
@@ -287,6 +299,7 @@ daily-love-for-jesus/
 ## 🚀 Deployment & Scaling
 
 ### Day 1: Local Development
+
 ```bash
 npm install
 npx expo start
@@ -294,6 +307,7 @@ npx expo start
 ```
 
 ### Day 7: Beta Testing
+
 ```bash
 eas build --platform all
 # Builds for iOS + Android
@@ -302,11 +316,13 @@ eas submit --platform all
 ```
 
 ### Week 2: Production Release
+
 - iOS App Store
 - Google Play Store
 - Web at vercel.app domain
 
 ### Weekly Content Updates
+
 - Automatic via Expo Updates
 - No app rebuild needed
 - Instant distribution
@@ -325,13 +341,13 @@ eas submit --platform all
 
 ## 📊 Performance Targets
 
-| Metric | Target | Method |
-|--------|--------|--------|
-| App Size | <100 MB | Code splitting, Expo optimization |
-| Startup Time | <2s | SQLite pre-loaded data |
-| Sync Time | <30s | Delta updates, compression |
-| UI Framerate | 60 FPS | React Native native rendering |
-| Battery | <5% drain/day | Efficient sync, local storage |
+| Metric       | Target        | Method                            |
+| ------------ | ------------- | --------------------------------- |
+| App Size     | <100 MB       | Code splitting, Expo optimization |
+| Startup Time | <2s           | SQLite pre-loaded data            |
+| Sync Time    | <30s          | Delta updates, compression        |
+| UI Framerate | 60 FPS        | React Native native rendering     |
+| Battery      | <5% drain/day | Efficient sync, local storage     |
 
 ---
 

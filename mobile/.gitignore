@@ -5,3 +5,4 @@ node_modules/
 android/
 ios/
 .web-build/
+/**.txt

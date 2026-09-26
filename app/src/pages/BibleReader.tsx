@@ -149,6 +149,88 @@ export default function BibleReader() {
     };
   }, [bNum, chNum, translation]);
 
+  // Reading tracking & Sunday School accountability
+  const [isChapterCompleted, setIsChapterCompleted] = useState<boolean>(false);
+  const readingStartTimeRef = useRef<number>(Date.now());
+  const hasTriggeredReadRef = useRef<boolean>(false);
+
+  // Reset tracking state whenever the chapter changes (React Router reuses the component)
+  useEffect(() => {
+    let stored = false;
+    try {
+      stored = localStorage.getItem(`chapter_read:${bNum}:${chNum}`) === "true";
+    } catch {}
+    setIsChapterCompleted(stored);
+    hasTriggeredReadRef.current = stored;
+    readingStartTimeRef.current = Date.now();
+  }, [bNum, chNum]);
+
+  const markChapterAsRead = async () => {
+    if (hasTriggeredReadRef.current || isChapterCompleted) return;
+    hasTriggeredReadRef.current = true;
+    setIsChapterCompleted(true);
+    try {
+      localStorage.setItem(`chapter_read:${bNum}:${chNum}`, "true");
+    } catch {}
+
+    const timeSpent = Math.max(15, Math.round((Date.now() - readingStartTimeRef.current) / 1000));
+    const contentId = `bible:${bNum}:${chNum}`;
+
+    // Attach Supabase auth token so the server can identify the user
+    let authToken: string | null = null;
+    try {
+      const session = localStorage.getItem("daily_love_supabase_session");
+      if (session) {
+        authToken = JSON.parse(session)?.access_token ?? null;
+      }
+    } catch {}
+
+    try {
+      const res = await fetch("/api/tracking/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          logs: [
+            {
+              contentId,
+              contentType: "bible_chapter",
+              bookNumber: bNum,
+              chapter: chNum,
+              timeSpent,
+              scrollDepth: 100,
+              completedAt: new Date().toISOString(),
+              clientLogId: `web_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            },
+          ],
+        }),
+      });
+      if (res.ok) {
+        toast.success(`✓ ${book?.name ?? "Chapter"} ${chNum} reading recorded!`);
+      } else {
+        console.warn("Reading log sync returned", res.status);
+      }
+    } catch (err) {
+      console.warn("Could not sync reading log immediately:", err);
+    }
+  };
+
+  // Scroll listener for 85% depth
+  useEffect(() => {
+    const onScroll = () => {
+      if (hasTriggeredReadRef.current) return;
+      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+      if (scrollHeight > 0 && window.scrollY / scrollHeight >= 0.85) {
+        markChapterAsRead();
+      }
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [bNum, chNum]);
+
   // Audio narration controls
   const handleToggleAudio = () => {
     if (!verses || verses.length === 0) return;
@@ -296,7 +378,23 @@ export default function BibleReader() {
             </div>
           </div>
 
+          {/* Right-side action buttons */}
           <div className="flex items-center gap-1.5">
+            {/* Mark as Read Completion Action */}
+            <button
+              onClick={markChapterAsRead}
+              disabled={isChapterCompleted}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isChapterCompleted
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  : "bg-amber-500 hover:bg-amber-600 text-white shadow-xs"
+              }`}
+              title="Mark this chapter as completed for reading progress & Sunday School"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{isChapterCompleted ? "Completed" : "Mark Read"}</span>
+            </button>
+
             {/* Translation Picker Trigger */}
             <button
               onClick={() => setIsTranslationModalOpen(true)}

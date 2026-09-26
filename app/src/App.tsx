@@ -11,6 +11,7 @@ const HymnDetail = lazy(() => import('./pages/HymnDetail'))
 const Devotionals = lazy(() => import('./pages/Devotionals'))
 const DevotionalDetail = lazy(() => import('./pages/DevotionalDetail'))
 const Settings = lazy(() => import('./pages/Settings'))
+const Community = lazy(() => import('./pages/Community'))
 const Login = lazy(() => import('./pages/Login'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
@@ -26,6 +27,7 @@ function App() {
         <Route path="hymns/:id" element={<Suspense fallback={<Loading />}><HymnDetail /></Suspense>} />
         <Route path="devotionals" element={<Suspense fallback={<Loading />}><Devotionals /></Suspense>} />
         <Route path="devotionals/:id" element={<Suspense fallback={<Loading />}><DevotionalDetail /></Suspense>} />
+        <Route path="community" element={<Suspense fallback={<Loading />}><Community /></Suspense>} />
         <Route path="settings" element={<Suspense fallback={<Loading />}><Settings /></Suspense>} />
       </Route>
       <Route path="/login" element={<Suspense fallback={<Loading />}><Login /></Suspense>} />

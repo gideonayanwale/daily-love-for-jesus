@@ -10,7 +10,7 @@
 ### Verify Installation
 
 ```bash
-node --version    # Should show v20.x.x
+2    # Should show v20.x.x
 npm --version     # Should show 10.x.x
 expo --version    # Should show latest
 ```
@@ -114,7 +114,9 @@ npx expo start --ios
 
 ```bash
 # Install Android Studio first, then:
+
 npx expo start --android
+
 # Opens Android Emulator
 ```
 

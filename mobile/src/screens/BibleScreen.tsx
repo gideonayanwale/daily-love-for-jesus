@@ -17,6 +17,7 @@ import {
   MobileVerse,
   BibleBook,
 } from '../lib/bibleApi';
+import { useReadingTracker } from '../hooks/useReadingTracker';
 
 export function BibleScreen() {
   const [selectedBook, setSelectedBook] = useState<BibleBook>(BIBLE_BOOKS[0]);
@@ -25,6 +26,18 @@ export function BibleScreen() {
   const [verses, setVerses] = useState<MobileVerse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Hook for 90% scroll depth tracking and offline reading queue sync
+  const {
+    isCompleted,
+    scrollDepth,
+    pendingQueueCount,
+    markAsRead,
+    handleScroll,
+  } = useReadingTracker({
+    bookNumber: selectedBook.id,
+    chapter: selectedChapter,
+  });
 
   // Modals
   const [isBookModalVisible, setIsBookModalVisible] = useState<boolean>(false);
@@ -88,10 +101,54 @@ export function BibleScreen() {
             <Text className="text-amber-400 font-bold text-xs">{translation}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Accountability & Reading Progress Bar */}
+        <View className="mt-2.5 pt-2 border-t border-white/5 flex-row items-center justify-between">
+          <View className="flex-row items-center space-x-2">
+            <View className="h-1.5 w-20 bg-white/10 rounded-full overflow-hidden">
+              <View
+                className="h-full bg-amber-400 rounded-full"
+                style={{ width: `${Math.min(100, Math.max(scrollDepth, isCompleted ? 100 : 0))}%` }}
+              />
+            </View>
+            <Text className="text-[10px] text-white/50">{scrollDepth}% read</Text>
+            {pendingQueueCount > 0 && (
+              <View className="px-1.5 py-0.5 rounded bg-amber-500/20">
+                <Text className="text-[9px] text-amber-300 font-medium">
+                  {pendingQueueCount} queued offline
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Mark as Read Button */}
+          <TouchableOpacity
+            onPress={markAsRead}
+            disabled={isCompleted}
+            className={`px-3 py-1 rounded-lg flex-row items-center space-x-1 ${
+              isCompleted
+                ? 'bg-emerald-500/20 border border-emerald-500/40'
+                : 'bg-amber-500 active:bg-amber-600'
+            }`}
+          >
+            <Text
+              className={`text-xs font-bold ${
+                isCompleted ? 'text-emerald-400' : 'text-slate-950'
+              }`}
+            >
+              {isCompleted ? '✓ Completed' : 'Mark as Read'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Scripture Verses View */}
-      <ScrollView className="flex-1 px-4 py-4" contentContainerStyle={{ paddingBottom: 60 }}>
+      <ScrollView
+        className="flex-1 px-4 py-4"
+        contentContainerStyle={{ paddingBottom: 60 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {isLoading ? (
           <View className="py-20 items-center justify-center">
             <ActivityIndicator size="large" color="#F59E0B" />

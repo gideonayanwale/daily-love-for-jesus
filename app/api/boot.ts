@@ -8,6 +8,7 @@ import { Paths } from "@contracts/constants";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
+import { communityRestRouter } from "./routes/community";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -73,6 +74,8 @@ app.post("/api/telegram/webhook", async (c) => {
     return c.json({ status: "error", message: "Internal server error" }, 500);
   }
 });
+
+app.route("/api", communityRestRouter);
 
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({

@@ -5,6 +5,7 @@ import {
   BookOpen,
   Music,
   CalendarHeart,
+  Users,
   Settings,
   WifiOff,
   Wifi,
@@ -14,6 +15,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus'
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
   { path: '/bible', label: 'Bible', icon: BookOpen },
+  { path: '/community', label: 'Community', icon: Users },
   { path: '/hymns', label: 'Hymns', icon: Music },
   { path: '/devotionals', label: 'Devotionals', icon: CalendarHeart },
   { path: '/settings', label: 'Settings', icon: Settings },
