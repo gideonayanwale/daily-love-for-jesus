@@ -3,62 +3,71 @@
 # Run from the `app/` directory: .\scripts\db-sync-both.ps1
 
 param(
-  [switch]$Force  # Pass -Force to skip confirmation prompts
+  [switch]$Force
 )
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 
-# Load .env
-$envFile = Join-Path $PSScriptRoot ".." ".env"
+# Load .env file
+$envFile = "$PSScriptRoot\..\.env"
 if (Test-Path $envFile) {
   Get-Content $envFile | ForEach-Object {
-    if ($_ -match "^\s*([^#=]+)=(.*)$") {
+    $line = $_.Trim()
+    if ($line -and -not $line.StartsWith("#") -and ($line -match "^([^=]+)=(.*)$")) {
       $key = $Matches[1].Trim()
       $val = $Matches[2].Trim()
-      if (-not [System.Environment]::GetEnvironmentVariable($key)) {
-        [System.Environment]::SetEnvironmentVariable($key, $val, "Process")
-      }
+      [System.Environment]::SetEnvironmentVariable($key, $val, "Process")
     }
   }
-  Write-Host "[db-sync-both] Loaded .env" -ForegroundColor Cyan
+  Write-Host "[db-sync-both] Successfully loaded environment variables from .env" -ForegroundColor Cyan
 }
 
-$neonUrl    = $env:NEON_DATABASE_URL
-$supabaseUrl = $env:DATABASE_URL
+$neonUrl = [System.Environment]::GetEnvironmentVariable("NEON_DATABASE_URL")
+$supabaseUrl = [System.Environment]::GetEnvironmentVariable("DATABASE_URL")
 
 if (-not $neonUrl -and -not $supabaseUrl) {
   Write-Error "Neither NEON_DATABASE_URL nor DATABASE_URL is set in your .env!"
   exit 1
 }
 
-# ── Push to Neon ───────────────────────────────────────────────────────────────
+# 1. Push schema to Neon
 if ($neonUrl) {
-  Write-Host "`n🟢 Pushing schema to NEON..." -ForegroundColor Green
-  $env:NEON_DATABASE_URL = $neonUrl
+  Write-Host ""
+  Write-Host "=========================================" -ForegroundColor Green
+  Write-Host "[1/2] Pushing schema to NEON Database..." -ForegroundColor Green
+  Write-Host "=========================================" -ForegroundColor Green
+  $env:DRIZZLE_DB_TARGET = "neon"
   npx drizzle-kit push
-  if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Neon push encountered errors (exit code $LASTEXITCODE)"
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "[OK] Neon schema pushed successfully." -ForegroundColor Green
   } else {
-    Write-Host "✅ Neon schema updated" -ForegroundColor Green
+    Write-Warning "[WARN] Neon push completed with exit code $LASTEXITCODE."
   }
 } else {
-  Write-Warning "NEON_DATABASE_URL not set — skipping Neon push"
+  Write-Warning "NEON_DATABASE_URL is not set - skipping Neon push."
 }
 
-# ── Push to Supabase (temporarily clear NEON_DATABASE_URL so drizzle picks DATABASE_URL) ──
+# 2. Push schema to Supabase
 if ($supabaseUrl) {
-  Write-Host "`n🔵 Pushing schema to SUPABASE..." -ForegroundColor Blue
-  $savedNeon = $env:NEON_DATABASE_URL
-  $env:NEON_DATABASE_URL = ""
+  Write-Host ""
+  Write-Host "=============================================" -ForegroundColor Blue
+  Write-Host "[2/2] Pushing schema to SUPABASE Database..." -ForegroundColor Blue
+  Write-Host "=============================================" -ForegroundColor Blue
+  $env:DRIZZLE_DB_TARGET = "supabase"
   npx drizzle-kit push
-  $env:NEON_DATABASE_URL = $savedNeon
-  if ($LASTEXITCODE -ne 0) {
-    Write-Warning "Supabase push encountered errors (exit code $LASTEXITCODE)"
+  if ($LASTEXITCODE -eq 0) {
+    Write-Host "[OK] Supabase schema pushed successfully." -ForegroundColor Blue
   } else {
-    Write-Host "✅ Supabase schema updated" -ForegroundColor Blue
+    Write-Warning "[WARN] Supabase push completed with exit code $LASTEXITCODE."
   }
 } else {
-  Write-Warning "DATABASE_URL not set — skipping Supabase push"
+  Write-Warning "DATABASE_URL is not set - skipping Supabase push."
 }
 
-Write-Host "`n🎉 Both databases are now in sync!" -ForegroundColor Yellow
+# Reset target
+$env:DRIZZLE_DB_TARGET = ""
+
+Write-Host ""
+Write-Host "=========================================" -ForegroundColor Yellow
+Write-Host "Schema push complete for both databases!" -ForegroundColor Yellow
+Write-Host "=========================================" -ForegroundColor Yellow
