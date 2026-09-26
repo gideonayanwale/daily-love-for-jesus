@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import * as schema from "@db/schema";
 import type { InsertUser, User } from "@db/schema";
-import { getDb } from "./connection";
+import { getDb, getNeonDb, getSupabaseDb } from "./connection";
 import { env } from "../lib/env";
 
 export async function findUserById(id: string): Promise<User | undefined> {
@@ -40,8 +40,10 @@ export async function upsertUser(data: InsertUser): Promise<User | undefined> {
     updateSet.role = "admin";
   }
 
+  // ─── Primary DB write ──────────────────────────────────────────────────────
+  let result: User | undefined;
   try {
-    const result = await getDb()
+    const rows = await getDb()
       .insert(schema.users)
       .values(values)
       .onConflictDoUpdate({
@@ -49,9 +51,32 @@ export async function upsertUser(data: InsertUser): Promise<User | undefined> {
         set: updateSet,
       })
       .returning();
-
-    return result.at(0);
+    result = rows.at(0);
   } catch {
-    return findUserById(values.id);
+    result = await findUserById(values.id);
   }
+
+  // ─── Mirror write to the secondary DB (fire-and-forget) ───────────────────
+  // Ensures user record exists in both Neon AND Supabase Postgres regardless
+  // of which one is the primary.
+  const primaryDb = getDb();
+  const neonDb = getNeonDb();
+  const supabaseDb = getSupabaseDb();
+  const secondaryDb = primaryDb === neonDb ? supabaseDb : neonDb;
+
+  if (secondaryDb && secondaryDb !== primaryDb) {
+    secondaryDb
+      .insert(schema.users)
+      .values(values)
+      .onConflictDoUpdate({
+        target: schema.users.id,
+        set: updateSet,
+      })
+      .catch((err: Error) => {
+        // Fire-and-forget: non-blocking background mirror
+        console.warn("[sync] Secondary DB user mirror failed:", err.message);
+      });
+  }
+
+  return result;
 }

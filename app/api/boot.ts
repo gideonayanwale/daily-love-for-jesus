@@ -9,6 +9,8 @@ import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
 import { communityRestRouter } from "./routes/community";
+import { syncRouter } from "./syncRouter";
+
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -76,6 +78,7 @@ app.post("/api/telegram/webhook", async (c) => {
 });
 
 app.route("/api", communityRestRouter);
+app.route("/api/sync", syncRouter);
 
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({

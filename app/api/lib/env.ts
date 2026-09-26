@@ -10,13 +10,17 @@ function get(name: string, defaultValue = ""): string {
 }
 
 export const env = {
-  // Supabase Configuration
+  // Supabase Configuration (Auth + Realtime + Storage)
   supabaseUrl: get("SUPABASE_URL", process.env.VITE_SUPABASE_URL ?? ""),
   supabaseAnonKey: get("SUPABASE_ANON_KEY", process.env.VITE_SUPABASE_ANON_KEY ?? ""),
   supabaseServiceRoleKey: get("SUPABASE_SERVICE_ROLE_KEY"),
 
-  // Database URL (Supabase PostgreSQL connection string)
+  // Supabase Postgres connection string (fallback / migrations)
   databaseUrl: get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"),
+
+  // Neon Serverless PostgreSQL (primary app data - fast serverless reads/writes)
+  // Get from: https://console.neon.tech → your project → Connection string
+  neonDatabaseUrl: get("NEON_DATABASE_URL", ""),
 
   // App & Security
   appId: get("APP_ID", "daily-love-app"),

@@ -14,7 +14,10 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:push:neon": "cross-env NEON_DATABASE_URL=$NEON_DATABASE_URL drizzle-kit push",
+    "db:push:supabase": "cross-env NEON_DATABASE_URL= drizzle-kit push"
+
   },
   "scripts-windows-help": {
     "fix:windows": "powershell -ExecutionPolicy Bypass -NoProfile -File ./scripts/windows-fix.ps1"
