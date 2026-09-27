@@ -1,0 +1,8 @@
+# ==============================================================================
+# Cloudflare Configuration (Root Workspace Level)
+# ==============================================================================
+
+name = "daily-love-for-jesus"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "app/dist/public"

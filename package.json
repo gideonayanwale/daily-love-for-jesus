@@ -19,7 +19,12 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "npm --prefix app run build",
+    "dev": "npm --prefix app run dev",
+    "start": "npm --prefix app run start",
+    "deploy:netlify": "npx netlify deploy --prod --dir=app/dist/public",
+    "deploy:cloudflare": "npx wrangler pages deploy app/dist/public",
+    "test": "npm --prefix app run test"
   },
   "dependencies": {
     "date-fns": "^4.1.0"

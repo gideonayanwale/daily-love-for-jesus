@@ -1,0 +1,7 @@
+# ==============================================================================
+# Daily Love For Jesus - Single Page Application (SPA) Redirects
+# Compatible with Netlify & Cloudflare Pages
+# ==============================================================================
+
+# Client-side SPA routing fallback (redirect all page visits to index.html with 200)
+/*    /index.html   200
