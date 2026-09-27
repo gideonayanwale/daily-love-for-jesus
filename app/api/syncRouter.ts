@@ -9,14 +9,37 @@ import { env } from "./lib/env";
 
 export const syncRouter = new Hono();
 
-// ── Auth guard: require Admin-Secret header for all sync routes ────────────────
-syncRouter.use("*", async (c, next) => {
+// ── Auth guard: require Admin-Secret or valid Admin user for sync triggers ───
+const adminAuth = async (c: any, next: any) => {
   const secret = c.req.header("x-admin-secret");
-  if (!secret || secret !== env.appSecret) {
-    return c.json({ error: "Unauthorized — x-admin-secret required" }, 401);
+  if (secret && secret === env.appSecret) {
+    return next();
   }
-  return next();
-});
+
+  // Also accept Supabase Bearer token for authenticated users
+  const authHeader = c.req.header("authorization");
+  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+    try {
+      const token = authHeader.substring(7).trim();
+      const { supabaseAdmin } = await import("./lib/supabase");
+      const user = await supabaseAdmin.getUser(token);
+      if (user && user.id) {
+        // Allow authenticated admin, or if no admin configured, any authenticated user
+        if (
+          !env.adminUserId ||
+          user.id === env.adminUserId ||
+          (user.email && user.email.toLowerCase() === env.adminEmail.toLowerCase())
+        ) {
+          return next();
+        }
+      }
+    } catch {
+      // Fall through to unauthorized
+    }
+  }
+
+  return c.json({ error: "Unauthorized — x-admin-secret or admin bearer token required" }, 401);
+};
 
 // ── GET /api/sync/health — check both DB connections ──────────────────────────
 syncRouter.get("/health", async (c) => {
@@ -38,7 +61,7 @@ syncRouter.get("/health", async (c) => {
 });
 
 // ── POST /api/sync/run — trigger a full bidirectional sync ────────────────────
-syncRouter.post("/run", async (c) => {
+syncRouter.post("/run", adminAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const direction = body?.direction ?? "all"; // "all" | "supabase→neon" | "neon→supabase"
 
@@ -64,7 +87,7 @@ syncRouter.post("/run", async (c) => {
 });
 
 // ── POST /api/sync/supabase-to-neon — one-way copy from Supabase → Neon ───────
-syncRouter.post("/supabase-to-neon", async (c) => {
+syncRouter.post("/supabase-to-neon", adminAuth, async (c) => {
   const start = Date.now();
   const results = await runFullSync("supabase→neon");
   return c.json({
@@ -76,7 +99,7 @@ syncRouter.post("/supabase-to-neon", async (c) => {
 });
 
 // ── POST /api/sync/neon-to-supabase — one-way copy from Neon → Supabase ───────
-syncRouter.post("/neon-to-supabase", async (c) => {
+syncRouter.post("/neon-to-supabase", adminAuth, async (c) => {
   const start = Date.now();
   const results = await runFullSync("neon→supabase");
   return c.json({
