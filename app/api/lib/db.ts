@@ -19,19 +19,8 @@ export function getNeonDb(): any {
     return null;
   }
 
-  // 1. Try @neondatabase/serverless (HTTP / WebSocket driver)
-  try {
-    const { neon } = require("@neondatabase/serverless");
-    const { drizzle } = require("drizzle-orm/neon-serverless");
-    const sql = neon(env.neonDatabaseUrl);
-    neonInstance = drizzle({ client: sql, schema: fullSchema });
-    console.log("[db] ✅ Neon serverless DB connected via @neondatabase/serverless");
-    return neonInstance;
-  } catch {
-    // If @neondatabase/serverless is not installed, fall through to postgres.js
-  }
-
-  // 2. Fallback to standard postgres.js driver (Neon supports standard PostgreSQL wire protocol)
+  // Neon supports standard PostgreSQL wire protocol.
+  // Using postgres.js provides fast pooled connections without requiring extra SDKs.
   try {
     const postgres = require("postgres");
     const { drizzle } = require("drizzle-orm/postgres-js");
@@ -47,6 +36,7 @@ export function getNeonDb(): any {
     return null;
   }
 }
+
 
 
 // ─── Supabase PostgreSQL DB (Fallback / Auth writes) ──────────────────────────

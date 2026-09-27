@@ -27,8 +27,9 @@ import {
   getOfflineChapter,
   isTranslationDownloaded,
   markTranslationDownloaded,
-  OfflineVerse,
+  type OfflineVerse,
 } from "@/lib/bibleOffline";
+
 
 const HIGHLIGHT_COLORS = [
   { id: "amber", bg: "bg-amber-100/80 dark:bg-amber-950/40 text-amber-900 border-amber-300" },

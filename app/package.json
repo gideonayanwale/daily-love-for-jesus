@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\"",
+    "build": "vite build && esbuild api/boot.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\" --external:@neondatabase/serverless",
     "lint": "eslint .",
+
     "preview": "vite preview",
     "start": "NODE_ENV=production node dist/boot.js",
     "check": "tsc -b",
@@ -24,8 +25,15 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.965.0",
     "@aws-sdk/s3-request-presigner": "^3.965.0",
+    "@babel/core": "^8.0.6",
+    "@babel/generator": "^8.0.6",
+    "@babel/traverse": "^8.0.6",
     "@hono/node-server": "^1.14.3",
     "@hookform/resolvers": "^5.2.2",
+    "@jridgewell/gen-mapping": "^0.3.13",
+    "@jridgewell/resolve-uri": "^3.1.2",
+    "@jridgewell/sourcemap-codec": "^1.6.0",
+    "@jridgewell/trace-mapping": "^0.3.31",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
