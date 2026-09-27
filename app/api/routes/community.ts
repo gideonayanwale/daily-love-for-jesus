@@ -133,8 +133,9 @@ communityRestRouter.post("/groups/invite", async (c) => {
       return c.json({ error: err.message }, err.statusCode as any);
     }
     if (err instanceof z.ZodError) {
-      return c.json({ error: "Validation failed", details: err.errors }, 400);
+      return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     }
+
     console.error("[api] /groups/invite error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
@@ -215,8 +216,9 @@ communityRestRouter.post("/groups/join", async (c) => {
       return c.json({ error: err.message }, err.statusCode as any);
     }
     if (err instanceof z.ZodError) {
-      return c.json({ error: "Validation failed", details: err.errors }, 400);
+      return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     }
+
     console.error("[api] /groups/join error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
@@ -274,8 +276,9 @@ communityRestRouter.post("/tracking/sync", async (c) => {
       return c.json({ error: err.message }, err.statusCode as any);
     }
     if (err instanceof z.ZodError) {
-      return c.json({ error: "Validation failed", details: err.errors }, 400);
+      return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     }
+
     console.error("[api] /tracking/sync error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
@@ -344,7 +347,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
       .where(inArray(readingLogs.userId, studentUserIds))
       .groupBy(readingLogs.userId);
 
-    const aggMap = new Map(readingAggregations.map((a) => [a.userId, a]));
+    const aggMap = new Map<string, any>(readingAggregations.map((a: any) => [a.userId, a]));
 
     // 4. Calculate reading streaks per student (consecutive active days)
     // Fetch unique reading dates for these students over the past 60 days
@@ -505,8 +508,9 @@ communityRestRouter.post("/announcements", async (c) => {
       return c.json({ error: err.message }, err.statusCode as any);
     }
     if (err instanceof z.ZodError) {
-      return c.json({ error: "Validation failed", details: err.errors }, 400);
+      return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     }
+
     console.error("[api] /announcements error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
@@ -542,7 +546,7 @@ communityRestRouter.post("/attendance/session", async (c) => {
     return c.json({ success: true, session });
   } catch (err: any) {
     if (err instanceof AuthorizationError) return c.json({ error: err.message }, err.statusCode as any);
-    if (err instanceof z.ZodError) return c.json({ error: "Validation failed", details: err.errors }, 400);
+    if (err instanceof z.ZodError) return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     console.error("[api] /attendance/session error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
@@ -599,7 +603,7 @@ communityRestRouter.post("/attendance/record", async (c) => {
     return c.json({ success: true, sessionId, recordsMarked: recordedCount });
   } catch (err: any) {
     if (err instanceof AuthorizationError) return c.json({ error: err.message }, err.statusCode as any);
-    if (err instanceof z.ZodError) return c.json({ error: "Validation failed", details: err.errors }, 400);
+    if (err instanceof z.ZodError) return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     console.error("[api] /attendance/record error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }
@@ -660,8 +664,8 @@ communityRestRouter.get("/dashboard/reports/weekly", async (c) => {
       ? Math.round(((currentWeekTotalChapters - prevWeekTotalChapters) / prevWeekTotalChapters) * 100)
       : currentWeekTotalChapters > 0 ? 100 : 0;
 
-    const logMap = new Map(currentWeekLogs.map((l) => [l.userId, l]));
-    const activeStudentCount = currentWeekLogs.filter((l) => l.chaptersCount > 0).length;
+    const logMap = new Map<string, any>(currentWeekLogs.map((l: any) => [l.userId, l]));
+    const activeStudentCount = currentWeekLogs.filter((l: any) => (l as any).chaptersCount > 0).length;
     const completionRatePercent = students.length > 0
       ? Math.round((activeStudentCount / students.length) * 100)
       : 0;
@@ -756,7 +760,7 @@ communityRestRouter.post("/teacher/followup", async (c) => {
     return c.json({ success: true, message: "Follow-up processed successfully." });
   } catch (err: any) {
     if (err instanceof AuthorizationError) return c.json({ error: err.message }, err.statusCode as any);
-    if (err instanceof z.ZodError) return c.json({ error: "Validation failed", details: err.errors }, 400);
+    if (err instanceof z.ZodError) return c.json({ error: "Validation failed", details: (err as any).issues || (err as any).errors }, 400);
     console.error("[api] /teacher/followup error:", err);
     return c.json({ error: "Internal server error" }, 500);
   }

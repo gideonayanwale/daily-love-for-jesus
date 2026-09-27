@@ -188,10 +188,15 @@ class BibleService {
       })
     );
 
-    return results
-      .filter((r): r is PromiseFulfilledResult<{ translation: string; text: string; fullName?: string }> => r.status === "fulfilled")
-      .map((r) => r.value);
+    const output: Array<{ translation: string; text: string; fullName?: string }> = [];
+    for (const r of results) {
+      if (r.status === "fulfilled") {
+        output.push(r.value);
+      }
+    }
+    return output;
   }
+
 
   /**
    * Search within a specific translation

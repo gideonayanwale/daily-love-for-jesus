@@ -10,6 +10,7 @@ import { telegramMessages, devotionals } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
 import { communityRestRouter } from "./routes/community";
 import { syncRouter } from "./syncRouter";
+import { env } from "./lib/env";
 
 
 const app = new Hono<{ Bindings: HttpBindings }>();
