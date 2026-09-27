@@ -11,6 +11,8 @@
     "start": "NODE_ENV=production node dist/boot.js",
     "deploy:netlify": "netlify deploy --prod --dir=dist/public",
     "deploy:cloudflare": "wrangler pages deploy dist/public",
+    "deploy:worker": "wrangler deploy",
+    "dev:worker": "wrangler dev",
     "check": "tsc -b",
     "format": "prettier --write .",
     "test": "vitest run",

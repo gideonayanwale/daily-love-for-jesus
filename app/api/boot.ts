@@ -98,7 +98,9 @@ const isServerless =
   Boolean(process.env.VERCEL) ||
   Boolean(process.env.NETLIFY) ||
   Boolean(process.env.CF_PAGES) ||
-  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME);
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  typeof (globalThis as any).WebSocketPair !== "undefined" ||
+  Boolean((globalThis as any).navigator?.userAgent?.includes("Cloudflare-Workers"));
 
 if (env.isProduction && !isServerless) {
   const { serve } = await import("@hono/node-server");

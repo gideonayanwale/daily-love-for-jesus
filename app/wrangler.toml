@@ -1,8 +1,22 @@
 # ==============================================================================
-# Cloudflare Configuration for Daily Love For Jesus (app directory)
+# Cloudflare Workers & Pages Configuration for Daily Love For Jesus (app)
 # ==============================================================================
 
 name = "daily-love-for-jesus"
+main = "worker/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Workers Static Assets (serves frontend at CDN speed with SPA fallback)
+[assets]
+directory = "./dist/public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Cloudflare Pages build directory compatibility
 pages_build_output_dir = "dist/public"
+
+# Default non-secret environment variables
+[vars]
+NODE_ENV = "production"
+APP_ID = "daily-love-app"

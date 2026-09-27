@@ -96,7 +96,7 @@ Where to locate and configure every environment variable used by the application
    - Ensure `nodejs_compat` is added (already configured in `wrangler.toml`).
 7. Click **Save and Deploy**.
 
-### Option B: Cloudflare Wrangler CLI (Direct Deployment)
+### Option B: Cloudflare Pages Deployment (Direct CLI)
 1. Authenticate with Cloudflare:
    ```bash
    npx wrangler login
@@ -108,8 +108,43 @@ Where to locate and configure every environment variable used by the application
 3. Deploy directly to Cloudflare Pages:
    ```bash
    npm run deploy:cloudflare
-   # or with project name:
-   npx wrangler pages deploy app/dist/public --project-name=daily-love-for-jesus
+   # or from app directory:
+   cd app && npm run deploy:cloudflare
+   ```
+
+---
+
+## 5. Deploying to Cloudflare Workers (Modern Unified Edge Worker)
+
+Cloudflare Workers can run the entire SaaS application (both the Hono API and edge static frontend) as a single high-performance Edge Worker using **Cloudflare Workers with Static Assets**.
+
+### Worker Architecture Files:
+- [`app/worker/index.ts`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/app/worker/index.ts): Main Worker entrypoint that dispatches `/api/*` to Hono and serves static assets with automatic SPA fallback.
+- [`wrangler.toml`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/wrangler.toml) / [`app/wrangler.toml`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/app/wrangler.toml): Configures `main = "worker/index.ts"`, `[assets]` binding, and `compatibility_flags = ["nodejs_compat"]`.
+
+### Deployment Steps:
+1. Build frontend and server assets:
+   ```bash
+   npm run build
+   ```
+2. Deploy the Worker to Cloudflare:
+   ```bash
+   npm run deploy:worker
+   # or directly:
+   npx wrangler deploy
+   ```
+3. Upload production secrets to Cloudflare Workers:
+   ```bash
+   npx wrangler secret put SUPABASE_URL
+   npx wrangler secret put SUPABASE_ANON_KEY
+   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+   npx wrangler secret put NEON_DATABASE_URL
+   npx wrangler secret put DATABASE_URL
+   npx wrangler secret put APP_SECRET
+   ```
+4. Local testing with Wrangler:
+   ```bash
+   npm run dev:worker
    ```
 
 ---

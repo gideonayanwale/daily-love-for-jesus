@@ -1,8 +1,22 @@
 # ==============================================================================
-# Cloudflare Configuration (Root Workspace Level)
+# Cloudflare Workers & Pages Configuration (Root Workspace Level)
 # ==============================================================================
 
 name = "daily-love-for-jesus"
+main = "app/worker/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare Workers Static Assets (serves frontend at CDN speed with SPA fallback)
+[assets]
+directory = "./app/dist/public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Cloudflare Pages build directory compatibility
 pages_build_output_dir = "app/dist/public"
+
+# Default non-secret environment variables
+[vars]
+NODE_ENV = "production"
+APP_ID = "daily-love-app"
