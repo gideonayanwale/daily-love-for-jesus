@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import GlassCard from '../components/GlassCard';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { mobileSupabase } from '../lib/supabase';
@@ -10,6 +11,8 @@ export function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const navigation = useNavigation<any>();
 
   const handleAuth = async () => {
     if (!email || !password) {
@@ -25,13 +28,14 @@ export function AuthScreen() {
           Alert.alert('Sign Up Failed', res.error.message);
         } else {
           Alert.alert('Success', 'Account created! Welcome to Daily Love For Jesus.');
+          navigation.replace('Home');
         }
       } else {
         const res = await mobileSupabase.signIn(email.trim(), password);
         if (res.error) {
           Alert.alert('Login Failed', res.error.message);
         } else {
-          Alert.alert('Success', 'Welcome back!');
+          navigation.replace('Home');
         }
       }
     } catch (e: any) {
@@ -111,11 +115,21 @@ export function AuthScreen() {
           {loading ? (
             <ActivityIndicator size="small" color="#f59e0b" className="py-3" />
           ) : (
-            <PrimaryButton
-              title={isSignUp ? 'Create Account' : 'Sign In'}
-              onPress={handleAuth}
-              className="w-full bg-amber-500"
-            />
+            <>
+              <PrimaryButton
+                title={isSignUp ? 'Create Account' : 'Sign In'}
+                onPress={handleAuth}
+                className="w-full bg-amber-500"
+              />
+              <TouchableOpacity
+                onPress={() => navigation.replace('Home')}
+                className="mt-3 py-2 items-center"
+              >
+                <Text className="text-xs text-amber-400 font-semibold underline">
+                  Continue as Guest
+                </Text>
+              </TouchableOpacity>
+            </>
           )}
         </GlassCard>
       </View>

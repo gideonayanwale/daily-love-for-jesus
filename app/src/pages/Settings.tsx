@@ -95,17 +95,17 @@ export default function Settings() {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-5">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <header>
-        <h1 className="text-2xl font-bold text-gray-800">Settings</h1>
-        <p className="text-gray-500 text-sm">
-          Manage your preferences
+      <div className="pb-2 border-b border-zinc-200 dark:border-zinc-800">
+        <h1 className="text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">Settings & Sync</h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+          Manage your account, offline preferences, and database synchronization
         </p>
-      </header>
+      </div>
 
       {/* User Profile */}
-      <section className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <section className="bg-white dark:bg-[#0c0c0f] rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xs">
         {isAuthenticated && user ? (
           <div className="p-4 flex items-center gap-3">
             <div className="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">

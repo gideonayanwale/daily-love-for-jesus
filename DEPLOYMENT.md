@@ -1,24 +1,30 @@
-# Deployment Guide: Cloudflare Pages & Netlify
+# Deployment & Architecture Guide: NestJS Backend & Vite SPA
 **Project:** Daily Love For Jesus  
 **Role:** Full-Stack System Engineer Guide  
-**Architecture:** React 19 + Vite 7 SPA Frontend, Hono Backend API, Drizzle ORM (Neon / Supabase PostgreSQL)
+**Architecture:** React 19 + Vite 7 SPA Frontend, NestJS Modular Enterprise Backend API, Drizzle ORM (Neon / Supabase PostgreSQL), tRPC & Swagger OpenAPI
 
 ---
 
 ## 1. Economical SaaS Architecture Overview
 
-For maximum cost efficiency and global edge performance:
-- **Cloudflare Pages:** Delivers worldwide edge CDN distribution for static assets (`dist/public`), unlimited bandwidth on the free tier, free automatic SSL, and zero cold-start delivery.
-- **Netlify:** Provides seamless Git-based CI/CD with automatic PR preview deploys, instant CDN distribution, and integrated Netlify Functions (v2) for Hono serverless endpoints.
+For maximum cost efficiency, reliability, and enterprise modularity:
+- **NestJS Modular Backend (`backend/`):** Runs on port 4000. Provides structured modules for Auth, Bible, Hymns, Devotionals, Community, Telegram, Favorites, and Database Sync. Includes Swagger interactive OpenAPI docs at `/api/docs` and backward-compatible tRPC endpoint at `/api/trpc`.
+- **Vite SPA Frontend (`app/`):** React 19 + Tailwind CSS + Lucide icons. Runs on port 3000 in development, with built-in proxy forwarding `/api` requests to NestJS.
 - **Data Layer:** Neon Serverless PostgreSQL (primary fast cold-start queries) and Supabase (Auth source-of-truth, storage, and fallback).
+- **Static Edge Delivery:** Cloudflare Pages / Netlify hosting for static assets (`dist/public`), unlimited bandwidth on the free tier, free automatic SSL, and zero cold-start delivery.
 
-Both platforms run on **\$0/month free-tier quotas**, keeping your SaaS operational costs completely lean.
+Both platforms run on **$0/month free-tier quotas**, keeping your SaaS operational costs completely lean.
 
 ---
 
-## 2. Environment Variables & Secrets Reference
+## 2. Environment Files & Secrets Reference
 
-Where to locate and configure every environment variable used by the application:
+### Environment File Locations:
+- **Backend Configuration:** `backend/.env` (and template at `backend/.env.example`)
+- **Frontend Configuration:** `app/.env` (and template at `app/.env.example`)
+- **Mobile Expo App:** `mobile/.env` (and template at `mobile/.env.example`)
+
+### Variable Reference & Where to Find Secrets:
 
 | Variable Name | Required By | Description | Where to Find / Generate |
 | :--- | :--- | :--- | :--- |

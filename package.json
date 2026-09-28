@@ -17,16 +17,20 @@
   "license": "ISC",
   "author": "Gideon Inioluwa Ayanwale",
   "type": "commonjs",
-  "main": "index.js",
   "scripts": {
-    "build": "npm --prefix app run build",
-    "dev": "npm --prefix app run dev",
-    "start": "npm --prefix app run start",
+    "build": "npm --prefix backend run build && npm --prefix app run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix app run build",
+    "dev:backend": "npm --prefix backend run start:dev",
+    "dev:frontend": "npm --prefix app run dev",
+    "dev": "npm --prefix backend run start:dev",
+    "start": "npm --prefix backend run start:prod",
+    "start:backend": "npm --prefix backend run start:prod",
     "deploy:netlify": "npx netlify deploy --prod --dir=app/dist/public",
     "deploy:cloudflare": "npx wrangler pages deploy app/dist/public",
     "deploy:worker": "npx wrangler deploy",
     "dev:worker": "npx wrangler dev",
-    "test": "npm --prefix app run test"
+    "test": "npm --prefix backend run test"
   },
   "dependencies": {
     "date-fns": "^4.1.0"

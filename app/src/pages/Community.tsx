@@ -293,16 +293,16 @@ export default function Community() {
   }
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-5xl mx-auto space-y-6">
       {/* Page Title */}
-      <div className="flex items-center justify-between">
+      <div className="pb-2 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Users className="w-6 h-6 text-amber-600" />
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50 flex items-center gap-2.5">
+            <Users className="w-7 h-7 text-amber-500" />
             Community & Sunday School
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Bible reading tracking, discipleship & announcements
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Bible reading tracking, teacher roster, attendance & fellowship announcements
           </p>
         </div>
       </div>

@@ -354,26 +354,26 @@ export default function BibleReader() {
   };
 
   return (
-    <div className="max-w-xl mx-auto pb-16">
+    <div className="max-w-4xl mx-auto pb-16">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-xl border-b border-gray-100/80 px-4 py-2.5 shadow-sm">
+      <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#0c0c0f]/95 backdrop-blur-xl border-b border-zinc-200 dark:border-zinc-800 px-4 py-2.5 shadow-xs transition-colors">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               onClick={() => navigate(`/bible/${bNum}`)}
-              className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 transition-colors text-gray-700"
+              className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-zinc-700 dark:text-zinc-300"
               title="Back to chapters"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div>
               <div className="flex items-center gap-1.5">
-                <h1 className="font-bold text-gray-800 text-sm leading-tight">
+                <h1 className="font-bold text-zinc-900 dark:text-zinc-50 text-sm leading-tight">
                   {book?.name ?? "Bible"}
                 </h1>
-                <span className="text-gray-400 text-xs">Ch. {chNum}</span>
+                <span className="text-zinc-400 dark:text-zinc-500 text-xs">Ch. {chNum}</span>
               </div>
-              <p className="text-[10px] text-amber-600 font-medium tracking-wide">
+              <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold tracking-wide">
                 {translation} Translation
               </p>
             </div>

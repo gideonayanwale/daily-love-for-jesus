@@ -10,9 +10,19 @@ export interface MobileAuthResponse {
   error: { message: string } | null;
 }
 
-// Configurable endpoint - replace with your Supabase URL
-const SUPABASE_URL = "https://your-project-ref.supabase.co";
-const SUPABASE_ANON_KEY = "your_supabase_anon_key_here";
+// Read credentials from environment (.env)
+const SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
+
+let currentToken: string | null = null;
+
+export function getMobileAuthToken(): string | null {
+  return currentToken;
+}
+
+export function setMobileAuthToken(token: string | null) {
+  currentToken = token;
+}
 
 export const mobileSupabase = {
   signIn: async (email: string, password: string): Promise<MobileAuthResponse> => {
@@ -32,6 +42,10 @@ export const mobileSupabase = {
           data: { user: null, session: null },
           error: { message: data.error_description || data.msg || "Login failed" },
         };
+      }
+
+      if (data.access_token) {
+        setMobileAuthToken(data.access_token);
       }
 
       return {
@@ -67,6 +81,10 @@ export const mobileSupabase = {
           data: { user: null, session: null },
           error: { message: data.msg || data.message || "Registration failed" },
         };
+      }
+
+      if (data.access_token) {
+        setMobileAuthToken(data.access_token);
       }
 
       return {

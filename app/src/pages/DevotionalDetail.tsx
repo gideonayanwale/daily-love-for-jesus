@@ -1,183 +1,205 @@
-import { useParams, useNavigate } from 'react-router'
-import { trpc } from '@/providers/trpc'
+import { useParams, useNavigate } from 'react-router';
+import { trpc } from '@/providers/trpc';
 import {
   ArrowLeft,
   Heart,
   Share2,
   BookOpen,
   MessageCircle,
-} from 'lucide-react'
-import { format } from 'date-fns'
+  Calendar,
+  Check,
+  Bookmark,
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { useState } from 'react';
 
 export default function DevotionalDetail() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
 
   const { data: devotional, isLoading } =
     trpc.devotional.byId.useQuery({
       id: parseInt(id ?? '1'),
-    })
+    });
 
   const handleShare = () => {
-    if (!devotional) return
-    const text = `${devotional.title}\n\n${devotional.body.substring(0, 300)}...`
+    if (!devotional) return;
+    const text = `${devotional.title}\n\n${devotional.body.substring(0, 300)}...`;
 
     if (navigator.share) {
-      navigator.share({ title: devotional.title, text })
+      navigator.share({ title: devotional.title, text, url: window.location.href });
     } else {
-      navigator.clipboard.writeText(text)
+      navigator.clipboard.writeText(`${text}\n\nRead more at ${window.location.href}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
-  }
+  };
 
   if (isLoading) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-6 animate-pulse space-y-4">
-        <div className="h-6 bg-gray-200 rounded w-2/3" />
-        <div className="h-4 bg-gray-200 rounded w-1/2" />
-        <div className="h-24 bg-gray-100 rounded-xl" />
+      <div className="max-w-3xl mx-auto py-8 animate-pulse space-y-4">
+        <div className="h-6 bg-zinc-200 dark:bg-zinc-800 rounded w-1/4" />
+        <div className="h-10 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4" />
+        <div className="h-32 bg-zinc-200 dark:bg-zinc-800 rounded-2xl" />
+        <div className="h-48 bg-zinc-200 dark:bg-zinc-800 rounded-2xl" />
       </div>
-    )
+    );
   }
 
   if (!devotional) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-6 text-center">
-        <p className="text-gray-500">Devotional not found</p>
+      <div className="max-w-3xl mx-auto py-16 text-center space-y-4">
+        <Heart className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto" />
+        <h2 className="text-xl font-bold text-zinc-800 dark:text-zinc-200">
+          Devotional not found
+        </h2>
+        <p className="text-sm text-zinc-400">
+          The devotional you are looking for may have been archived or removed.
+        </p>
+        <button
+          onClick={() => navigate('/devotionals')}
+          className="px-4 py-2 rounded-xl bg-amber-500 text-slate-950 font-semibold text-xs"
+        >
+          Return to Devotionals
+        </button>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="max-w-lg mx-auto">
-      {/* Header */}
-      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/devotionals')}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4 text-gray-600" />
-            </button>
-            <div>
-              <h1 className="font-bold text-gray-800 text-sm leading-tight">
-                Devotional
-              </h1>
-              <p className="text-gray-400 text-xs">
-                {format(
-                  new Date(devotional.devotionalDate),
-                  'MMMM d, yyyy'
-                )}
-              </p>
-            </div>
-          </div>
+    <div className="max-w-3xl mx-auto space-y-6">
+      {/* ── Top Navigation Bar ──────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between pb-3 border-b border-zinc-200 dark:border-zinc-800">
+        <button
+          onClick={() => navigate('/devotionals')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-xs font-semibold transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>All Devotionals</span>
+        </button>
+
+        <div className="flex items-center gap-2">
           <button
             onClick={handleShare}
-            className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-xs font-medium transition-colors"
           >
-            <Share2 className="w-4 h-4 text-gray-500" />
+            {copied ? (
+              <>
+                <Check className="w-4 h-4 text-emerald-500" />
+                <span>Link Copied</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-4 h-4 text-zinc-500" />
+                <span>Share</span>
+              </>
+            )}
           </button>
         </div>
-      </header>
+      </div>
 
-      {/* Content */}
-      <article className="px-4 py-6 space-y-5">
-        {/* Title */}
-        <div className="flex items-start gap-3">
-          <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-            <Heart className="w-6 h-6 text-amber-500" />
+      {/* ── Main Article Card ────────────────────────────────────────────────── */}
+      <article className="bg-white dark:bg-[#0c0c0f] border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-10 shadow-sm space-y-6">
+        
+        {/* Date and Author Tag */}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400">
+            <Calendar className="w-3.5 h-3.5" />
+            <span>
+              {format(
+                new Date(devotional.devotionalDate || new Date()),
+                'EEEE, MMMM d, yyyy'
+              )}
+            </span>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 leading-tight">
-              {devotional.title}
-            </h2>
-            {devotional.author && (
-              <p className="text-gray-500 text-sm mt-0.5">
-                By {devotional.author}
-              </p>
-            )}
-          </div>
+          {devotional.author && (
+            <>
+              <span>&bull;</span>
+              <span>Minister: {devotional.author}</span>
+            </>
+          )}
         </div>
 
-        {/* Scripture */}
+        {/* Title */}
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-950 dark:text-zinc-50 leading-tight">
+          {devotional.title}
+        </h1>
+
+        {/* Scripture Box */}
         {devotional.scripture && (
-          <div className="bg-blue-50 rounded-xl p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-blue-500" />
-              <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">
-                Scripture
+          <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <BookOpen className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Scripture Reading
               </span>
             </div>
-            <p className="text-blue-800 font-semibold text-sm">
+            <p className="text-base font-bold text-zinc-900 dark:text-zinc-100">
               {devotional.scripture}
             </p>
             {devotional.scriptureText && (
-              <blockquote className="text-blue-700 text-sm leading-relaxed italic border-l-2 border-blue-300 pl-3">
-                {devotional.scriptureText}
+              <blockquote className="text-sm leading-relaxed italic text-zinc-800 dark:text-zinc-200 border-l-2 border-amber-500/50 pl-3 font-serif">
+                &ldquo;{devotional.scriptureText}&rdquo;
               </blockquote>
             )}
           </div>
         )}
 
-        {/* Body */}
-        <div className="prose prose-sm max-w-none">
-          {devotional.body.split('\n').map((paragraph, i) => (
-            <p key={i} className="text-gray-700 leading-relaxed mb-3">
-              {paragraph}
+        {/* Body Paragraphs */}
+        <div className="space-y-4 text-base leading-relaxed text-zinc-800 dark:text-zinc-200 font-normal">
+          {devotional.body.split('\n\n').map((para, i) => (
+            <p key={i} className="leading-relaxed">
+              {para}
             </p>
           ))}
         </div>
 
         {/* Reflection */}
         {devotional.reflection && (
-          <div className="bg-purple-50 rounded-xl p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <MessageCircle className="w-4 h-4 text-purple-500" />
-              <span className="text-xs font-bold text-purple-700 uppercase tracking-wider">
-                Reflection
+          <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+              <MessageCircle className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Spiritual Reflection
               </span>
             </div>
-            <p className="text-purple-800 text-sm leading-relaxed">
+            <p className="text-sm italic leading-relaxed text-zinc-700 dark:text-zinc-300 font-serif">
               {devotional.reflection}
             </p>
           </div>
         )}
 
-        {/* Prayer */}
+        {/* Prayer Box */}
         {devotional.prayer && (
-          <div className="bg-amber-50 rounded-xl p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <Heart className="w-4 h-4 text-amber-500" />
-              <span className="text-xs font-bold text-amber-700 uppercase tracking-wider">
-                Prayer
+          <div className="bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Heart className="w-4 h-4 fill-current" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Prayer of Faith
               </span>
             </div>
-            <p className="text-amber-800 text-sm leading-relaxed italic">
+            <p className="text-sm italic leading-relaxed text-zinc-900 dark:text-zinc-100 font-serif">
               {devotional.prayer}
             </p>
           </div>
         )}
 
-        {/* Source */}
-        {devotional.source && (
-          <div className="pt-4 border-t border-gray-100">
-            <span
-              className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${
-                devotional.source === 'telegram'
-                  ? 'bg-blue-50 text-blue-600'
-                  : devotional.source === 'manual'
-                    ? 'bg-gray-100 text-gray-600'
-                    : 'bg-purple-50 text-purple-600'
-              }`}
-            >
-              Source: {devotional.source}
-            </span>
-          </div>
-        )}
+        {/* Footer actions */}
+        <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <button
+            onClick={() => navigate('/bible')}
+            className="text-xs text-amber-600 dark:text-amber-400 font-bold hover:underline inline-flex items-center gap-1"
+          >
+            <span>Open Bible for Study</span>
+            <span>&rarr;</span>
+          </button>
 
-        {/* Bottom spacing */}
-        <div className="h-8" />
+          <span className="text-[11px] text-zinc-400">
+            LFCI Daily Devotional Series
+          </span>
+        </div>
       </article>
     </div>
-  )
+  );
 }

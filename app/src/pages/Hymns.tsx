@@ -1,13 +1,12 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router'
-import { trpc } from '@/providers/trpc'
-import { Search, Music, SlidersHorizontal } from 'lucide-react'
+import { useState } from 'react';
+import { useNavigate } from 'react-router';
+import { trpc } from '@/providers/trpc';
+import { Search, Music, SlidersHorizontal, ArrowRight, BookOpen } from 'lucide-react';
 
 export default function Hymns() {
-  const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [showFilters, setShowFilters] = useState(false)
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const { data: hymns, isLoading } = trpc.hymns.list.useQuery(
     search
@@ -15,67 +14,61 @@ export default function Hymns() {
       : selectedCategory
         ? { category: selectedCategory }
         : {}
-  )
+  );
 
-  const { data: categories } = trpc.hymns.categories.useQuery()
+  const { data: categories } = trpc.hymns.categories.useQuery();
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-      {/* Header */}
-      <header>
-        <h1 className="text-2xl font-bold text-gray-800">Baptist Hymnal</h1>
-        <p className="text-gray-500 text-sm">101 Classic Hymns</p>
-      </header>
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 pb-2 border-b border-zinc-200 dark:border-zinc-800">
+        <div>
+          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs font-bold uppercase tracking-wider mb-1">
+            <Music className="w-3.5 h-3.5" />
+            <span>Sacred Hymnody</span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-zinc-50">
+            Baptist Hymnal
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Classic and inspired hymns of praise, faith, devotion, and adoration
+          </p>
+        </div>
 
-      {/* Search */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        {/* Search input */}
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search hymns or authors..."
-            className="w-full pl-10 pr-4 py-2.5 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent"
+            placeholder="Search by title, number, or lyrics..."
+            className="w-full pl-10 pr-4 py-2 bg-white dark:bg-[#0c0c0f] border border-zinc-200 dark:border-zinc-800 rounded-xl text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
           />
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`w-10 h-10 flex items-center justify-center rounded-xl border transition-colors ${
-            showFilters || selectedCategory
-              ? 'bg-purple-500 border-purple-500 text-white'
-              : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'
-          }`}
-        >
-          <SlidersHorizontal className="w-4 h-4" />
-        </button>
       </div>
 
-      {/* Category Filters */}
-      {showFilters && categories && (
-        <div className="flex flex-wrap gap-1.5">
+      {/* ── Category Filter Pills ───────────────────────────────────────────── */}
+      {categories && categories.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
           <button
-            onClick={() => setSelectedCategory('')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            onClick={() => setSelectedCategory(null)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               !selectedCategory
-                ? 'bg-purple-500 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'bg-white dark:bg-[#0c0c0f] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900'
             }`}
           >
-            All
+            All Hymns ({hymns?.length ?? 101})
           </button>
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() =>
-                setSelectedCategory(
-                  selectedCategory === cat ? null : cat
-                )
-              }
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              onClick={() => setSelectedCategory(selectedCategory === cat ? null : cat)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 selectedCategory === cat
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-amber-500 text-slate-950 shadow-sm'
+                  : 'bg-white dark:bg-[#0c0c0f] border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900'
               }`}
             >
               {cat}
@@ -84,51 +77,68 @@ export default function Hymns() {
         </div>
       )}
 
-      {/* Hymns List */}
+      {/* ── Hymns Grid ──────────────────────────────────────────────────────── */}
       {isLoading ? (
-        <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="h-16 bg-white rounded-xl animate-pulse border border-gray-100"
+              className="h-24 bg-white dark:bg-[#0c0c0f] rounded-2xl animate-pulse border border-zinc-200 dark:border-zinc-800"
             />
           ))}
         </div>
-      ) : (
-        <div className="space-y-1.5">
-          {hymns?.map((hymn) => (
-            <button
+      ) : hymns && hymns.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {hymns.map((hymn) => (
+            <div
               key={hymn.id}
               onClick={() => navigate(`/hymns/${hymn.id}`)}
-              className="w-full flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 hover:border-purple-200 hover:shadow-sm transition-all text-left"
+              className="bg-white dark:bg-[#0c0c0f] border border-zinc-200 dark:border-zinc-800 hover:border-amber-400 dark:hover:border-amber-600 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
             >
-              <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Music className="w-4 h-4 text-purple-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-800 text-sm truncate">
+              <div>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold text-xs flex items-center justify-center">
+                      #{hymn.hymnNumber}
+                    </span>
+                    {hymn.category && (
+                      <span className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-[10px] font-semibold">
+                        {hymn.category}
+                      </span>
+                    )}
+                  </div>
+
+                  <ArrowRight className="w-4 h-4 text-zinc-400 group-hover:text-amber-500 group-hover:translate-x-0.5 transition-all" />
+                </div>
+
+                <h3 className="font-bold text-zinc-950 dark:text-zinc-50 text-base leading-snug group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
                   {hymn.title}
                 </h3>
-                <p className="text-gray-400 text-xs truncate">
-                  {hymn.author && `by ${hymn.author}`}
-                  {hymn.author && hymn.category && ' \u00B7 '}
-                  {hymn.category}
+
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 line-clamp-2 mt-1.5 font-serif italic">
+                  {hymn.lyrics.substring(0, 140)}...
                 </p>
               </div>
-              <span className="text-xs text-purple-400 font-mono flex-shrink-0">
-                #{hymn.hymnNumber}
-              </span>
-            </button>
+
+              {hymn.author && (
+                <div className="pt-3 mt-3 border-t border-zinc-100 dark:border-zinc-800/80 text-[11px] text-zinc-400">
+                  Author: {hymn.author}
+                </div>
+              )}
+            </div>
           ))}
         </div>
-      )}
-
-      {hymns?.length === 0 && (
-        <div className="text-center py-12">
-          <Music className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-          <p className="text-gray-500 text-sm">No hymns found</p>
+      ) : (
+        <div className="bg-white dark:bg-[#0c0c0f] rounded-2xl border border-zinc-200 dark:border-zinc-800 p-10 text-center space-y-2">
+          <Music className="w-10 h-10 text-zinc-300 dark:text-zinc-700 mx-auto" />
+          <h4 className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+            No hymns matched your query
+          </h4>
+          <p className="text-xs text-zinc-400">
+            Try adjusting your search terms or selecting a different category filter.
+          </p>
         </div>
       )}
     </div>
-  )
+  );
 }
