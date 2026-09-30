@@ -15,6 +15,7 @@ Templates available:
 - [`.env.example`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/.env.example) (Root template)
 - [`backend/.env.example`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/backend/.env.example) (Backend template)
 - [`app/.env.example`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/app/.env.example) (Frontend template)
+- [`mobile/.env.example`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/mobile/.env.example) (React Native / Expo template)
 
 ---
 
@@ -37,10 +38,13 @@ Templates available:
 | `API_BIBLE_KEY` | Backend | Optional | [American Bible Society API.Bible](https://scripture.api.bible/signup). Default Bible engine uses Bolls Life API (completely free, 50+ translations, 0 keys needed). |
 | `TELEGRAM_BOT_TOKEN` | Backend | Optional | Generated via [@BotFather](https://t.me/BotFather) on Telegram for automated channel message ingestion. |
 | `TELEGRAM_CHANNEL_ID` | Backend | Optional | The Telegram channel ID (e.g. `@dailyloveforjesus` or `-100xxxxxx`) from which devotionals are ingested. |
+| `EXPO_PUBLIC_API_URL` | Mobile App | Optional (Default: `http://localhost:4000`) | Base API URL pointing to the NestJS backend. (Use `http://10.0.2.2:4000` for Android emulator or LAN IP `http://192.168.x.x:4000` for physical devices). |
+| `EXPO_PUBLIC_SUPABASE_URL` | Mobile App | Required for Mobile Auth | Public URL of your Supabase project. |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Mobile App | Required for Mobile Auth | Public anon key for mobile auth client. |
 
 ---
 
 ## 🛡️ Security Best Practices
 
-1. **Client-side isolation**: Only keys prefixed with `VITE_` are bundled into frontend code. Never prefix `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, or database connection strings with `VITE_`.
+1. **Client-side isolation**: Only keys prefixed with `VITE_` or `EXPO_PUBLIC_` are bundled into frontend or mobile client builds. Never prefix `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, or database connection strings with client prefixes.
 2. **Local Fallback Mode**: If Supabase or Neon credentials are not yet configured in development, the NestJS backend automatically defaults to a mock admin user (`Developer Mode`) and a resilient dev stub proxy, allowing you to develop and test UI features offline.
