@@ -2,7 +2,8 @@ import { createTRPCReact } from "@trpc/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import superjson from "superjson";
-import type { AppRouter } from "../../../backend/src/modules/trpc/trpc.router";
+import type { AppRouter } from "@/types/trpc-router";
+export type { AppRouter };
 import type { ReactNode } from "react";
 import { getSupabaseAccessToken } from "@/lib/supabase";
 

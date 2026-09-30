@@ -40,3 +40,12 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+
+# Temporary scratch files & internal draft documentation
+app/ACTION_PLAN.md
+app/VALIDATION.md
+app/info.md
+app/ARCHITECTURE.md
+app/docs/
+*.tmp
+*.bak

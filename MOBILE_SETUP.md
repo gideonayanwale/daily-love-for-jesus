@@ -1,297 +1,122 @@
-# Mobile Setup Addendum - Integration with Web Backend
+# Mobile Setup & Integration Guide: Daily Love For Jesus 📱
 
-**Purpose**: Bridge mobile and web apps with shared authentication, types, and API client
+> **Guide for configuring, running, and deploying the React Native / Expo SDK 52 mobile application with the NestJS modular backend.**
 
 ---
 
-## 1. Shared Types Setup
+## 1. 🏗️ Architecture & Connectivity
 
-Create `shared/types.ts` in project root (parallel to `app/` and `mobile/`):
+The mobile application is a cross-platform client (iOS & Android) that connects directly to the NestJS backend API:
 
-```typescript
-// shared/types.ts
-
-export interface User {
-  id: string
-  email: string
-  name: string
-  createdAt: Date
-}
-
-export interface BibleVerse {
-  id: string
-  book: string
-  chapter: number
-  verse: number
-  text: string
-  version: string
-}
-
-export interface Hymn {
-  id: string
-  title: string
-  lyrics: string
-  author: string
-  year: number
-}
-
-export interface Devotional {
-  id: string
-  title: string
-  content: string
-  scripture: string
-  date: Date
-  author: string
-}
-
-export interface APIResponse<T> {
-  data?: T
-  error?: string
-  status: number
-}
+```
+┌──────────────────────────────────────────────┐
+│       Expo SDK 52 / React Native App         │
+│  - HomeScreen (Today Devotional + Scripture) │
+│  - DevotionalsScreen (Reader & Archive)      │
+│  - HymnsScreen (Lyrics Directory)            │
+│  - BibleScreen (Scripture Navigation)        │
+│  - AuthScreen (Supabase Authentication)      │
+└──────────────────────┬───────────────────────┘
+                       │
+       REST / OpenAPI  │  (EXPO_PUBLIC_API_URL)
+                       ▼
+┌──────────────────────────────────────────────┐
+│           NestJS Enterprise Backend          │
+│            Listening on Port 4000            │
+└──────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Shared API Client
+## 2. 🔑 Environment Configuration
 
-Create `shared/api-client.ts`:
-
-```typescript
-// shared/api-client.ts
-
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api'
-
-export class APIClient {
-  private token: string | null = null
-
-  setToken(token: string) {
-    this.token = token
-  }
-
-  private async request<T>(
-    endpoint: string,
-    options?: RequestInit
-  ): Promise<T> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    }
-
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
-
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      ...options,
-      headers,
-    })
-
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.statusText}`)
-    }
-
-    return response.json()
-  }
-
-  // Auth
-  async login(email: string, password: string) {
-    return this.request('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    })
-  }
-
-  async register(email: string, password: string, name: string) {
-    return this.request('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, name }),
-    })
-  }
-
-  // Bible
-  async getBibleBooks() {
-    return this.request('/bible/books')
-  }
-
-  async getBibleChapter(bookId: number, chapterNumber: number) {
-    return this.request(`/bible/books/${bookId}/chapters/${chapterNumber}`)
-  }
-
-  // Hymns
-  async getHymns(limit = 50, offset = 0) {
-    return this.request(`/hymns?limit=${limit}&offset=${offset}`)
-  }
-
-  async getHymn(id: string) {
-    return this.request(`/hymns/${id}`)
-  }
-
-  // Devotionals
-  async getDevotionals(limit = 50, offset = 0) {
-    return this.request(`/devotionals?limit=${limit}&offset=${offset}`)
-  }
-
-  async getDevotional(id: string) {
-    return this.request(`/devotionals/${id}`)
-  }
-}
-
-export const apiClient = new APIClient()
-```
-
----
-
-## 3. Update Mobile App.tsx
-
-Update `mobile/App.tsx` to connect to API:
-
-```typescript
-import React, { useEffect, useState } from 'react'
-import { StatusBar } from 'expo-status-bar'
-import { SafeAreaView, Text, View, ScrollView } from 'react-native'
-import { apiClient } from '../shared/api-client'
-import GlassCard from './src/components/GlassCard'
-
-export default function App() {
-  const [devotional, setDevotional] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadDevotional = async () => {
-      try {
-        const data = await apiClient.getDevotionals(1)
-        if (data.devotionals && data.devotionals.length > 0) {
-          setDevotional(data.devotionals[0])
-        }
-      } catch (error) {
-        console.error('Failed to load devotional:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    loadDevotional()
-  }, [])
-
-  return (
-    <SafeAreaView className="flex-1 bg-slate-900">
-      <ScrollView className="flex-1 p-4">
-        <Text className="text-3xl font-bold text-white mb-4 text-center">
-          Daily Love For Jesus
-        </Text>
-
-        {loading ? (
-          <Text className="text-white text-center">Loading...</Text>
-        ) : devotional ? (
-          <GlassCard title={devotional.title}>
-            <Text className="text-white/90 mb-3">{devotional.content}</Text>
-            <Text className="text-amber-300 italic">{devotional.scripture}</Text>
-          </GlassCard>
-        ) : (
-          <Text className="text-white/60 text-center">No devotional found</Text>
-        )}
-
-        <Text className="text-white/60 text-center mt-8 text-xs">
-          Powered by ForLove Media
-        </Text>
-      </ScrollView>
-
-      <StatusBar style="auto" />
-    </SafeAreaView>
-  )
-}
-```
-
----
-
-## 4. Update Web App to Use Shared Types
-
-In `app/src/App.tsx`, import shared types:
-
-```typescript
-import type { Devotional, BibleVerse, Hymn } from '../../../shared/types'
-```
-
----
-
-## 5. Environment Variables for Mobile
-
-Create `mobile/.env`:
+Create `mobile/.env` (using [`mobile/.env.example`](mobile/.env.example)):
 
 ```env
-REACT_APP_API_URL=http://localhost:3000/api
+# Base API URL pointing to the NestJS backend
+# For local Android emulator: http://10.0.2.2:4000
+# For local iOS simulator: http://localhost:4000
+# For production: https://your-backend.railway.app
+EXPO_PUBLIC_API_URL=http://localhost:4000
+
+# Supabase Auth Integration
+EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-For production (when deployed):
-
-```env
-REACT_APP_API_URL=https://your-backend.vercel.app/api
-```
+> [!NOTE]
+> All mobile environment variables are prefixed with `EXPO_PUBLIC_` so they are available inside the Expo runtime bundle without secret leakage.
 
 ---
 
-## 6. Setup Instructions
+## 3. 🚀 Running Locally
 
-### For Development
-
+### Step 1: Install Dependencies
+From the project root:
 ```bash
-# 1. Navigate to mobile folder
+npm run install:mobile
+```
+Or inside `mobile/`:
+```bash
 cd mobile
+npm install --legacy-peer-deps
+```
 
-# 2. Install dependencies
-npm install
+### Step 2: Ensure NestJS Backend Is Running
+In a separate terminal:
+```bash
+npm run dev:backend
+```
+Confirm the backend is alive by checking `http://localhost:4000/api/sync/health`.
 
-# 3. Install NativeWind & Tailwind
-npm install nativewind tailwindcss postcss autoprefixer
-
-# 4. Initialize Tailwind config (if not done)
-npx tailwindcss init -p
-
-# 5. Create .env file (optional, uses default if not present)
-echo 'REACT_APP_API_URL=http://localhost:3000/api' > .env
-
-# 6. Ensure web backend is running
-# In another terminal: cd app && npm run dev
-
-# 7. Start Expo
+### Step 3: Start Expo Development Server
+```bash
+cd mobile
 npm run start
 ```
 
-### For Production
-
-```bash
-# Update .env with production backend URL
-echo 'REACT_APP_API_URL=https://your-backend.vercel.app/api' > .env
-
-# Build and deploy
-eas build --platform all
-eas submit --platform all
-```
+- **Android Emulator**: Press `a` (automatic fallback mapping `http://10.0.2.2:4000`).
+- **iOS Simulator**: Press `i` (connects to `http://localhost:4000`).
+- **Web Browser**: Press `w`.
+- **Physical Device**: Scan the terminal QR code using the **Expo Go** app (ensure phone and computer are on the same Wi-Fi, and set `EXPO_PUBLIC_API_URL` to your computer's local IP address like `http://192.168.1.50:4000`).
 
 ---
 
-## 7. Verification Checklist
+## 4. 📦 Production Builds (EAS Build)
 
-- [ ] Mobile app starts without errors
-- [ ] Can fetch devotionals from backend
-- [ ] Glassmorphism styling displays correctly
-- [ ] "Daily Love For Jesus" title shows
-- [ ] "Powered by ForLove Media" footer shows
-- [ ] Tailwind classes applied correctly
+1. **Install EAS CLI**:
+   ```bash
+   npm install -g eas-cli
+   eas login
+   ```
+
+2. **Configure Project**:
+   ```bash
+   cd mobile
+   eas build:configure
+   ```
+
+3. **Build Android Release**:
+   ```bash
+   # Standalone installable APK:
+   eas build --platform android --profile preview
+
+   # Production Google Play App Bundle (AAB):
+   eas build --platform android --profile production
+   ```
+
+4. **Build iOS Release**:
+   ```bash
+   eas build --platform ios --profile production
+   ```
 
 ---
 
-## Next Steps
+## 5. 🩺 Verification Checklist
 
-1. ✅ Mobile scaffold created
-2. ✅ NativeWind + Tailwind configured
-3. ✅ GlassCard component ready
-4. 👉 **Now: Run install & connect to backend**
-5. ⏳ Add more glassmorphism screens
-6. ⏳ Setup offline sync
-7. ⏳ Deploy to app stores
-
----
-
-**Last Updated**: June 13, 2026
+- [x] App loads clean with native navigation
+- [x] Connection banner shows `Connected (NestJS Backend)`
+- [x] Today's devotional loads from `/api/devotionals/today`
+- [x] Christian hymns load with lyrics and categories
+- [x] Bible screen allows chapter navigation with back button support
+- [x] Auth screen enables Supabase email sign-in / registration

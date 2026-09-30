@@ -1,57 +1,71 @@
-Getting started with the Expo mobile scaffold
+# Daily Love For Jesus — Mobile App 📱
 
-This folder contains a minimal Expo-managed scaffold. To create and run the app locally, follow these steps:
+> **Cross-Platform React Native application built with Expo SDK 52, NativeWind (Tailwind CSS), and full API integration with the NestJS backend.**
 
-1. Install `expo-cli` (optional) or use `npx`:
+---
 
+## 🌟 Screens & Features
+
+- **Home Screen**: Today's featured devotional card, Verse of the Day, quick actions, and backend connection indicator.
+- **Devotionals Screen**: Full daily devotional reader with scripture references, reflections, and prayers.
+- **Hymns Screen**: Searchable Christian hymn directory with chorus highlights and category navigation.
+- **Bible Screen**: Bible reader with chapter navigation, translation switcher, and back button navigation.
+- **Auth Screen**: Supabase authentication with persistent session storage.
+- **Offline & Fallback Resilience**: Seamless fallback to offline cached data when offline.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Node.js `v24.21.0` (or `>=20.18.0 <=24.x.x`)
+- npm `>=10.0.0`
+- Expo Go on iOS / Android or Android Studio / Xcode simulators
+
+### Installation
+From the root directory:
 ```bash
-# using npx (recommended, no global install)
-npx create-expo-app mobile --template blank
-# or if you prefer, globally:
-npm install -g expo-cli
-expo init mobile
+npm run install:mobile
 ```
-
-2. Move into the folder and start the dev server:
-
+Or directly inside `mobile/`:
 ```bash
 cd mobile
-npm install
-npm run start
-# then open on a device via Expo Go or run on emulator
+npm install --legacy-peer-deps
 ```
 
-Notes:
-- We intentionally created a minimal scaffold here. Running `npx create-expo-app` will populate the project with the correct `dependencies` and native templates.
-- For a native-first, glassmorphism UI, we'll use `nativewind` + `tailwindcss` and `expo-updates` for OTA releases.
-
-Quick setup (run locally):
-
+### Environment Setup
+Create `mobile/.env`:
 ```bash
-cd mobile
-# install core Expo deps
-npm install
+cp .env.example .env
+```
+Key configuration:
+- `EXPO_PUBLIC_API_URL`: Points to your NestJS backend (e.g. `http://localhost:4000` on iOS simulator, `http://10.0.2.2:4000` on Android emulator, or your deployed backend URL).
+- `EXPO_PUBLIC_SUPABASE_URL`: Supabase project URL.
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key.
 
-# install NativeWind + Tailwind (optional; recommended for glassmorphism UI)
-npm install nativewind tailwindcss postcss autoprefixer
-
-# initialize Tailwind config (creates tailwind.config.js + postcss.config.js)
-npx tailwindcss init -p
-
-# start Expo dev server
+### Starting Development Server
+```bash
 npm run start
 ```
+- Press `a` to open in Android Emulator
+- Press `i` to open in iOS Simulator
+- Press `w` to open in Web Browser
+- Scan the QR code with **Expo Go** on a physical device
 
-NativeWind notes:
-- We've added `babel.config.js`, `tailwind.config.js`, and a starter `App.tsx` that uses Tailwind classNames via NativeWind.
-- A reusable `GlassCard` component is in `src/components/GlassCard.tsx` to help you build the glassmorphism UI.
+---
 
-Branding
-- App title: Daily Love For Jesus
-- Footer: Powered by ForLove Media
+## 📦 Building for Production (EAS)
 
-Next steps I can take here:
-- Add more example screens and wire an API client to the web backend.
-- Create CI/CD workflows for Expo Updates (OTAs) and publish automation.
-
-Run the install locally and tell me when it's done; I'll then add the glassmorphism screens and polish styles.
+1. Install EAS CLI:
+   ```bash
+   npm install -g eas-cli
+   eas login
+   ```
+2. Build Android APK / App Bundle (AAB):
+   ```bash
+   eas build --platform android --profile production
+   ```
+3. Build iOS IPA:
+   ```bash
+   eas build --platform ios --profile production
+   ```

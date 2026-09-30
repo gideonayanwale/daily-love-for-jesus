@@ -12,7 +12,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "NODE_ENV=production node dist/boot.js",
+    "start": "cross-env NODE_ENV=production node dist/boot.js",
     "deploy:netlify": "netlify deploy --prod --dir=dist/public",
     "deploy:cloudflare": "wrangler pages deploy dist/public",
     "deploy:worker": "wrangler deploy",
