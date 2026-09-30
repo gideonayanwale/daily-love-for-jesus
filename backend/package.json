@@ -14,7 +14,8 @@
     "start": "tsx src/main.ts",
     "start:dev": "tsx watch src/main.ts",
     "start:prod": "node dist/main",
-    "test": "tsc --project tsconfig.json --noEmit"
+    "test": "tsc --project tsconfig.json --noEmit",
+    "db:seed": "tsx src/database/seed.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

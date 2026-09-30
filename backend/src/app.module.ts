@@ -13,6 +13,7 @@ import { CommunityModule } from './modules/community/community.module';
 import { SyncModule } from './modules/sync/sync.module';
 import { TrpcModule } from './modules/trpc/trpc.module';
 import { TrpcService } from './modules/trpc/trpc.service';
+import { TasksModule } from './modules/tasks/tasks.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { TrpcService } from './modules/trpc/trpc.service';
     CommunityModule,
     SyncModule,
     TrpcModule,
+    TasksModule,
   ],
 })
 export class AppModule implements NestModule {
