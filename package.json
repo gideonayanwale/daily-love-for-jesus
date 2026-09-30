@@ -18,9 +18,10 @@
   "author": "Gideon Inioluwa Ayanwale",
   "type": "commonjs",
   "scripts": {
-    "build": "npm --prefix backend run build && npm --prefix app run build",
-    "build:backend": "npm --prefix backend run build",
-    "build:frontend": "npm --prefix app run build",
+    "build": "npm --prefix backend install --legacy-peer-deps && npm --prefix backend run build",
+    "build:all": "npm --prefix backend install --legacy-peer-deps && npm --prefix app install --legacy-peer-deps && npm --prefix backend run build && npm --prefix app run build",
+    "build:backend": "npm --prefix backend install --legacy-peer-deps && npm --prefix backend run build",
+    "build:frontend": "npm --prefix app install --legacy-peer-deps && npm --prefix app run build",
     "dev:backend": "npm --prefix backend run start:dev",
     "dev:frontend": "npm --prefix app run dev",
     "dev": "npm --prefix backend run start:dev",

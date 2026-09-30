@@ -10,9 +10,14 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 
-async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, new ExpressAdapter());
+let cachedServer: express.Express | null = null;
+
+export async function createApp(): Promise<{ app: NestExpressApplication; expressApp: express.Express }> {
+  const expressApp = express();
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule,
+    new ExpressAdapter(expressApp),
+  );
   const configService = app.get(ConfigService);
 
   // Global filters & pipes
@@ -46,7 +51,7 @@ async function bootstrap() {
       if (!origin || !isProduction || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.startsWith('http://10.')) {
         callback(null, true);
       } else {
-        callback(null, true); // Permissive in dev, or allow valid origins
+        callback(null, true);
       }
     },
     credentials: true,
@@ -75,12 +80,21 @@ async function bootstrap() {
     customSiteTitle: 'Daily Love For Jesus API Docs',
   });
 
+  return { app, expressApp };
+}
+
+// Standalone bootstrap for Render, Docker, Railway, and local development
+async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+  const { app } = await createApp();
+  const configService = app.get(ConfigService);
+  const isProduction = configService.get<string>('nodeEnv') === 'production';
+
   // In production, serve frontend SPA static files if present
   const publicDir = path.resolve(__dirname, '../../app/dist/public');
   if (isProduction && fs.existsSync(publicDir)) {
     logger.log(`Serving static SPA frontend from: ${publicDir}`);
     app.use(express.static(publicDir));
-    // SPA fallback
     app.use((req, res, next) => {
       if (!req.path.startsWith('/api')) {
         res.sendFile(path.join(publicDir, 'index.html'));
@@ -98,4 +112,17 @@ async function bootstrap() {
   logger.log(`⚡ tRPC API Endpoint: http://localhost:${port}/api/trpc`);
 }
 
-bootstrap();
+// Auto-run bootstrap when running directly in a standalone Node environment
+if (!process.env.VERCEL) {
+  bootstrap();
+}
+
+// Serverless entrypoint for Vercel
+export default async function handler(req: any, res: any) {
+  if (!cachedServer) {
+    const { app, expressApp } = await createApp();
+    await app.init();
+    cachedServer = expressApp;
+  }
+  return cachedServer(req, res);
+}
