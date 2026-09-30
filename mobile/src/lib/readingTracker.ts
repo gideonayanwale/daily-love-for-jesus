@@ -164,7 +164,8 @@ export class ReadingTrackerService {
     }
 
     this.isSyncing = true;
-    const apiUrl = options?.apiUrl ?? process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000";
+    const apiUrl = (options?.apiUrl ?? process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
+    const token = options?.authToken ?? (await storage.getItem("@daily_love_mobile_token")) ?? null;
 
     // Snapshot the IDs we are about to sync so new items added during the
     // fetch flight are not accidentally removed from the queue on success.
@@ -173,9 +174,10 @@ export class ReadingTrackerService {
     try {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
+        Accept: "application/json",
       };
-      if (options?.authToken) {
-        headers["Authorization"] = `Bearer ${options.authToken}`;
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
       }
 
       const response = await fetch(`${apiUrl}/api/tracking/sync`, {

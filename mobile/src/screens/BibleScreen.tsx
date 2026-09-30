@@ -9,6 +9,7 @@ import {
   FlatList,
   Share,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { GlassCard } from '../components/GlassCard';
 import {
   BIBLE_BOOKS,
@@ -20,6 +21,7 @@ import {
 import { useReadingTracker } from '../hooks/useReadingTracker';
 
 export function BibleScreen() {
+  const navigation = useNavigation<any>();
   const [selectedBook, setSelectedBook] = useState<BibleBook>(BIBLE_BOOKS[0]);
   const [selectedChapter, setSelectedChapter] = useState<number>(1);
   const [translation, setTranslation] = useState<string>('KJV');
@@ -76,8 +78,16 @@ export function BibleScreen() {
       {/* Header Bar */}
       <View className="pt-12 pb-3 px-4 bg-slate-900/80 border-b border-white/10">
         <View className="flex-row items-center justify-between">
-          {/* Book & Chapter Trigger */}
+          {/* Book & Chapter Trigger with Back Button */}
           <View className="flex-row items-center space-x-2">
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              className="px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/15 active:bg-white/20 mr-1"
+              accessibilityLabel="Back to Home"
+            >
+              <Text className="text-white font-bold text-xs">←</Text>
+            </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() => setIsBookModalVisible(true)}
               className="px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 active:bg-white/20"

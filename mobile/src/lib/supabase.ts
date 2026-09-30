@@ -22,6 +22,12 @@ export function getMobileAuthToken(): string | null {
 
 export function setMobileAuthToken(token: string | null) {
   currentToken = token;
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      if (token) window.localStorage.setItem("@daily_love_mobile_token", token);
+      else window.localStorage.removeItem("@daily_love_mobile_token");
+    }
+  } catch {}
 }
 
 export const mobileSupabase = {

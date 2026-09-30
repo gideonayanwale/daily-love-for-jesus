@@ -123,8 +123,33 @@ export async function fetchChapterVerses(
   chapter: number
 ): Promise<MobileVerse[]> {
   const trans = (translation || 'KJV').toUpperCase();
-  const url = `https://bolls.life/get-chapter/${trans}/${bookId}/${chapter}/`;
 
+  // 1. Try fetching from NestJS Backend
+  try {
+    const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
+    const res = await fetch(
+      `${backendUrl}/api/bible/verses?bookNumber=${bookId}&chapter=${chapter}&translation=${trans}`,
+      { headers: { Accept: 'application/json' } }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((r: any) => ({
+          id: r.id || r.pk,
+          bookNumber: bookId,
+          chapter,
+          verse: r.verse,
+          text: cleanText(r.text),
+          translation: trans,
+        }));
+      }
+    }
+  } catch {
+    // Backend fetch failed or offline; continue to fallback
+  }
+
+  // 2. Direct Fallback to Bolls Life API (zero-cost, multilingual)
+  const url = `https://bolls.life/get-chapter/${trans}/${bookId}/${chapter}/`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error(`Failed to fetch scripture: HTTP ${res.status}`);
