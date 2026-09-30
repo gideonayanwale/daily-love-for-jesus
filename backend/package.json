@@ -13,7 +13,8 @@
     "build": "node ../app/node_modules/typescript/bin/tsc --project tsconfig.json",
     "start": "tsx src/main.ts",
     "start:dev": "tsx watch src/main.ts",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "test": "node ../app/node_modules/typescript/bin/tsc --project tsconfig.json --noEmit"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
