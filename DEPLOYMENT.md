@@ -105,13 +105,18 @@ The frontend compiles to static HTML, CSS, and hashed JavaScript assets inside `
    - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
 5. Click **Save and Deploy**.
 
-### Provider C: Vercel (Pre-Configured via `vercel.json`)
+### Provider C: Vercel Multi-Service Project (Unified App & API)
+The repository is configured for **Vercel Services** via [`vercel.json`](vercel.json), deploying both frontend and backend as a unified project under a single domain:
+- **`app` service:** React 19 + Vite SPA (root: `app`), mounted publicly at `/*`.
+- **`backend` service:** NestJS API (root: `backend`), mounted publicly at `/api` and `/api/*`, with internal binding `FRONTEND_URL` automatically populated.
+- **Single Domain:** All `/api/*` requests from the web frontend are same-origin (zero CORS issues).
+
 1. Sign in to [Vercel](https://vercel.com) &rarr; **Add New Project** &rarr; Import Git repository.
-2. Root [`vercel.json`](vercel.json) automatically instructs Vercel:
-   - **Build Command:** `npm run build:frontend`
-   - **Output Directory:** `app/dist/public`
-3. Add environment variables: `VITE_API_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-4. Deploy!
+2. Vercel automatically detects the root [`vercel.json`](vercel.json) multi-service configuration.
+3. Configure Environment Variables in the Vercel Dashboard (for Production, Preview, and Development):
+   - `NEON_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `APP_SECRET`
+   - `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+4. Deploy! Both frontend and NestJS API deploy together with shared routing.
 
 ---
 

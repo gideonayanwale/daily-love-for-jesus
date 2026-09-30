@@ -3,11 +3,20 @@
   "services": {
     "app": {
       "root": "app",
-      "framework": "vite"
+      "framework": "vite",
+      "outputDirectory": "dist/public"
     },
     "backend": {
       "root": "backend",
-      "framework": "nestjs"
+      "framework": "nestjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "app",
+          "format": "url",
+          "env": "FRONTEND_URL"
+        }
+      ]
     }
   },
   "rewrites": [

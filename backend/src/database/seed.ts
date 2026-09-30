@@ -263,9 +263,17 @@ async function seed() {
     // 2. Seed Hymns
     console.log('🎵 Seeding Baptist Hymns...');
     for (const hymn of HYMNS) {
+      const stanzas = [{ number: 1, text: hymn.lyrics }];
       await db
         .insert(schema.hymns)
-        .values(hymn)
+        .values({
+          hymnNumber: hymn.hymnNumber,
+          title: hymn.title,
+          author: hymn.author,
+          meter: hymn.meter,
+          category: hymn.category,
+          stanzas,
+        })
         .onConflictDoUpdate({
           target: schema.hymns.hymnNumber,
           set: {
@@ -273,7 +281,7 @@ async function seed() {
             author: hymn.author,
             meter: hymn.meter,
             category: hymn.category,
-            lyrics: hymn.lyrics,
+            stanzas,
           },
         });
     }
