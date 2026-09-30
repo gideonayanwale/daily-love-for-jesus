@@ -5,6 +5,10 @@
   "author": "Gideon Inioluwa Ayanwale",
   "private": true,
   "license": "ISC",
+  "engines": {
+    "node": ">=20.18.0 <23.0.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "build": "node ../app/node_modules/typescript/bin/tsc --project tsconfig.json",
     "start": "tsx src/main.ts",

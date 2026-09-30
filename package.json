@@ -26,11 +26,19 @@
     "dev": "npm --prefix backend run start:dev",
     "start": "npm --prefix backend run start:prod",
     "start:backend": "npm --prefix backend run start:prod",
+    "install:all": "npm install && npm --prefix backend install --legacy-peer-deps && npm --prefix app install --legacy-peer-deps",
+    "install:backend": "npm --prefix backend install --legacy-peer-deps",
+    "install:frontend": "npm --prefix app install --legacy-peer-deps",
+    "install:mobile": "npm --prefix mobile install --legacy-peer-deps",
     "deploy:netlify": "npx netlify deploy --prod --dir=app/dist/public",
     "deploy:cloudflare": "npx wrangler pages deploy app/dist/public",
     "deploy:worker": "npx wrangler deploy",
     "dev:worker": "npx wrangler dev",
     "test": "npm --prefix backend run test"
+  },
+  "engines": {
+    "node": ">=20.18.0 <23.0.0",
+    "npm": ">=10.0.0"
   },
   "dependencies": {
     "date-fns": "^4.1.0"
