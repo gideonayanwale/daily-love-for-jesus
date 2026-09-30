@@ -5,7 +5,7 @@ import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 
 @Module({
   controllers: [FavoritesController],
-  providers: [FavoritesService, SupabaseAuthGuard],
+  providers: [FavoritesService],
   exports: [FavoritesService],
 })
 export class FavoritesModule {}

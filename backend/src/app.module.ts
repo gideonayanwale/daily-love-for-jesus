@@ -1,6 +1,7 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import configuration from './config/configuration';
+import { CommonModule } from './common/common.module';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BibleModule } from './modules/bible/bible.module';
@@ -20,6 +21,7 @@ import { TrpcService } from './modules/trpc/trpc.service';
       load: [configuration],
       envFilePath: ['.env', '../app/.env'],
     }),
+    CommonModule,
     DatabaseModule,
     AuthModule,
     BibleModule,

@@ -5,7 +5,7 @@ import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 
 @Module({
   controllers: [CommunityController],
-  providers: [CommunityService, SupabaseAuthGuard],
+  providers: [CommunityService],
   exports: [CommunityService],
 })
 export class CommunityModule {}

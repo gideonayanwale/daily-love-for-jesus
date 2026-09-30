@@ -6,7 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Module({
   controllers: [DevotionalsController],
-  providers: [DevotionalsService, SupabaseAuthGuard, RolesGuard],
+  providers: [DevotionalsService],
   exports: [DevotionalsService],
 })
 export class DevotionalsModule {}

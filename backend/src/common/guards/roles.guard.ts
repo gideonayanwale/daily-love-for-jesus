@@ -4,11 +4,9 @@ import {
   ExecutionContext,
   ForbiddenException,
   SetMetadata,
+  Inject,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { DatabaseService } from '../../database/database.service';
-import * as schema from '@db/schema';
-import { eq, and } from 'drizzle-orm';
 
 export const ROLES_KEY = 'roles';
 export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
@@ -16,8 +14,7 @@ export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 @Injectable()
 export class RolesGuard implements CanActivate {
   constructor(
-    private readonly reflector: Reflector,
-    private readonly dbService: DatabaseService,
+    @Inject(Reflector) private readonly reflector: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

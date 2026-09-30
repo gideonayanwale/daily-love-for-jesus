@@ -4,6 +4,8 @@ import {
   ExecutionContext,
   UnauthorizedException,
   Logger,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
@@ -17,23 +19,47 @@ import { eq } from 'drizzle-orm';
 @Injectable()
 export class SupabaseAuthGuard implements CanActivate {
   private readonly logger = new Logger(SupabaseAuthGuard.name);
-  private supabaseAdmin: any;
+  private supabaseAdmin: any = undefined;
 
   constructor(
-    private readonly reflector: Reflector,
-    private readonly configService: ConfigService,
-    private readonly dbService: DatabaseService,
-  ) {
-    const url = this.configService.get<string>('supabase.url');
+    @Inject(Reflector) private readonly reflector: Reflector,
+    @Optional() @Inject(ConfigService) private readonly configService?: ConfigService,
+    @Optional() @Inject(DatabaseService) private readonly dbService?: DatabaseService,
+  ) {}
+
+  private getSupabaseAdmin() {
+    if (this.supabaseAdmin !== undefined) {
+      return this.supabaseAdmin;
+    }
+
+    const url =
+      this.configService?.get<string>('supabase.url') ||
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      '';
+
     const key =
-      this.configService.get<string>('supabase.serviceRoleKey') ||
-      this.configService.get<string>('supabase.anonKey');
+      this.configService?.get<string>('supabase.serviceRoleKey') ||
+      this.configService?.get<string>('supabase.anonKey') ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.VITE_SUPABASE_ANON_KEY ||
+      '';
 
     if (url && key) {
-      this.supabaseAdmin = createClient(url, key, {
-        auth: { autoRefreshToken: false, persistSession: false },
-      });
+      try {
+        this.supabaseAdmin = createClient(url, key, {
+          auth: { autoRefreshToken: false, persistSession: false },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to initialize Supabase client: ${err.message}`);
+        this.supabaseAdmin = null;
+      }
+    } else {
+      this.supabaseAdmin = null;
     }
+
+    return this.supabaseAdmin;
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -51,7 +77,8 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     try {
-      if (!this.supabaseAdmin) {
+      const supabaseAdmin = this.getSupabaseAdmin();
+      if (!supabaseAdmin) {
         if (isPublic) return true;
         // In local dev without Supabase configured, create a mock user
         request.user = {
@@ -63,22 +90,41 @@ export class SupabaseAuthGuard implements CanActivate {
         return true;
       }
 
-      const { data: { user: authUser }, error } = await this.supabaseAdmin.auth.getUser(token);
+      const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
       if (error || !authUser) {
         if (isPublic) return true;
         throw new UnauthorizedException('Invalid or expired authentication token');
       }
 
       // Upsert/find user in database
-      const db = this.dbService.getDb();
-      const adminUserId = this.configService.get<string>('security.adminUserId');
-      const adminEmail = this.configService.get<string>('security.adminEmail');
+      const db = this.dbService?.getDb();
+      const adminUserId =
+        this.configService?.get<string>('security.adminUserId') ||
+        process.env.ADMIN_USER_ID;
+      const adminEmail =
+        this.configService?.get<string>('security.adminEmail') ||
+        process.env.ADMIN_EMAIL;
 
       const isAdmin =
         (adminUserId && authUser.id === adminUserId) ||
         (adminEmail && authUser.email?.toLowerCase() === adminEmail.toLowerCase());
 
       const userRole = isAdmin ? 'admin' : 'user';
+
+      if (!db) {
+        request.user = {
+          id: authUser.id,
+          email: authUser.email ?? null,
+          name:
+            authUser.user_metadata?.full_name ??
+            authUser.user_metadata?.name ??
+            authUser.email?.split('@')[0] ??
+            'Believer',
+          avatar: authUser.user_metadata?.avatar_url ?? null,
+          role: userRole,
+        };
+        return true;
+      }
 
       const existingUsers = await db
         .select()

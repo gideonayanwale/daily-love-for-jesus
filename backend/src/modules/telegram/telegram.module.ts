@@ -6,7 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 
 @Module({
   controllers: [TelegramController],
-  providers: [TelegramService, SupabaseAuthGuard, RolesGuard],
+  providers: [TelegramService],
   exports: [TelegramService],
 })
 export class TelegramModule {}
