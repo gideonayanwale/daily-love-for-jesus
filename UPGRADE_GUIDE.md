@@ -4,49 +4,50 @@ This guide details how to upgrade Node.js to the recommended LTS version and ins
 
 ---
 
-## 🟢 Node.js Version Recommendation
+## 🟢 Node.js Version Support
 
-- **Recommended Version**: **Node.js v22.14.0 LTS** (Active LTS) or `>=20.18.0`
+- **Target Version**: **Node.js v24.21.0** (with backward compatibility for `>=20.18.0 <=24.x.x`)
 - **Supported npm**: `>=10.0.0`
 - Configured in [`.nvmrc`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/.nvmrc), [`.node-version`](file:///c:/Users/ayanw/Documents/Web%20Projects/Daily%20Love%20For%20Jesus/.node-version), and `engines` in all `package.json` manifests.
+- TypeScript Node definitions (`@types/node`) upgraded to `^24.10.1` across backend and frontend workspaces.
 
 ---
 
-## 🛠️ Step 1: Upgrade Node.js on Windows
+## 🛠️ Step 1: Set / Upgrade Node.js to v24.21.0 on Windows
 
 Choose any of the following methods that match your setup:
 
-### Option A: Using Windows Package Manager (`winget`) — Recommended
-Run in PowerShell (as Administrator):
-```powershell
-winget upgrade OpenJS.NodeJS.LTS
-# Or if installing fresh:
-winget install OpenJS.NodeJS.LTS
-```
-
-### Option B: Using `nvm-windows`
+### Option A: Using `nvm-windows`
 If you use NVM for Windows:
 ```powershell
-nvm install 22.14.0
-nvm use 22.14.0
+nvm install 24.21.0
+nvm use 24.21.0
 ```
 
-### Option C: Using `fnm` (Fast Node Manager)
+### Option B: Using `fnm` (Fast Node Manager)
 If you use `fnm`:
 ```powershell
-fnm install 22
-fnm use 22
-fnm default 22
+fnm install 24.21.0
+fnm use 24.21.0
+fnm default 24.21.0
+```
+
+### Option C: Using Windows Package Manager (`winget`)
+Run in PowerShell (as Administrator):
+```powershell
+winget upgrade OpenJS.NodeJS
+# Or if installing fresh:
+winget install OpenJS.NodeJS
 ```
 
 ### Option D: Direct Official Installer (.msi)
-Download the latest LTS Windows installer directly from:
+Download the Windows installer directly from:
 👉 **[https://nodejs.org/en/download](https://nodejs.org/en/download)**
 
 After updating, verify in your terminal:
 ```powershell
-node -v   # Should show v22.x.x (or v20.18+)
-npm -v    # Should show 10.x.x
+node -v   # Should show v24.21.0
+npm -v    # Should show 10.x or 11.x
 ```
 
 ---
