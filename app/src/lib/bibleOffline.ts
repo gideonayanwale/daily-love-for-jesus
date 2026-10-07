@@ -181,3 +181,67 @@ export async function deleteDownloadedTranslation(translation: string): Promise<
     console.warn("Failed to delete downloaded translation:", err);
   }
 }
+
+/**
+ * Downloads all chapters of a book into offline IndexedDB storage.
+ */
+export async function downloadBook(
+  translation: string,
+  bookNumber: number,
+  totalChapters: number,
+  onProgress?: (completed: number, total: number) => void
+): Promise<{ success: boolean; errors: number }> {
+  let completed = 0;
+  let errors = 0;
+  const trans = translation.toUpperCase();
+
+  // Process in small batches of 4 to avoid overwhelming the network
+  const batchSize = 4;
+  for (let start = 1; start <= totalChapters; start += batchSize) {
+    const end = Math.min(start + batchSize - 1, totalChapters);
+    const chapterPromises = [];
+
+    for (let ch = start; ch <= end; ch++) {
+      chapterPromises.push(
+        (async (chapterNum: number) => {
+          try {
+            const res = await fetch(`/api/bible/verses?bookNumber=${bookNumber}&chapter=${chapterNum}&translation=${trans}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const verses = await res.json();
+            if (Array.isArray(verses) && verses.length > 0) {
+              await saveOfflineChapter(trans, bookNumber, chapterNum, verses);
+            }
+            completed++;
+          } catch {
+            errors++;
+          } finally {
+            onProgress?.(completed, totalChapters);
+          }
+        })(ch)
+      );
+    }
+
+    await Promise.all(chapterPromises);
+  }
+
+  return { success: errors === 0, errors };
+}
+
+/**
+ * Checks if all chapters of a book are cached in IndexedDB.
+ */
+export async function isBookDownloaded(
+  translation: string,
+  bookNumber: number,
+  totalChapters: number
+): Promise<boolean> {
+  const trans = translation.toUpperCase();
+  for (let ch = 1; ch <= totalChapters; ch++) {
+    const chapterData = await getOfflineChapter(trans, bookNumber, ch);
+    if (!chapterData || chapterData.length === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+

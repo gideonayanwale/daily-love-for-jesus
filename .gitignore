@@ -49,3 +49,5 @@ app/ARCHITECTURE.md
 app/docs/
 *.tmp
 *.bak
+.expo/*.*
+.expo/

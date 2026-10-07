@@ -172,6 +172,13 @@ export function HomeScreen() {
               onPress={() => navigation.navigate('Hymns')}
             />
           </GlassCard>
+
+          <GlassCard title="Sunday School & Fellowship" subtitle="Class attendance, rosters & announcements">
+            <PrimaryButton
+              title="Open Community"
+              onPress={() => navigation.navigate('Community')}
+            />
+          </GlassCard>
         </View>
       </ScrollView>
 

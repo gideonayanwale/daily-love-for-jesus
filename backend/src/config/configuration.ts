@@ -21,6 +21,17 @@ export interface AppConfig {
     apiBibleKey: string;
     telegramBotToken: string;
     telegramChannelId: string;
+    geminiApiKey: string;
+    openrouterApiKey: string;
+    cloudinaryCloudName: string;
+    cloudinaryApiKey: string;
+    cloudinaryApiSecret: string;
+    cloudinaryUrl: string;
+  };
+  archive: {
+    supabaseUrl: string;
+    supabaseServiceRoleKey: string;
+    supabaseBucket: string;
   };
 }
 
@@ -47,5 +58,16 @@ export default (): AppConfig => ({
     apiBibleKey: process.env.API_BIBLE_KEY || '',
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
     telegramChannelId: process.env.TELEGRAM_CHANNEL_ID || '',
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+    openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
+    cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
+    cloudinaryApiKey: process.env.CLOUDINARY_API_KEY || '',
+    cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET || '',
+    cloudinaryUrl: process.env.CLOUDINARY_URL || '',
+  },
+  archive: {
+    supabaseUrl: process.env.ARCHIVE_SUPABASE_URL || '',
+    supabaseServiceRoleKey: process.env.ARCHIVE_SUPABASE_SERVICE_ROLE_KEY || '',
+    supabaseBucket: process.env.ARCHIVE_SUPABASE_BUCKET || 'chat-bulk-archives',
   },
 });

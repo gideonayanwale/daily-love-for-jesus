@@ -14,6 +14,7 @@ import { SyncModule } from './modules/sync/sync.module';
 import { TrpcModule } from './modules/trpc/trpc.module';
 import { TrpcService } from './modules/trpc/trpc.service';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { AiModule } from './modules/ai/ai.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
     SyncModule,
     TrpcModule,
     TasksModule,
+    AiModule,
   ],
 })
 export class AppModule implements NestModule {

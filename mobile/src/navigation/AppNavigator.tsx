@@ -5,6 +5,7 @@ import { HomeScreen } from '../screens/HomeScreen'
 import { BibleScreen } from '../screens/BibleScreen'
 import { HymnsScreen } from '../screens/HymnsScreen'
 import { DevotionalsScreen } from '../screens/DevotionalsScreen'
+import { CommunityScreen } from '../screens/CommunityScreen'
 import { AuthScreen } from '../screens/AuthScreen'
 
 const Stack = createNativeStackNavigator()
@@ -18,6 +19,7 @@ export function AppNavigator() {
         <Stack.Screen name="Bible" component={BibleScreen} />
         <Stack.Screen name="Hymns" component={HymnsScreen} />
         <Stack.Screen name="Devotionals" component={DevotionalsScreen} />
+        <Stack.Screen name="Community" component={CommunityScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   )

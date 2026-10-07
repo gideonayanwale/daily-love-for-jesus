@@ -21,6 +21,8 @@ export const users = pgTable(
     email: varchar("email", { length: 320 }),
     name: varchar("name", { length: 255 }),
     avatar: text("avatar"),
+    phone: varchar("phone", { length: 50 }),
+    whatsappNumber: varchar("whatsapp_number", { length: 50 }),
     role: varchar("role", { length: 50 }).default("user").notNull(), // 'user' | 'admin'
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -210,8 +212,9 @@ export const communities = pgTable(
     timezone: varchar("timezone", { length: 100 }).default("UTC").notNull(),
     brandingSettings: jsonb("branding_settings"),
     joinSettings: jsonb("join_settings"),
-    status: varchar("status", { length: 50 }).default("active").notNull(), // 'active' | 'inactive' | 'archived'
+    status: varchar("status", { length: 50 }).default("active").notNull(), // 'pending_approval' | 'active' | 'inactive' | 'archived'
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -262,6 +265,7 @@ export const groups = pgTable(
     inviteCode: varchar("invite_code", { length: 10 }).unique(), // 6-digit class code, e.g. 'LF8421' or '482910'
     qrCodeToken: varchar("qr_code_token", { length: 64 }).unique(),
     privacySetting: varchar("privacy_setting", { length: 50 }).default("public").notNull(), // 'public' | 'private' | 'hidden'
+    onlyAdminsCanPost: boolean("only_admins_can_post").default(false).notNull(), // WhatsApp-like admin posting controls
     status: varchar("status", { length: 50 }).default("active").notNull(), // 'active' | 'inactive' | 'archived'
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -495,13 +499,16 @@ export const attendanceRecords = pgTable(
     id: serial("id").primaryKey(),
     sessionId: integer("session_id").notNull().references(() => attendanceSessions.id, { onDelete: "cascade" }),
     groupId: integer("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    guestName: varchar("guest_name", { length: 255 }),
+    guestPhone: varchar("guest_phone", { length: 50 }),
+    isGuest: boolean("is_guest").default(false).notNull(),
     status: varchar("status", { length: 50 }).default("present").notNull(), // 'present' | 'absent' | 'excused' | 'late'
     notes: text("notes"),
     markedAt: timestamp("marked_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("idx_attendance_records_session_user").on(table.sessionId, table.userId),
+    index("idx_attendance_records_session").on(table.sessionId),
     index("idx_attendance_records_user").on(table.userId),
   ]
 );
@@ -577,3 +584,65 @@ export const auditLogs = pgTable(
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// ─── Chat Messages (Slack-like Channels & Direct Messages) ───────────────────
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: serial("id").primaryKey(),
+    channelType: varchar("channel_type", { length: 50 }).default("group").notNull(), // 'general' | 'community' | 'group' | 'dm' | 'leadership'
+    communityId: uuid("community_id").references(() => communities.id, { onDelete: "cascade" }),
+    groupId: integer("group_id").references(() => groups.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    receiverId: uuid("receiver_id").references(() => users.id, { onDelete: "cascade" }), // Populated for DM
+    content: text("content").notNull(),
+    mediaUrl: text("media_url"),
+    isEncrypted: boolean("is_encrypted").default(false).notNull(),
+    isPinned: boolean("is_pinned").default(false).notNull(),
+    isKept: boolean("is_kept").default(false).notNull(),
+    isAnnouncement: boolean("is_announcement").default(false).notNull(),
+    isDeleted: boolean("is_deleted").default(false).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_chat_channel").on(table.channelType, table.groupId),
+    index("idx_chat_community").on(table.communityId),
+    index("idx_chat_dm").on(table.senderId, table.receiverId),
+    index("idx_chat_created").on(table.createdAt),
+    index("idx_chat_expires").on(table.expiresAt),
+  ]
+);
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+// ─── Chat Bulk Snapshots (Secondary Supabase Project Cold Storage) ────────────
+export const chatBulkSnapshots = pgTable(
+  "chat_bulk_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    communityId: uuid("community_id").references(() => communities.id, { onDelete: "cascade" }),
+    groupId: integer("group_id").references(() => groups.id, { onDelete: "cascade" }),
+    channelType: varchar("channel_type", { length: 50 }).notNull(),
+    archiveYearMonth: varchar("archive_year_month", { length: 7 }).notNull(), // '2026-10'
+    archiveDate: varchar("archive_date", { length: 10 }).notNull(), // '2026-10-03'
+    storageProvider: varchar("storage_provider", { length: 50 }).default("supabase_secondary").notNull(),
+    storagePath: text("storage_path").notNull(),
+    storageUrl: text("storage_url"),
+    messageCount: integer("message_count").default(0).notNull(),
+    fileSizeBytes: integer("file_size_bytes").default(0).notNull(),
+    checksum: text("checksum"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_bulk_snapshots_comm").on(table.communityId),
+    index("idx_bulk_snapshots_group").on(table.groupId),
+    index("idx_bulk_snapshots_ym").on(table.archiveYearMonth),
+  ]
+);
+
+export type ChatBulkSnapshot = typeof chatBulkSnapshots.$inferSelect;
+export type InsertChatBulkSnapshot = typeof chatBulkSnapshots.$inferInsert;
+

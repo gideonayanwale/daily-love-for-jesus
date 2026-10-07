@@ -148,7 +148,7 @@ export default function DevotionalDetail() {
 
         {/* Body Paragraphs */}
         <div className="space-y-4 text-base leading-relaxed text-zinc-800 dark:text-zinc-200 font-normal">
-          {devotional.body.split('\n\n').map((para, i) => (
+          {devotional.body.split('\n\n').map((para: string, i: number) => (
             <p key={i} className="leading-relaxed">
               {para}
             </p>

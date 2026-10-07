@@ -65,6 +65,7 @@ function DropdownMenuItem({
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Item> & {
   inset?: boolean
   variant?: "default" | "destructive"
+  className?: string
 }) {
   return (
     <DropdownMenuPrimitive.Item
@@ -147,6 +148,7 @@ function DropdownMenuLabel({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Label> & {
   inset?: boolean
+  className?: string
 }) {
   return (
     <DropdownMenuPrimitive.Label
@@ -203,6 +205,7 @@ function DropdownMenuSubTrigger({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.SubTrigger> & {
   inset?: boolean
+  className?: string
 }) {
   return (
     <DropdownMenuPrimitive.SubTrigger

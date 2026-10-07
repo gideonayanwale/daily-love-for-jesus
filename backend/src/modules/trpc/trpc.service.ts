@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service';
 import { AuthService } from '../auth/auth.service';
@@ -23,16 +23,20 @@ export class TrpcService {
   private supabaseAdmin: any;
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly dbService: DatabaseService,
-    private readonly authService: AuthService,
-    private readonly bibleService: BibleService,
-    private readonly hymnsService: HymnsService,
-    private readonly devotionalsService: DevotionalsService,
-    private readonly telegramService: TelegramService,
-    private readonly favoritesService: FavoritesService,
-    private readonly communityService: CommunityService,
+    @Optional() @Inject(ConfigService) private configService: ConfigService,
+    @Inject(DatabaseService) private readonly dbService: DatabaseService,
+    @Inject(AuthService) private readonly authService: AuthService,
+    @Inject(BibleService) private readonly bibleService: BibleService,
+    @Inject(HymnsService) private readonly hymnsService: HymnsService,
+    @Inject(DevotionalsService) private readonly devotionalsService: DevotionalsService,
+    @Inject(TelegramService) private readonly telegramService: TelegramService,
+    @Inject(FavoritesService) private readonly favoritesService: FavoritesService,
+    @Inject(CommunityService) private readonly communityService: CommunityService,
   ) {
+    if (!this.configService) {
+      this.configService = new ConfigService();
+    }
+
     this.appRouter = buildAppRouter(
       this.authService,
       this.bibleService,
@@ -43,10 +47,15 @@ export class TrpcService {
       this.communityService,
     );
 
-    const url = this.configService.get<string>('supabase.url');
+    const url =
+      this.configService?.get<string>('supabase.url') ||
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL;
     const key =
-      this.configService.get<string>('supabase.serviceRoleKey') ||
-      this.configService.get<string>('supabase.anonKey');
+      this.configService?.get<string>('supabase.serviceRoleKey') ||
+      this.configService?.get<string>('supabase.anonKey') ||
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_ANON_KEY;
 
     if (url && key) {
       this.supabaseAdmin = createClient(url, key, {
@@ -83,8 +92,12 @@ export class TrpcService {
 
           user = rows[0];
           if (!user) {
-            const adminUserId = this.configService.get<string>('security.adminUserId');
-            const adminEmail = this.configService.get<string>('security.adminEmail');
+            const adminUserId =
+              this.configService?.get<string>('security.adminUserId') ||
+              process.env.ADMIN_USER_ID;
+            const adminEmail =
+              this.configService?.get<string>('security.adminEmail') ||
+              process.env.ADMIN_EMAIL;
             const isAdmin =
               (adminUserId && authUser.id === adminUserId) ||
               (adminEmail && authUser.email?.toLowerCase() === adminEmail.toLowerCase());

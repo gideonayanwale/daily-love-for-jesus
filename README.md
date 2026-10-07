@@ -68,7 +68,14 @@ cp mobile/.env.example mobile/.env
 👉 *For complete details on obtaining free database and auth keys, see [`ENV_SETUP.md`](ENV_SETUP.md).*
 
 ### 3. Start Development Servers
-Start both the NestJS API server (`http://localhost:4000`) and the Vite React frontend (`http://localhost:3000`):
+Start both the NestJS API server (`http://localhost:4000`) and the Vite React frontend (`http://localhost:3000`) concurrently in a single terminal:
+```bash
+# Run both Backend and Frontend together
+npm run dev
+# (or npm run dev:all)
+```
+
+Or run them in separate terminals:
 ```bash
 # Terminal 1: NestJS Backend (watches and auto-reloads)
 npm run dev:backend
@@ -89,6 +96,7 @@ npm --prefix mobile run start
 
 | Command | Action |
 | :--- | :--- |
+| `npm run dev` / `npm run dev:all` | Runs both NestJS backend and Vite frontend concurrently with unified logging. |
 | `npm run dev:backend` | Starts NestJS API server in watch mode with TypeScript execution (`tsx`). |
 | `npm run dev:frontend`| Starts Vite React development server on port 3000 with `/api` proxy. |
 | `npm run build` | Compiles both NestJS backend (`tsc`) and Vite frontend (`dist/public`). |

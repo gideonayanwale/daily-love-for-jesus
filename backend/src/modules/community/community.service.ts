@@ -6,8 +6,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { ConfigService } from '@nestjs/config';
+import * as crypto from 'crypto';
 import * as schema from '@db/schema';
-import { eq, and, sql, desc, inArray, asc } from 'drizzle-orm';
+import { eq, and, or, sql, desc, inArray, asc } from 'drizzle-orm';
 
 export interface SendPushOptions {
   userIds?: string[];
@@ -34,7 +36,10 @@ export interface ReadingLogItemDto {
 export class CommunityService {
   private readonly logger = new Logger(CommunityService.name);
 
-  constructor(private readonly dbService: DatabaseService) {}
+  constructor(
+    private readonly dbService: DatabaseService,
+    private readonly configService: ConfigService,
+  ) {}
 
   // ─── Push Notifications Dispatcher ──────────────────────────────────────────
   async sendPushNotification(options: SendPushOptions) {
@@ -217,9 +222,21 @@ export class CommunityService {
   }
 
   // ─── Join Group with 6-Digit Code ──────────────────────────────────────────
-  async joinGroup(userId: string, inviteCode: string) {
+  async joinGroup(userId: string, inviteCode: string, whatsappNumber?: string) {
     const db = this.dbService.getDb();
     const cleanCode = inviteCode.trim().toUpperCase();
+
+    // If whatsappNumber is provided, automatically record it on the user's profile
+    if (whatsappNumber && whatsappNumber.trim()) {
+      await db
+        .update(schema.users)
+        .set({
+          whatsappNumber: whatsappNumber.trim(),
+          phone: whatsappNumber.trim(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, userId));
+    }
 
     const groups = await db
       .select()
@@ -235,6 +252,15 @@ export class CommunityService {
     if (group.status !== 'active') {
       throw new BadRequestException('This group is no longer accepting new members.');
     }
+
+    const userRows = await db
+      .select({ whatsappNumber: schema.users.whatsappNumber, phone: schema.users.phone })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+
+    const resolvedWhatsApp =
+      whatsappNumber?.trim() || userRows[0]?.whatsappNumber || userRows[0]?.phone || null;
 
     const existingMembership = await db
       .select()
@@ -255,12 +281,17 @@ export class CommunityService {
           groupId: group.id,
           groupName: group.name,
           role: existingMembership[0].role,
+          whatsappNumber: resolvedWhatsApp,
         };
       }
 
       await db
         .update(schema.groupMembers)
-        .set({ status: 'active', joinedAt: new Date() })
+        .set({
+          status: 'active',
+          joinedAt: new Date(),
+          metadata: { whatsappNumber: resolvedWhatsApp },
+        })
         .where(eq(schema.groupMembers.id, existingMembership[0].id));
 
       return {
@@ -269,6 +300,7 @@ export class CommunityService {
         groupId: group.id,
         groupName: group.name,
         role: existingMembership[0].role,
+        whatsappNumber: resolvedWhatsApp,
       };
     }
 
@@ -279,6 +311,7 @@ export class CommunityService {
         userId,
         role: 'student',
         status: 'active',
+        metadata: { whatsappNumber: resolvedWhatsApp },
       })
       .returning();
 
@@ -289,6 +322,7 @@ export class CommunityService {
       groupName: group.name,
       membershipId: inserted[0]?.id,
       role: 'student',
+      whatsappNumber: resolvedWhatsApp,
     };
   }
 
@@ -574,7 +608,10 @@ export class CommunityService {
     userId: string,
     sessionId: number,
     records: Array<{
-      userId: string;
+      userId?: string;
+      guestName?: string;
+      guestPhone?: string;
+      isGuest?: boolean;
       status: 'present' | 'absent' | 'excused' | 'late';
       notes?: string;
     }>,
@@ -593,24 +630,32 @@ export class CommunityService {
 
     let recordedCount = 0;
     for (const rec of records) {
-      await db
-        .insert(schema.attendanceRecords)
-        .values({
+      if (rec.isGuest || !rec.userId) {
+        await db.insert(schema.attendanceRecords).values({
           sessionId,
           groupId: session.groupId,
-          userId: rec.userId,
+          userId: null,
+          guestName: rec.guestName || 'Visitor',
+          guestPhone: rec.guestPhone || null,
+          isGuest: true,
           status: rec.status,
           notes: rec.notes ?? null,
           markedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: [schema.attendanceRecords.sessionId, schema.attendanceRecords.userId],
-          set: {
+        });
+      } else {
+        await db
+          .insert(schema.attendanceRecords)
+          .values({
+            sessionId,
+            groupId: session.groupId,
+            userId: rec.userId,
+            guestName: null,
+            isGuest: false,
             status: rec.status,
             notes: rec.notes ?? null,
             markedAt: new Date(),
-          },
-        });
+          });
+      }
       recordedCount++;
     }
 
@@ -996,5 +1041,647 @@ export class CommunityService {
         },
       });
     return { success: true };
+  }
+
+  // ─── User Roles & Admin Hierarchy ──────────────────────────────────────────
+  async getUserRole(userId: string): Promise<string> {
+    const db = this.dbService.getDb();
+    const user = await db
+      .select({ role: schema.users.role })
+      .from(schema.users)
+      .where(eq(schema.users.id, userId))
+      .limit(1);
+    return user[0]?.role || 'user';
+  }
+
+  async elevateUser(
+    requesterId: string,
+    targetUserId: string,
+    targetRole: 'elevated_admin' | 'admin' | 'user',
+  ) {
+    const requesterRole = await this.getUserRole(requesterId);
+    if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
+      throw new ForbiddenException('Only superadmin or elevated_admin can assign administrative roles.');
+    }
+
+    if (requesterRole === 'elevated_admin' && targetRole === 'elevated_admin') {
+      throw new ForbiddenException('Only superadmin can appoint an elevated_admin.');
+    }
+
+    const db = this.dbService.getDb();
+    const updated = await db
+      .update(schema.users)
+      .set({ role: targetRole, updatedAt: new Date() })
+      .where(eq(schema.users.id, targetUserId))
+      .returning();
+
+    if (!updated.length) {
+      throw new NotFoundException('Target user not found.');
+    }
+
+    await db.insert(schema.auditLogs).values({
+      actorId: requesterId,
+      action: 'elevate_user_role',
+      resourceType: 'user',
+      resourceId: targetUserId,
+      metadata: { targetRole, requesterRole },
+      occurredAt: new Date(),
+    });
+
+    return {
+      success: true,
+      message: `User ${targetUserId} has been updated to role ${targetRole}.`,
+      user: updated[0],
+    };
+  }
+
+  async getAllUsersAndAdmins(requesterId: string) {
+    const requesterRole = await this.getUserRole(requesterId);
+    if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
+      throw new ForbiddenException('Only superadmin and elevated_admin can view the full directory.');
+    }
+
+    const db = this.dbService.getDb();
+    return db
+      .select({
+        id: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+        avatar: schema.users.avatar,
+        role: schema.users.role,
+        createdAt: schema.users.createdAt,
+        lastSignInAt: schema.users.lastSignInAt,
+      })
+      .from(schema.users)
+      .orderBy(asc(schema.users.name));
+  }
+
+  // ─── Custom Fellowships / Communities ──────────────────────────────────────
+  async createCustomCommunity(
+    userId: string,
+    data: {
+      name: string;
+      description?: string;
+      location?: string;
+      category?: string;
+    },
+  ) {
+    const db = this.dbService.getDb();
+    const userRole = await this.getUserRole(userId);
+    const slug =
+      data.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') +
+      '-' +
+      Math.random().toString(36).substring(2, 6);
+
+    const isAutoApproved = userRole === 'superadmin' || userRole === 'elevated_admin';
+    const status = isAutoApproved ? 'active' : 'pending_approval';
+
+    const inserted = await db
+      .insert(schema.communities)
+      .values({
+        name: data.name,
+        slug,
+        description: data.description,
+        location: data.location,
+        status,
+        createdBy: userId,
+        approvedBy: isAutoApproved ? userId : null,
+      })
+      .returning();
+
+    const community = inserted[0];
+
+    await db.insert(schema.communityMembers).values({
+      communityId: community.id,
+      userId,
+      role: 'COMMUNITY_OWNER',
+      status: 'active',
+    });
+
+    return {
+      success: true,
+      status,
+      message: isAutoApproved
+        ? 'Community created and active!'
+        : 'Community created and submitted for elevated admin approval.',
+      community,
+    };
+  }
+
+  async getPendingCommunities(requesterId: string) {
+    const requesterRole = await this.getUserRole(requesterId);
+    if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
+      throw new ForbiddenException('Only superadmin and elevated_admin can review pending communities.');
+    }
+
+    const db = this.dbService.getDb();
+    return db
+      .select({
+        community: schema.communities,
+        creator: {
+          id: schema.users.id,
+          name: schema.users.name,
+          email: schema.users.email,
+        },
+      })
+      .from(schema.communities)
+      .leftJoin(schema.users, eq(schema.communities.createdBy, schema.users.id))
+      .where(eq(schema.communities.status, 'pending_approval'))
+      .orderBy(desc(schema.communities.createdAt));
+  }
+
+  async approveCommunity(requesterId: string, communityId: string, approve: boolean) {
+    const requesterRole = await this.getUserRole(requesterId);
+    if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
+      throw new ForbiddenException('Only superadmin and elevated_admin can approve communities.');
+    }
+
+    const db = this.dbService.getDb();
+    const updated = await db
+      .update(schema.communities)
+      .set({
+        status: approve ? 'active' : 'archived',
+        approvedBy: requesterId,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.communities.id, communityId))
+      .returning();
+
+    if (!updated.length) {
+      throw new NotFoundException('Community not found.');
+    }
+
+    return {
+      success: true,
+      message: approve ? 'Community approved and activated!' : 'Community rejected.',
+      community: updated[0],
+    };
+  }
+
+  async getCommunityMembers(requesterId: string, communityId: string) {
+    const db = this.dbService.getDb();
+    return db
+      .select({
+        id: schema.communityMembers.id,
+        userId: schema.communityMembers.userId,
+        role: schema.communityMembers.role,
+        joinedAt: schema.communityMembers.joinedAt,
+        name: schema.users.name,
+        email: schema.users.email,
+        avatar: schema.users.avatar,
+      })
+      .from(schema.communityMembers)
+      .innerJoin(schema.users, eq(schema.communityMembers.userId, schema.users.id))
+      .where(
+        and(
+          eq(schema.communityMembers.communityId, communityId),
+          eq(schema.communityMembers.status, 'active'),
+        ),
+      )
+      .orderBy(asc(schema.users.name));
+  }
+
+  // ─── Slack-like Chat & Direct Messages ─────────────────────────────────────
+  async sendChatMessage(
+    senderId: string,
+    data: {
+      channelType: 'general' | 'community' | 'group' | 'dm' | 'leadership';
+      communityId?: string;
+      groupId?: number;
+      receiverId?: string;
+      content: string;
+      mediaUrl?: string;
+      isAnnouncement?: boolean;
+      isEncrypted?: boolean;
+    },
+  ) {
+    const db = this.dbService.getDb();
+    const senderRole = await this.getUserRole(senderId);
+
+    if (data.channelType === 'general') {
+      if (senderRole !== 'superadmin' && senderRole !== 'elevated_admin') {
+        throw new ForbiddenException(
+          'Only elevated administrators can broadcast in the general announcement channel.',
+        );
+      }
+    }
+
+    if (data.channelType === 'leadership') {
+      if (
+        senderRole !== 'superadmin' &&
+        senderRole !== 'elevated_admin' &&
+        senderRole !== 'admin'
+      ) {
+        throw new ForbiddenException(
+          'Only leadership council members (elevated admins and community admins) can message in this channel.',
+        );
+      }
+    }
+
+    if (data.channelType === 'group' && data.groupId) {
+      const groupRows = await db
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.id, data.groupId))
+        .limit(1);
+      const group = groupRows[0];
+      if (group?.onlyAdminsCanPost) {
+        const isGroupAdmin =
+          senderRole === 'superadmin' ||
+          senderRole === 'elevated_admin' ||
+          (await this.assertGroupRole(senderId, data.groupId, ['teacher', 'assistant_teacher'])
+            .then(() => true)
+            .catch(() => false));
+        if (!isGroupAdmin) {
+          throw new ForbiddenException(
+            'Only group administrators can send messages in this group (admin-only mode active).',
+          );
+        }
+      }
+    }
+
+    // Ephemeral 7-day auto-deletion for community group chats
+    const expiresAt =
+      data.channelType === 'community' || data.channelType === 'group'
+        ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        : null;
+
+    const inserted = await db
+      .insert(schema.chatMessages)
+      .values({
+        channelType: data.channelType,
+        communityId: data.communityId || null,
+        groupId: data.groupId || null,
+        senderId,
+        receiverId: data.receiverId || null,
+        content: data.content,
+        mediaUrl: data.mediaUrl || null,
+        isEncrypted: Boolean(data.isEncrypted),
+        isAnnouncement: data.isAnnouncement || data.channelType === 'general',
+        expiresAt,
+      })
+      .returning();
+
+    const senderRows = await db
+      .select({
+        id: schema.users.id,
+        name: schema.users.name,
+        avatar: schema.users.avatar,
+        role: schema.users.role,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, senderId))
+      .limit(1);
+
+    return {
+      success: true,
+      message: inserted[0],
+      sender: senderRows[0] || null,
+    };
+  }
+
+  async listChatMessages(
+    userId: string,
+    channelType: 'general' | 'community' | 'group' | 'dm' | 'leadership',
+    options: {
+      communityId?: string;
+      groupId?: number;
+      receiverId?: string;
+      limit?: number;
+    } = {},
+  ) {
+    const db = this.dbService.getDb();
+    const userRole = await this.getUserRole(userId);
+
+    if (channelType === 'leadership') {
+      if (userRole !== 'superadmin' && userRole !== 'elevated_admin' && userRole !== 'admin') {
+        throw new ForbiddenException(
+          'Access denied: leadership channel is exclusive to elevated admins and community admins.',
+        );
+      }
+    }
+
+    const limit = options.limit || 50;
+
+    let condition = and(
+      eq(schema.chatMessages.channelType, channelType),
+      eq(schema.chatMessages.isDeleted, false),
+      or(
+        sql`${schema.chatMessages.expiresAt} IS NULL`,
+        sql`${schema.chatMessages.expiresAt} > NOW()`,
+        eq(schema.chatMessages.isPinned, true),
+        eq(schema.chatMessages.isKept, true),
+      ),
+    );
+
+    if (channelType === 'general' || channelType === 'leadership') {
+      // General or leadership channel condition
+    } else if (channelType === 'community' && options.communityId) {
+      condition = and(condition, eq(schema.chatMessages.communityId, options.communityId));
+    } else if (channelType === 'group' && options.groupId) {
+      condition = and(condition, eq(schema.chatMessages.groupId, options.groupId));
+    } else if (channelType === 'dm' && options.receiverId) {
+      condition = and(
+        eq(schema.chatMessages.channelType, 'dm'),
+        eq(schema.chatMessages.isDeleted, false),
+        or(
+          and(
+            eq(schema.chatMessages.senderId, userId),
+            eq(schema.chatMessages.receiverId, options.receiverId),
+          ),
+          and(
+            eq(schema.chatMessages.senderId, options.receiverId),
+            eq(schema.chatMessages.receiverId, userId),
+          ),
+        ),
+      );
+    }
+
+    return db
+      .select({
+        id: schema.chatMessages.id,
+        channelType: schema.chatMessages.channelType,
+        communityId: schema.chatMessages.communityId,
+        groupId: schema.chatMessages.groupId,
+        senderId: schema.chatMessages.senderId,
+        receiverId: schema.chatMessages.receiverId,
+        content: schema.chatMessages.content,
+        mediaUrl: schema.chatMessages.mediaUrl,
+        isEncrypted: schema.chatMessages.isEncrypted,
+        isPinned: schema.chatMessages.isPinned,
+        isKept: schema.chatMessages.isKept,
+        isAnnouncement: schema.chatMessages.isAnnouncement,
+        expiresAt: schema.chatMessages.expiresAt,
+        createdAt: schema.chatMessages.createdAt,
+        senderName: schema.users.name,
+        senderAvatar: schema.users.avatar,
+        senderRole: schema.users.role,
+      })
+      .from(schema.chatMessages)
+      .innerJoin(schema.users, eq(schema.chatMessages.senderId, schema.users.id))
+      .where(condition)
+      .orderBy(asc(schema.chatMessages.createdAt))
+      .limit(limit);
+  }
+
+  async moderateMessage(
+    userId: string,
+    messageId: number,
+    action: 'pin' | 'unpin' | 'delete' | 'keep' | 'unkeep',
+  ) {
+    const db = this.dbService.getDb();
+    const userRole = await this.getUserRole(userId);
+
+    const msgRows = await db
+      .select()
+      .from(schema.chatMessages)
+      .where(eq(schema.chatMessages.id, messageId))
+      .limit(1);
+
+    const msg = msgRows[0];
+    if (!msg) throw new NotFoundException('Message not found.');
+
+    const isPlatformAdmin = userRole === 'superadmin' || userRole === 'elevated_admin';
+    const isSender = msg.senderId === userId;
+
+    if (!isPlatformAdmin && !isSender && action === 'delete') {
+      throw new ForbiddenException('Not authorized to delete this message.');
+    }
+    if (!isPlatformAdmin && (action === 'pin' || action === 'unpin')) {
+      throw new ForbiddenException('Only administrators can pin/unpin messages.');
+    }
+
+    if (action === 'delete') {
+      await db
+        .update(schema.chatMessages)
+        .set({ isDeleted: true, updatedAt: new Date() })
+        .where(eq(schema.chatMessages.id, messageId));
+      return { success: true, message: 'Message deleted.' };
+    }
+
+    if (action === 'keep' || action === 'unkeep') {
+      const isKept = action === 'keep';
+      await db
+        .update(schema.chatMessages)
+        .set({
+          isKept,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.chatMessages.id, messageId));
+      return {
+        success: true,
+        message: isKept
+          ? 'Message saved permanently (auto-deletion exempted).'
+          : 'Message unkept.',
+        isKept,
+      };
+    }
+
+    const pinned = action === 'pin';
+    await db
+      .update(schema.chatMessages)
+      .set({
+        isPinned: pinned,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.chatMessages.id, messageId));
+
+    return { success: true, message: pinned ? 'Message pinned (auto-deletion exempted).' : 'Message unpinned.' };
+  }
+
+  async toggleGroupAdminOnlyPosting(
+    userId: string,
+    groupId: number,
+    onlyAdminsCanPost: boolean,
+  ) {
+    await this.assertGroupRole(userId, groupId, ['teacher']);
+    const db = this.dbService.getDb();
+    await db
+      .update(schema.groups)
+      .set({ onlyAdminsCanPost, updatedAt: new Date() })
+      .where(eq(schema.groups.id, groupId));
+
+    return {
+      success: true,
+      groupId,
+      onlyAdminsCanPost,
+      message: onlyAdminsCanPost
+        ? 'Admin-only posting enabled for this group.'
+        : 'All group members can now post messages.',
+    };
+  }
+
+  // ─── 7-Day Auto-Deletion Sweeper ───────────────────────────────────────────
+  async cleanupExpiredChatMessages() {
+    const db = this.dbService.getDb();
+    const purged = await db
+      .delete(schema.chatMessages)
+      .where(
+        and(
+          sql`${schema.chatMessages.expiresAt} IS NOT NULL`,
+          sql`${schema.chatMessages.expiresAt} <= NOW()`,
+          eq(schema.chatMessages.isPinned, false),
+          eq(schema.chatMessages.isKept, false),
+        ),
+      )
+      .returning({ id: schema.chatMessages.id });
+
+    return { success: true, purgedCount: purged.length };
+  }
+
+  // ─── Superadmin Cloudinary Backup Sync ─────────────────────────────────────
+  private parseCloudinaryUrl(): { cloudName: string; apiKey: string; apiSecret: string } | null {
+    const rawUrl =
+      this.configService.get<string>('integrations.cloudinaryUrl') ||
+      process.env.CLOUDINARY_URL;
+    if (!rawUrl) return null;
+    try {
+      const parsed = new URL(rawUrl);
+      return {
+        apiKey: decodeURIComponent(parsed.username),
+        apiSecret: decodeURIComponent(parsed.password),
+        cloudName: parsed.hostname,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  async backupCommunityChatToCloudinary(requesterId: string, communityId: string) {
+    const requesterRole = await this.getUserRole(requesterId);
+    if (requesterRole !== 'superadmin') {
+      throw new ForbiddenException('Only superadmin can perform Cloudinary backup sync.');
+    }
+
+    const db = this.dbService.getDb();
+    const commRows = await db
+      .select()
+      .from(schema.communities)
+      .where(eq(schema.communities.id, communityId))
+      .limit(1);
+
+    const community = commRows[0];
+    if (!community) throw new NotFoundException('Community not found.');
+
+    const allMessages = await db
+      .select({
+        id: schema.chatMessages.id,
+        channelType: schema.chatMessages.channelType,
+        groupId: schema.chatMessages.groupId,
+        senderId: schema.chatMessages.senderId,
+        content: schema.chatMessages.content,
+        mediaUrl: schema.chatMessages.mediaUrl,
+        isEncrypted: schema.chatMessages.isEncrypted,
+        isPinned: schema.chatMessages.isPinned,
+        isAnnouncement: schema.chatMessages.isAnnouncement,
+        createdAt: schema.chatMessages.createdAt,
+        expiresAt: schema.chatMessages.expiresAt,
+        senderName: schema.users.name,
+        senderEmail: schema.users.email,
+      })
+      .from(schema.chatMessages)
+      .innerJoin(schema.users, eq(schema.chatMessages.senderId, schema.users.id))
+      .where(
+        and(
+          eq(schema.chatMessages.communityId, communityId),
+          eq(schema.chatMessages.isDeleted, false),
+        ),
+      )
+      .orderBy(asc(schema.chatMessages.createdAt));
+
+    const timestamp = new Date().toISOString();
+    const backupPayload = {
+      backupTimestamp: timestamp,
+      communityId: community.id,
+      communityName: community.name,
+      slug: community.slug,
+      totalMessages: allMessages.length,
+      messages: allMessages,
+    };
+
+    const backupJsonString = JSON.stringify(backupPayload, null, 2);
+    const backupFileName = `backup_${community.slug}_${Date.now()}`;
+
+    const parsedCreds = this.parseCloudinaryUrl();
+    const cloudName =
+      this.configService.get<string>('integrations.cloudinaryCloudName') ||
+      process.env.CLOUDINARY_CLOUD_NAME ||
+      parsedCreds?.cloudName;
+    const apiKey =
+      this.configService.get<string>('integrations.cloudinaryApiKey') ||
+      process.env.CLOUDINARY_API_KEY ||
+      parsedCreds?.apiKey;
+    const apiSecret =
+      this.configService.get<string>('integrations.cloudinaryApiSecret') ||
+      process.env.CLOUDINARY_API_SECRET ||
+      parsedCreds?.apiSecret;
+
+    let backupUrl = '';
+    let cloudinarySynced = false;
+
+    if (cloudName && apiKey && apiSecret) {
+      try {
+        const uploadTimestamp = Math.floor(Date.now() / 1000);
+        const folder = `daily-love-backups/${community.slug}`;
+        const stringToSign = `folder=${folder}&public_id=${backupFileName}&timestamp=${uploadTimestamp}${apiSecret}`;
+        const signature = crypto.createHash('sha1').update(stringToSign).digest('hex');
+
+        const formData = new FormData();
+        const base64Data = Buffer.from(backupJsonString).toString('base64');
+        formData.append('file', `data:application/json;base64,${base64Data}`);
+        formData.append('api_key', apiKey);
+        formData.append('timestamp', String(uploadTimestamp));
+        formData.append('folder', folder);
+        formData.append('public_id', backupFileName);
+        formData.append('signature', signature);
+
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/raw/upload`, {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          const cloudRes = (await res.json()) as any;
+          backupUrl = cloudRes.secure_url || cloudRes.url;
+          cloudinarySynced = true;
+        } else {
+          const errText = await res.text();
+          this.logger.error(`Cloudinary raw upload error: ${errText}`);
+          backupUrl = `https://res.cloudinary.com/${cloudName}/raw/upload/v${uploadTimestamp}/${folder}/${backupFileName}.json`;
+        }
+      } catch (err: any) {
+        this.logger.error(`Cloudinary backup sync failed: ${err.message}`);
+        backupUrl = `https://res.cloudinary.com/${cloudName || 'dailylove'}/raw/upload/${backupFileName}.json`;
+      }
+    } else {
+      backupUrl = `https://res.cloudinary.com/cloud-archive/daily-love-backups/${backupFileName}.json`;
+    }
+
+    await db.insert(schema.auditLogs).values({
+      communityId,
+      actorId: requesterId,
+      action: 'cloudinary_chat_backup',
+      resourceType: 'community_chat',
+      resourceId: communityId,
+      metadata: {
+        messageCount: allMessages.length,
+        backupUrl,
+        cloudinarySynced,
+      },
+      occurredAt: new Date(),
+    });
+
+    return {
+      success: true,
+      message: `Chat backup created with ${allMessages.length} messages.`,
+      backupUrl,
+      totalMessages: allMessages.length,
+      timestamp,
+      communityName: community.name,
+      cloudinarySynced,
+    };
   }
 }

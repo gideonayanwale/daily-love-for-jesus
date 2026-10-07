@@ -19,6 +19,18 @@ import {
   BibleBook,
 } from '../lib/bibleApi';
 import { useReadingTracker } from '../hooks/useReadingTracker';
+import { mobileNarrator } from '../lib/mobileAudio';
+import {
+  downloadWholeVersion,
+  getDownloadedVersions,
+  isVersionDownloaded,
+  DownloadProgress,
+} from '../lib/mobileBibleStorage';
+import {
+  lookupMobileYorubaAudio,
+  saveYorubaAudioLocal,
+  MobileYorubaAudioInfo,
+} from '../lib/yorubaAudio';
 
 export function BibleScreen() {
   const navigation = useNavigation<any>();
@@ -28,6 +40,19 @@ export function BibleScreen() {
   const [verses, setVerses] = useState<MobileVerse[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Offline Translations Storage State
+  const [downloadedVersions, setDownloadedVersions] = useState<string[]>([]);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+
+  // Yoruba DaBible Audio State
+  const [yorubaAudio, setYorubaAudio] = useState<MobileYorubaAudioInfo | null>(null);
+  const [showYorubaBar, setShowYorubaBar] = useState(false);
+
+  // Audio Narration State
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [isAudioPaused, setIsAudioPaused] = useState(false);
+  const [activeNarratedVerse, setActiveNarratedVerse] = useState<number | null>(null);
 
   // Hook for 90% scroll depth tracking and offline reading queue sync
   const {
@@ -61,8 +86,87 @@ export function BibleScreen() {
   };
 
   useEffect(() => {
+    mobileNarrator.stop();
+    setIsPlayingAudio(false);
+    setIsAudioPaused(false);
+    setActiveNarratedVerse(null);
     loadVerses();
+    getDownloadedVersions().then(setDownloadedVersions);
+    lookupMobileYorubaAudio(selectedBook.id, selectedChapter).then(setYorubaAudio);
+    return () => {
+      mobileNarrator.stop();
+    };
   }, [selectedBook.id, selectedChapter, translation]);
+
+  const handleDownloadTranslation = async (transCode: string) => {
+    if (downloadProgress && downloadProgress.status === 'downloading') return;
+    setDownloadProgress({
+      completedChapters: 0,
+      totalChapters: 1189,
+      percentage: 0,
+      status: 'downloading',
+      currentBookName: 'Starting...',
+    });
+    try {
+      await downloadWholeVersion(transCode, (prog) => {
+        setDownloadProgress({ ...prog });
+      });
+      const updated = await getDownloadedVersions();
+      setDownloadedVersions(updated);
+    } catch {
+      setDownloadProgress(null);
+    }
+  };
+
+  const handleSaveYorubaAudio = async () => {
+    await saveYorubaAudioLocal(selectedBook.id, selectedChapter, 'cached');
+    const updated = await lookupMobileYorubaAudio(selectedBook.id, selectedChapter);
+    setYorubaAudio(updated);
+  };
+
+  const handleToggleAudio = () => {
+    if (isPlayingAudio && !isAudioPaused) {
+      mobileNarrator.pause();
+      setIsAudioPaused(true);
+      return;
+    }
+
+    if (isAudioPaused) {
+      mobileNarrator.resume();
+      setIsAudioPaused(false);
+      return;
+    }
+
+    if (verses.length === 0) return;
+
+    const verseTexts = verses.map(
+      (v) => `Verse ${v.verse}. ${v.text}`
+    );
+
+    setIsPlayingAudio(true);
+    setIsAudioPaused(false);
+    mobileNarrator.startNarration(
+      verseTexts,
+      0,
+      (idx) => {
+        if (verses[idx]) {
+          setActiveNarratedVerse(verses[idx].verse);
+        }
+      },
+      () => {
+        setIsPlayingAudio(false);
+        setIsAudioPaused(false);
+        setActiveNarratedVerse(null);
+      }
+    );
+  };
+
+  const handleStopAudio = () => {
+    mobileNarrator.stop();
+    setIsPlayingAudio(false);
+    setIsAudioPaused(false);
+    setActiveNarratedVerse(null);
+  };
 
   const handleShareVerse = (verse: MobileVerse) => {
     Share.share({
@@ -103,14 +207,76 @@ export function BibleScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Translation Picker Trigger */}
-          <TouchableOpacity
-            onPress={() => setIsTransModalVisible(true)}
-            className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 active:bg-amber-500/30"
-          >
-            <Text className="text-amber-400 font-bold text-xs">{translation}</Text>
-          </TouchableOpacity>
+          {/* Audio Narration and Translation Controls */}
+          <View className="flex-row items-center space-x-1.5">
+            <TouchableOpacity
+              onPress={handleToggleAudio}
+              className={`px-2.5 py-1.5 rounded-xl border flex-row items-center space-x-1 ${
+                isPlayingAudio
+                  ? 'bg-amber-500 border-amber-400'
+                  : 'bg-white/10 border-white/15 active:bg-white/20'
+              }`}
+            >
+              <Text className={`text-xs font-bold ${isPlayingAudio ? 'text-slate-950' : 'text-white'}`}>
+                {isPlayingAudio ? (isAudioPaused ? '▶ Resume' : '⏸ Pause') : '🔊 Listen'}
+              </Text>
+            </TouchableOpacity>
+
+            {isPlayingAudio && (
+              <TouchableOpacity
+                onPress={handleStopAudio}
+                className="px-2 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40"
+              >
+                <Text className="text-rose-400 font-bold text-xs">⏹</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Yoruba Audio Trigger */}
+            <TouchableOpacity
+              onPress={() => setShowYorubaBar(!showYorubaBar)}
+              className={`px-2 py-1.5 rounded-xl border flex-row items-center ${
+                showYorubaBar
+                  ? 'bg-amber-600 border-amber-500'
+                  : 'bg-white/10 border-white/15 active:bg-white/20'
+              }`}
+            >
+              <Text className="text-white text-xs font-bold">Yorùbá</Text>
+              {yorubaAudio?.isDownloaded && (
+                <View className="w-1.5 h-1.5 rounded-full bg-emerald-400 ml-1" />
+              )}
+            </TouchableOpacity>
+
+            {/* Translation Picker Trigger */}
+            <TouchableOpacity
+              onPress={() => setIsTransModalVisible(true)}
+              className="px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/40 active:bg-amber-500/30"
+            >
+              <Text className="text-amber-400 font-bold text-xs">{translation}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* Yoruba DaBible Audio Panel */}
+        {showYorubaBar && (
+          <View className="mt-2.5 pt-2 border-t border-amber-500/30 bg-amber-500/10 -mx-4 px-4 py-2 flex-row items-center justify-between">
+            <View>
+              <Text className="text-amber-300 font-bold text-xs">
+                Bibeli Mímọ́ (Yorùbá) — Orí {selectedChapter}
+              </Text>
+              <Text className="text-white/60 text-[10px]">
+                {yorubaAudio?.isDownloaded ? '✓ Saved on Local Storage' : 'Streaming from DaBible'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleSaveYorubaAudio}
+              className="px-2.5 py-1 rounded-lg bg-white/15 border border-white/20"
+            >
+              <Text className="text-white text-[11px] font-semibold">
+                {yorubaAudio?.isDownloaded ? '✓ Saved' : '↓ Save Offline'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Accountability & Reading Progress Bar */}
         <View className="mt-2.5 pt-2 border-t border-white/5 flex-row items-center justify-between">
@@ -182,7 +348,13 @@ export function BibleScreen() {
                 onPress={() => handleShareVerse(v)}
                 activeOpacity={0.7}
               >
-                <GlassCard className="p-3.5 mb-2.5">
+                <GlassCard
+                  className={`p-3.5 mb-2.5 ${
+                    activeNarratedVerse === v.verse
+                      ? 'border border-amber-400 bg-amber-500/20'
+                      : ''
+                  }`}
+                >
                   <View className="flex-row items-start space-x-2">
                     <Text className="text-amber-400 font-bold text-xs mt-0.5 w-6">
                       {v.verse}
@@ -317,34 +489,92 @@ export function BibleScreen() {
                 <Text className="text-amber-400 text-sm font-semibold">Close</Text>
               </TouchableOpacity>
             </View>
+            {/* Download Progress Banner */}
+            {downloadProgress && downloadProgress.status === 'downloading' && (
+              <View className="mb-3 p-3 rounded-xl bg-amber-500/15 border border-amber-500/30">
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-amber-300 font-bold text-xs">
+                    Downloading {downloadProgress.currentBookName}...
+                  </Text>
+                  <Text className="text-amber-300 font-bold text-xs">
+                    {downloadProgress.percentage}%
+                  </Text>
+                </View>
+                <View className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                  <View
+                    className="h-full bg-amber-400 rounded-full"
+                    style={{ width: `${downloadProgress.percentage}%` }}
+                  />
+                </View>
+                <Text className="text-white/40 text-[10px] mt-1">
+                  Saving all 66 books to local storage for offline use
+                </Text>
+              </View>
+            )}
+
             <FlatList
               data={POPULAR_TRANSLATIONS}
               keyExtractor={(item) => item.shortName}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => {
-                    setTranslation(item.shortName);
-                    setIsTransModalVisible(false);
-                  }}
-                  className={`py-3 px-3 rounded-xl mb-1.5 flex-row items-center justify-between ${
-                    translation === item.shortName
-                      ? 'bg-amber-500/20 border border-amber-500/40'
-                      : 'bg-white/5'
-                  }`}
-                >
-                  <View>
-                    <Text
-                      className={`font-bold text-sm ${
-                        translation === item.shortName ? 'text-amber-400' : 'text-white'
-                      }`}
+              renderItem={({ item }) => {
+                const isInbuilt = item.shortName === 'KJV';
+                const isDownloaded = downloadedVersions.includes(item.shortName);
+                const isSelected = translation === item.shortName;
+
+                return (
+                  <View
+                    className={`p-3 rounded-xl mb-2 flex-row items-center justify-between ${
+                      isSelected
+                        ? 'bg-amber-500/20 border border-amber-500/40'
+                        : 'bg-white/5 border border-white/5'
+                    }`}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        setTranslation(item.shortName);
+                        setIsTransModalVisible(false);
+                      }}
+                      className="flex-1 mr-2"
                     >
-                      {item.shortName}
-                    </Text>
-                    <Text className="text-white/60 text-xs">{item.fullName}</Text>
+                      <View className="flex-row items-center space-x-2">
+                        <Text
+                          className={`font-bold text-sm ${
+                            isSelected ? 'text-amber-400' : 'text-white'
+                          }`}
+                        >
+                          {item.shortName}
+                        </Text>
+                        {isInbuilt && (
+                          <View className="px-1.5 py-0.5 rounded bg-emerald-500/20">
+                            <Text className="text-emerald-400 text-[9px] font-bold">
+                              Inbuilt Default
+                            </Text>
+                          </View>
+                        )}
+                        {isDownloaded && !isInbuilt && (
+                          <View className="px-1.5 py-0.5 rounded bg-emerald-500/20">
+                            <Text className="text-emerald-400 text-[9px] font-bold">
+                              ✓ Saved Offline
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text className="text-white/60 text-xs">{item.fullName}</Text>
+                      <Text className="text-amber-400/60 text-[10px]">{item.language}</Text>
+                    </TouchableOpacity>
+
+                    {!isInbuilt && !isDownloaded && (
+                      <TouchableOpacity
+                        onPress={() => handleDownloadTranslation(item.shortName)}
+                        className="px-2.5 py-1.5 rounded-lg bg-amber-500 active:bg-amber-600"
+                      >
+                        <Text className="text-slate-950 font-bold text-[10px]">
+                          ↓ Download
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
-                  <Text className="text-amber-400/70 text-xs">{item.language}</Text>
-                </TouchableOpacity>
-              )}
+                );
+              }}
             />
           </View>
         </View>

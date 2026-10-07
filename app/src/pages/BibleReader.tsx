@@ -17,10 +17,13 @@ import {
   Highlighter,
   Globe,
   Loader2,
+  Sparkles,
+  Music,
 } from "lucide-react";
 import { toast } from "sonner";
 import { TranslationSelectorModal } from "@/components/TranslationSelectorModal";
 import { CompareVersesModal } from "@/components/CompareVersesModal";
+import { AiStudyModal } from "@/components/AiStudyModal";
 import { bibleNarrator } from "@/lib/bibleAudio";
 import {
   saveOfflineChapter,
@@ -29,6 +32,12 @@ import {
   markTranslationDownloaded,
   type OfflineVerse,
 } from "@/lib/bibleOffline";
+import {
+  lookupYorubaAudio,
+  downloadYorubaAudioChapter,
+  isYorubaAudioDownloaded,
+  type YorubaAudioInfo,
+} from "@/lib/yorubaAudio";
 
 
 const HIGHLIGHT_COLORS = [
@@ -56,6 +65,10 @@ export default function BibleReader() {
   // Compare Verses State
   const [compareVerseNumber, setCompareVerseNumber] = useState<number | null>(null);
 
+  // AI Study Guide State
+  const [isAiStudyModalOpen, setIsAiStudyModalOpen] = useState(false);
+  const [aiStudyVerse, setAiStudyVerse] = useState<{ scripture: string; text: string } | null>(null);
+
   // Reader Settings
   const [fontSize, setFontSize] = useState<"sm" | "md" | "lg">("md");
   const [selectedVerse, setSelectedVerse] = useState<number | null>(null);
@@ -65,6 +78,13 @@ export default function BibleReader() {
   const [isAudioPaused, setIsAudioPaused] = useState(false);
   const [activeNarratedVerse, setActiveNarratedVerse] = useState<number | null>(null);
   const [audioSpeed, setAudioSpeed] = useState<number>(1.0);
+
+  // Yoruba DaBible Audio State (lookup & download to local storage)
+  const [yorubaAudio, setYorubaAudio] = useState<YorubaAudioInfo | null>(null);
+  const [showYorubaBar, setShowYorubaBar] = useState(false);
+  const [isYorubaPlaying, setIsYorubaPlaying] = useState(false);
+  const [isDownloadingYoruba, setIsDownloadingYoruba] = useState(false);
+  const yorubaAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Offline Download State
   const [isCurrentTranslationDownloaded, setIsCurrentTranslationDownloaded] = useState(false);
@@ -147,8 +167,22 @@ export default function BibleReader() {
   useEffect(() => {
     return () => {
       bibleNarrator.stop();
+      if (yorubaAudioRef.current) {
+        yorubaAudioRef.current.pause();
+      }
     };
   }, [bNum, chNum, translation]);
+
+  // Sync Yoruba audio lookup (DaBible / Bibeli Mímọ́)
+  useEffect(() => {
+    lookupYorubaAudio(bNum, chNum, book?.name || "Bibeli Mímọ́").then((info) => {
+      setYorubaAudio(info);
+    });
+    if (yorubaAudioRef.current) {
+      yorubaAudioRef.current.pause();
+      setIsYorubaPlaying(false);
+    }
+  }, [bNum, chNum, book?.name]);
 
   // Reading tracking & Sunday School accountability
   const [isChapterCompleted, setIsChapterCompleted] = useState<boolean>(false);
@@ -288,6 +322,56 @@ export default function BibleReader() {
     bibleNarrator.setRate(nextSpeed);
   };
 
+  const handleToggleYorubaAudio = () => {
+    if (!yorubaAudio) return;
+    if (isPlayingAudio) {
+      handleStopAudio();
+    }
+    if (!yorubaAudioRef.current) {
+      yorubaAudioRef.current = new Audio(yorubaAudio.streamUrl);
+      yorubaAudioRef.current.onended = () => setIsYorubaPlaying(false);
+      yorubaAudioRef.current.onerror = () => {
+        setIsYorubaPlaying(false);
+        toast.error("Yoruba stream error. You can download it directly for offline playback.");
+      };
+    } else {
+      if (yorubaAudioRef.current.src !== yorubaAudio.streamUrl) {
+        yorubaAudioRef.current.src = yorubaAudio.streamUrl;
+      }
+    }
+
+    if (isYorubaPlaying) {
+      yorubaAudioRef.current.pause();
+      setIsYorubaPlaying(false);
+    } else {
+      yorubaAudioRef.current.play().then(() => {
+        setIsYorubaPlaying(true);
+      }).catch((e) => {
+        console.warn("Yoruba audio play error:", e);
+        toast.error("Audio playback error. Click download to save locally.");
+      });
+    }
+    setShowYorubaBar(true);
+  };
+
+  const handleDownloadYorubaAudio = async () => {
+    if (isDownloadingYoruba) return;
+    setIsDownloadingYoruba(true);
+    toast.info("Downloading Yoruba audio straight to local storage...");
+    const res = await downloadYorubaAudioChapter(bNum, chNum);
+    setIsDownloadingYoruba(false);
+    if (res.success) {
+      toast.success("✓ Yoruba audio saved to local storage!");
+      const refreshed = await lookupYorubaAudio(bNum, chNum, book?.name || "Bibeli Mímọ́");
+      setYorubaAudio(refreshed);
+      if (yorubaAudioRef.current && refreshed.localBlobUrl) {
+        yorubaAudioRef.current.src = refreshed.localBlobUrl;
+      }
+    } else {
+      toast.error("Failed to download Yoruba audio. Check connection.");
+    }
+  };
+
   // Download translation for offline use
   const handleDownloadTranslation = async () => {
     if (isDownloading) return;
@@ -396,6 +480,23 @@ export default function BibleReader() {
               <span className="hidden sm:inline">{isChapterCompleted ? "Completed" : "Mark Read"}</span>
             </button>
 
+            {/* AI Study Guide Trigger */}
+            <button
+              onClick={() => {
+                const firstVerse = verses?.[0];
+                setAiStudyVerse({
+                  scripture: `${book?.name ?? "Bible"} ${chNum}`,
+                  text: firstVerse ? firstVerse.text : "",
+                });
+                setIsAiStudyModalOpen(true);
+              }}
+              className="flex items-center gap-1 px-2.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/40 rounded-xl text-xs font-semibold text-amber-700 dark:text-amber-300 transition-colors shadow-xs"
+              title="Open AI Spiritual Study Guide"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 fill-current" />
+              <span className="hidden sm:inline">AI Study</span>
+            </button>
+
             {/* Translation Picker Trigger */}
             <button
               onClick={() => setIsTranslationModalOpen(true)}
@@ -443,6 +544,23 @@ export default function BibleReader() {
               <Volume2 className="w-4 h-4" />
             </button>
 
+            {/* Yoruba Audio (DaBible / Bibeli Mímọ́) */}
+            <button
+              onClick={handleToggleYorubaAudio}
+              className={`px-2 py-1 rounded-xl border text-[11px] font-semibold flex items-center gap-1 transition-colors ${
+                isYorubaPlaying
+                  ? "bg-amber-600 border-amber-700 text-white shadow-sm"
+                  : "bg-white hover:bg-amber-50 border-gray-200 text-amber-700"
+              }`}
+              title="DaBible Yorùbá Audio Bible"
+            >
+              <Music className="w-3.5 h-3.5" />
+              <span>Yorùbá</span>
+              {yorubaAudio?.isDownloaded && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" title="Offline audio saved" />
+              )}
+            </button>
+
             {/* Font Size Toggle */}
             <button
               onClick={() =>
@@ -483,6 +601,64 @@ export default function BibleReader() {
                 onClick={handleStopAudio}
                 className="p-1 rounded bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-500"
                 title="Stop narration"
+              >
+                <VolumeX className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Yoruba DaBible Floating Audio Bar */}
+        {showYorubaBar && (
+          <div className="mt-2 pt-2 border-t border-amber-100 bg-amber-50/70 -mx-4 px-4 py-2 flex items-center justify-between text-xs animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isYorubaPlaying ? "bg-emerald-500 animate-ping" : "bg-amber-400"}`} />
+              <div className="flex flex-col">
+                <span className="text-gray-900 font-medium text-[11px]">
+                  Bibeli Mímọ́ (Yorùbá) — Orí {chNum}
+                </span>
+                <span className="text-[10px] text-gray-500">
+                  {yorubaAudio?.isDownloaded ? "✓ Saved on local storage (Offline)" : "Streaming from DaBible"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleToggleYorubaAudio}
+                className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium text-[11px] flex items-center gap-1"
+              >
+                {isYorubaPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                <span>{isYorubaPlaying ? "Pause" : "Play"}</span>
+              </button>
+
+              <button
+                onClick={handleDownloadYorubaAudio}
+                disabled={isDownloadingYoruba || yorubaAudio?.isDownloaded}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  yorubaAudio?.isDownloaded
+                    ? "bg-emerald-100 border-emerald-300 text-emerald-700"
+                    : "bg-white hover:bg-gray-100 border-gray-200 text-gray-700"
+                }`}
+                title={yorubaAudio?.isDownloaded ? "Saved to local storage" : "Download Yoruba audio for offline listening"}
+              >
+                {isDownloadingYoruba ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                ) : yorubaAudio?.isDownloaded ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : (
+                  <Download className="w-3.5 h-3.5" />
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  if (yorubaAudioRef.current) yorubaAudioRef.current.pause();
+                  setIsYorubaPlaying(false);
+                  setShowYorubaBar(false);
+                }}
+                className="p-1 rounded text-gray-400 hover:text-gray-600"
+                title="Close Yoruba player"
               >
                 <VolumeX className="w-3.5 h-3.5" />
               </button>
@@ -563,6 +739,21 @@ export default function BibleReader() {
 
                       {/* Action buttons */}
                       <div className="flex items-center gap-1 ml-auto">
+                        <button
+                          onClick={() => {
+                            setAiStudyVerse({
+                              scripture: `${book?.name} ${chNum}:${verse.verse}`,
+                              text: verse.text,
+                            });
+                            setIsAiStudyModalOpen(true);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-400/30 rounded-lg text-amber-700 dark:text-amber-300 text-[11px] font-medium transition-colors"
+                          title="AI Spiritual Explanation"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-600 dark:text-amber-400 fill-current" />
+                          Explain
+                        </button>
+
                         <button
                           onClick={() => setCompareVerseNumber(verse.verse)}
                           className="flex items-center gap-1 px-2 py-1 bg-white hover:bg-gray-100 border border-gray-200 rounded-lg text-gray-700 text-[11px] font-medium transition-colors"
@@ -660,6 +851,14 @@ export default function BibleReader() {
           verse={compareVerseNumber}
         />
       )}
+
+      {/* AI Spiritual Study Modal */}
+      <AiStudyModal
+        isOpen={isAiStudyModalOpen}
+        onClose={() => setIsAiStudyModalOpen(false)}
+        scripture={aiStudyVerse?.scripture ?? `${book?.name ?? "Scripture"} ${chNum}`}
+        verseText={aiStudyVerse?.text ?? (verses?.[0]?.text ?? "")}
+      />
     </div>
   );
 }

@@ -94,6 +94,7 @@ function MenubarItem({
 }: React.ComponentProps<typeof MenubarPrimitive.Item> & {
   inset?: boolean
   variant?: "default" | "destructive"
+  className?: string
 }) {
   return (
     <MenubarPrimitive.Item
@@ -165,6 +166,7 @@ function MenubarLabel({
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.Label> & {
   inset?: boolean
+  className?: string
 }) {
   return (
     <MenubarPrimitive.Label
@@ -221,6 +223,7 @@ function MenubarSubTrigger({
   ...props
 }: React.ComponentProps<typeof MenubarPrimitive.SubTrigger> & {
   inset?: boolean
+  className?: string
 }) {
   return (
     <MenubarPrimitive.SubTrigger

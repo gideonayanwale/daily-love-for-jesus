@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { CommunityService, ReadingLogItemDto } from './community.service';
+import { ChatArchiveService } from './archive.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
@@ -18,7 +19,10 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(SupabaseAuthGuard)
 @Controller('api')
 export class CommunityController {
-  constructor(private readonly communityService: CommunityService) {}
+  constructor(
+    private readonly communityService: CommunityService,
+    private readonly archiveService: ChatArchiveService,
+  ) {}
 
   // ─── 1. Group Invite Code ──────────────────────────────────────────────────
   @Post('groups/invite')
@@ -35,9 +39,9 @@ export class CommunityController {
   @ApiOperation({ summary: 'Join Sunday School class using 6-digit invite code' })
   async joinGroup(
     @CurrentUser('id') userId: string,
-    @Body() body: { inviteCode: string },
+    @Body() body: { inviteCode: string; whatsappNumber?: string },
   ) {
-    return this.communityService.joinGroup(userId, body.inviteCode);
+    return this.communityService.joinGroup(userId, body.inviteCode, body.whatsappNumber);
   }
 
   // ─── 3. Offline Reading Tracking Sync ──────────────────────────────────────
@@ -94,16 +98,19 @@ export class CommunityController {
     return this.communityService.createAttendanceSession(userId, body);
   }
 
-  // ─── 7. Record Attendance ──────────────────────────────────────────────────
+  // ─── 7. Record Attendance (Supports Registered Students & Guest Attendees) ─
   @Post('attendance/record')
-  @ApiOperation({ summary: 'Mark student attendance statuses (present, absent, excused, late)' })
+  @ApiOperation({ summary: 'Mark student attendance statuses (supports guest attendees)' })
   async recordAttendance(
     @CurrentUser('id') userId: string,
     @Body()
     body: {
       sessionId: number;
       records: Array<{
-        userId: string;
+        userId?: string;
+        guestName?: string;
+        guestPhone?: string;
+        isGuest?: boolean;
         status: 'present' | 'absent' | 'excused' | 'late';
         notes?: string;
       }>;
@@ -178,5 +185,167 @@ export class CommunityController {
     @Body() body: { token: string; platform?: 'expo' | 'fcm' | 'apns' },
   ) {
     return this.communityService.registerPushToken(userId, body.token, body.platform);
+  }
+
+  // ─── 10. Role Hierarchy & Elevation ────────────────────────────────────────
+  @Get('admin/users')
+  @ApiOperation({ summary: 'Elevated admin directory access to all users and admins' })
+  async getAllUsersAndAdmins(@CurrentUser('id') userId: string) {
+    return this.communityService.getAllUsersAndAdmins(userId);
+  }
+
+  @Post('admin/elevate')
+  @ApiOperation({ summary: 'Elevate or modify user admin status' })
+  async elevateUser(
+    @CurrentUser('id') userId: string,
+    @Body() body: { targetUserId: string; targetRole: 'elevated_admin' | 'admin' | 'user' },
+  ) {
+    return this.communityService.elevateUser(userId, body.targetUserId, body.targetRole);
+  }
+
+  // ─── 11. Custom Fellowships & Approval ─────────────────────────────────────
+  @Post('communities/custom')
+  @ApiOperation({ summary: 'Create custom fellowship/community (requires approval if not admin)' })
+  async createCustomCommunity(
+    @CurrentUser('id') userId: string,
+    @Body() body: { name: string; description?: string; location?: string; category?: string },
+  ) {
+    return this.communityService.createCustomCommunity(userId, body);
+  }
+
+  @Get('communities/pending')
+  @ApiOperation({ summary: 'List communities pending approval by elevated admin' })
+  async getPendingCommunities(@CurrentUser('id') userId: string) {
+    return this.communityService.getPendingCommunities(userId);
+  }
+
+  @Post('communities/:id/approve')
+  @ApiOperation({ summary: 'Approve or reject custom fellowship by elevated admin' })
+  async approveCommunity(
+    @CurrentUser('id') userId: string,
+    @Param('id') communityId: string,
+    @Body() body: { approve: boolean },
+  ) {
+    return this.communityService.approveCommunity(userId, communityId, body.approve);
+  }
+
+  @Get('communities/:id/members')
+  @ApiOperation({ summary: 'List members belonging to a specific community' })
+  async getCommunityMembers(
+    @CurrentUser('id') userId: string,
+    @Param('id') communityId: string,
+  ) {
+    return this.communityService.getCommunityMembers(userId, communityId);
+  }
+
+  // ─── 12. Slack-like Chat & Direct Messages ─────────────────────────────────
+  @Post('chat/messages')
+  @ApiOperation({ summary: 'Send message in general channel, leadership group, community, group, or DM' })
+  async sendChatMessage(
+    @CurrentUser('id') userId: string,
+    @Body()
+    body: {
+      channelType: 'general' | 'community' | 'group' | 'dm' | 'leadership';
+      communityId?: string;
+      groupId?: number;
+      receiverId?: string;
+      content: string;
+      mediaUrl?: string;
+      isAnnouncement?: boolean;
+      isEncrypted?: boolean;
+    },
+  ) {
+    return this.communityService.sendChatMessage(userId, body);
+  }
+
+  @Get('chat/messages')
+  @ApiOperation({ summary: 'List chat messages for channel, community, group, leadership, or DM' })
+  @ApiQuery({ name: 'channelType', required: true, enum: ['general', 'community', 'group', 'dm', 'leadership'] })
+  async listChatMessages(
+    @CurrentUser('id') userId: string,
+    @Query('channelType') channelType: 'general' | 'community' | 'group' | 'dm' | 'leadership',
+    @Query('communityId') communityId?: string,
+    @Query('groupId') groupId?: string,
+    @Query('receiverId') receiverId?: string,
+  ) {
+    return this.communityService.listChatMessages(userId, channelType, {
+      communityId,
+      groupId: groupId ? parseInt(groupId, 10) : undefined,
+      receiverId,
+    });
+  }
+
+  @Post('chat/messages/:id/moderate')
+  @ApiOperation({ summary: 'Moderate or retain message (pin, unpin, keep permanently, or delete)' })
+  async moderateMessage(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIntPipe) messageId: number,
+    @Body() body: { action: 'pin' | 'unpin' | 'delete' | 'keep' | 'unkeep' },
+  ) {
+    return this.communityService.moderateMessage(userId, messageId, body.action);
+  }
+
+  @Post('groups/:id/admin-only')
+  @ApiOperation({ summary: 'Toggle WhatsApp-like admin-only posting controls for group' })
+  async toggleGroupAdminOnlyPosting(
+    @CurrentUser('id') userId: string,
+    @Param('id', ParseIntPipe) groupId: number,
+    @Body() body: { onlyAdminsCanPost: boolean },
+  ) {
+    return this.communityService.toggleGroupAdminOnlyPosting(userId, groupId, body.onlyAdminsCanPost);
+  }
+
+  // ─── 13. Cloudinary Backup & 7-Day Auto-Purge ──────────────────────────────
+  @Post('communities/:id/chat/backup-to-cloudinary')
+  @ApiOperation({ summary: 'Superadmin: sync and archive community chat messages into Cloudinary' })
+  async backupCommunityChatToCloudinary(
+    @CurrentUser('id') userId: string,
+    @Param('id') communityId: string,
+  ) {
+    return this.communityService.backupCommunityChatToCloudinary(userId, communityId);
+  }
+
+  @Post('chat/cleanup-expired')
+  @ApiOperation({ summary: 'Purge messages older than 7 days from active community chats' })
+  async cleanupExpiredChatMessages() {
+    return this.communityService.cleanupExpiredChatMessages();
+  }
+
+  // ─── 14. Dedicated Secondary Supabase Bulk Cold Storage Archives ─────────────
+  @Post('chat/archives/snapshot')
+  @ApiOperation({ summary: 'Create bulk snapshot of messages to Secondary Supabase cold storage' })
+  async createChatSnapshot(
+    @CurrentUser('id') userId: string,
+    @Body() body: { communityId?: string; groupId?: number; channelType?: string; snapshotAll?: boolean },
+  ) {
+    if (body.snapshotAll) {
+      return this.archiveService.snapshotAllActiveCommunities();
+    }
+    return this.archiveService.createBulkSnapshot({
+      communityId: body.communityId,
+      groupId: body.groupId,
+      channelType: body.channelType,
+    });
+  }
+
+  @Get('chat/archives')
+  @ApiOperation({ summary: 'List available cloud archive snapshots from Secondary Supabase storage' })
+  async listChatArchives(
+    @Query('communityId') communityId?: string,
+    @Query('groupId') groupId?: string,
+  ) {
+    const parsedGroupId = groupId ? parseInt(groupId, 10) : undefined;
+    return this.archiveService.listAvailableSnapshots({
+      communityId,
+      groupId: Number.isFinite(parsedGroupId) ? parsedGroupId : undefined,
+    });
+  }
+
+  @Get('chat/archives/:id/download')
+  @ApiOperation({ summary: 'Download and restore chat messages from cloud archive snapshot' })
+  async downloadChatArchive(
+    @Param('id', ParseIntPipe) snapshotId: number,
+  ) {
+    return this.archiveService.downloadSnapshot(snapshotId);
   }
 }

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { DatabaseModule } from '../../database/database.module';
 import { TrpcService } from './trpc.service';
 import { AuthModule } from '../auth/auth.module';
 import { BibleModule } from '../bible/bible.module';
@@ -10,6 +12,8 @@ import { CommunityModule } from '../community/community.module';
 
 @Module({
   imports: [
+    ConfigModule,
+    DatabaseModule,
     AuthModule,
     BibleModule,
     HymnsModule,

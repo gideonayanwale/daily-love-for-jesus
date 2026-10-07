@@ -15,9 +15,11 @@ import {
   Bell,
   Check,
   FileSpreadsheet,
+  MessageSquare,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { CommunityChat } from '@/components/CommunityChat'
 
 /** Reads the Supabase session access token from localStorage for REST API calls */
 function getAuthHeader(): Record<string, string> {
@@ -35,9 +37,16 @@ function getAuthHeader(): Record<string, string> {
 export default function Community() {
   const navigate = useNavigate()
   const [inviteCode, setInviteCode] = useState('')
+  const [userWhatsApp, setUserWhatsApp] = useState(() => {
+    try {
+      return localStorage.getItem('user_whatsapp_number') || ''
+    } catch {
+      return ''
+    }
+  })
   const [isJoining, setIsJoining] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null)
-  const [teacherTab, setTeacherTab] = useState<'overview' | 'roster' | 'attendance' | 'report'>('overview')
+  const [teacherTab, setTeacherTab] = useState<'overview' | 'chat' | 'roster' | 'attendance' | 'report'>('overview')
 
   // Announcement composer state
   const [announcementTitle, setAnnouncementTitle] = useState('')
@@ -45,10 +54,13 @@ export default function Community() {
   const [priority, setPriority] = useState<'normal' | 'high' | 'urgent'>('normal')
   const [isPosting, setIsPosting] = useState(false)
 
-  // Roster, Attendance & Report States
+  // Roster, Attendance, Guests & Report States
   const [roster, setRoster] = useState<any[]>([])
   const [isRosterLoading, setIsRosterLoading] = useState(false)
   const [attendanceRecordsState, setAttendanceRecordsState] = useState<Record<string, 'present' | 'absent' | 'excused' | 'late'>>({})
+  const [guestList, setGuestList] = useState<Array<{ id: string; name: string; phone?: string; status: 'present' | 'absent' | 'excused' | 'late' }>>([])
+  const [newGuestName, setNewGuestName] = useState('')
+  const [newGuestPhone, setNewGuestPhone] = useState('')
   const [isSavingAttendance, setIsSavingAttendance] = useState(false)
   const [weeklyReport, setWeeklyReport] = useState<any | null>(null)
   const [isReportLoading, setIsReportLoading] = useState(false)
@@ -139,10 +151,19 @@ export default function Community() {
 
     setIsJoining(true)
     try {
+      if (userWhatsApp.trim()) {
+        try {
+          localStorage.setItem('user_whatsapp_number', userWhatsApp.trim())
+        } catch {}
+      }
+
       const res = await fetch('/api/groups/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeader() },
-        body: JSON.stringify({ inviteCode: inviteCode.trim() }),
+        body: JSON.stringify({
+          inviteCode: inviteCode.trim(),
+          whatsappNumber: userWhatsApp.trim() || undefined,
+        }),
       })
 
       const data = await res.json()
@@ -253,11 +274,20 @@ export default function Community() {
       const sessionData = await sessionRes.json()
       if (!sessionRes.ok) throw new Error(sessionData.error || 'Failed to create session')
 
-      // 2. Record students
-      const records = Object.entries(attendanceRecordsState).map(([userId, status]) => ({
-        userId,
-        status,
-      }))
+      // 2. Record students and guest attendees
+      const records = [
+        ...Object.entries(attendanceRecordsState).map(([userId, status]) => ({
+          userId,
+          status,
+          isGuest: false,
+        })),
+        ...guestList.map((g) => ({
+          guestName: g.name,
+          guestPhone: g.phone || null,
+          status: g.status,
+          isGuest: true,
+        })),
+      ]
 
       const recordRes = await fetch('/api/attendance/record', {
         method: 'POST',
@@ -270,7 +300,7 @@ export default function Community() {
 
       if (!recordRes.ok) throw new Error('Failed to save attendance marks')
 
-      toast.success(`Attendance saved for ${records.length} students!`)
+      toast.success(`Attendance saved for ${records.length} attendees (${roster.length} students, ${guestList.length} visitors)!`)
     } catch (err: any) {
       toast.error(err.message || 'Error recording attendance')
     } finally {
@@ -318,22 +348,34 @@ export default function Community() {
         <p className="text-xs text-white/90 mb-3">
           Enter the 6-digit invite code provided by your Sunday School teacher or fellowship leader.
         </p>
-        <form onSubmit={handleJoin} className="flex gap-2">
-          <input
-            type="text"
-            placeholder="e.g. LF8421"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-            maxLength={10}
-            className="flex-1 px-3 py-2 rounded-xl bg-white text-gray-900 font-mono font-bold tracking-wider placeholder:font-sans placeholder:font-normal placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
-          />
-          <button
-            type="submit"
-            disabled={isJoining || !inviteCode.trim()}
-            className="px-4 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 disabled:opacity-50 transition-all"
-          >
-            {isJoining ? 'Joining...' : 'Join Class'}
-          </button>
+        <form onSubmit={handleJoin} className="space-y-2">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              placeholder="Class Code (e.g. LF8421)"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+              maxLength={10}
+              className="flex-1 px-3 py-2 rounded-xl bg-white text-gray-900 font-mono font-bold tracking-wider placeholder:font-sans placeholder:font-normal placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+            />
+            <input
+              type="tel"
+              placeholder="Your WhatsApp Number (e.g. +234 801 234 5678)"
+              value={userWhatsApp}
+              onChange={(e) => setUserWhatsApp(e.target.value)}
+              className="flex-1 px-3 py-2 rounded-xl bg-white text-gray-900 placeholder:text-gray-400 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+            />
+            <button
+              type="submit"
+              disabled={isJoining || !inviteCode.trim()}
+              className="px-5 py-2 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5"
+            >
+              {isJoining ? 'Joining...' : 'Join Class'}
+            </button>
+          </div>
+          <p className="text-[10px] text-white/80">
+            * WhatsApp number is automatically linked to your class teacher roster for attendance and fellowship updates.
+          </p>
         </form>
       </section>
 
@@ -412,51 +454,66 @@ export default function Community() {
               </div>
             </div>
 
-            {/* Teacher Workstation Tabs */}
-            {isTeacher && (
-              <div className="pt-2 border-t border-gray-100 flex gap-1.5 overflow-x-auto">
-                <button
-                  onClick={() => setTeacherTab('overview')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    teacherTab === 'overview'
-                      ? 'bg-amber-100 text-amber-900'
-                      : 'text-gray-500 hover:bg-gray-50'
-                  }`}
-                >
-                  Overview & Reading
-                </button>
-                <button
-                  onClick={() => setTeacherTab('roster')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    teacherTab === 'roster'
-                      ? 'bg-amber-100 text-amber-900'
-                      : 'text-gray-500 hover:bg-gray-50'
-                  }`}
-                >
-                  Student Streaks ({roster.length || teacherOverview?.totalStudents || 0})
-                </button>
-                <button
-                  onClick={() => setTeacherTab('attendance')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    teacherTab === 'attendance'
-                      ? 'bg-amber-100 text-amber-900'
-                      : 'text-gray-500 hover:bg-gray-50'
-                  }`}
-                >
-                  Take Attendance
-                </button>
-                <button
-                  onClick={() => setTeacherTab('report')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    teacherTab === 'report'
-                      ? 'bg-amber-100 text-amber-900'
-                      : 'text-gray-500 hover:bg-gray-50'
-                  }`}
-                >
-                  Weekly Report
-                </button>
-              </div>
-            )}
+            {/* Workstation & Fellowship Tabs */}
+            <div className="pt-2 border-t border-gray-100 flex gap-1.5 overflow-x-auto">
+              <button
+                onClick={() => setTeacherTab('overview')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  teacherTab === 'overview'
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                Overview & Reading
+              </button>
+
+              <button
+                onClick={() => setTeacherTab('chat')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  teacherTab === 'chat'
+                    ? 'bg-amber-100 text-amber-900'
+                    : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                <MessageSquare className="w-3.5 h-3.5" />
+                <span>Chat & Announcements</span>
+              </button>
+
+              {isTeacher && (
+                <>
+                  <button
+                    onClick={() => setTeacherTab('roster')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      teacherTab === 'roster'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    Student Streaks ({roster.length || teacherOverview?.totalStudents || 0})
+                  </button>
+                  <button
+                    onClick={() => setTeacherTab('attendance')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      teacherTab === 'attendance'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    Take Attendance
+                  </button>
+                  <button
+                    onClick={() => setTeacherTab('report')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      teacherTab === 'report'
+                        ? 'bg-amber-100 text-amber-900'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    Weekly Report
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {/* TAB 1: OVERVIEW & READING ASSIGNMENTS */}
@@ -594,6 +651,19 @@ export default function Community() {
             </>
           )}
 
+          {/* TAB: CHAT & ANNOUNCEMENTS */}
+          {teacherTab === 'chat' && (
+            <section className="space-y-4">
+              <CommunityChat
+                communityId={groupDetails.group.communityId}
+                groupId={activeGroupId}
+                groupName={groupDetails.group.name}
+                isGroupAdmin={isTeacher}
+                currentUserRole={isTeacher ? 'admin' : 'user'}
+              />
+            </section>
+          )}
+
           {/* TAB 2: STUDENT ROSTER & STREAKS */}
           {teacherTab === 'roster' && (
             <section className="space-y-3">
@@ -715,6 +785,109 @@ export default function Community() {
               ) : (
                 <p className="text-xs text-gray-400 text-center py-4">No enrolled students to mark.</p>
               )}
+              {/* Guest / Visitor Attendance */}
+              <div className="pt-4 border-t border-gray-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-800">
+                      Sunday School Visitors & Guests (Non-Users)
+                    </h4>
+                    <p className="text-[10px] text-gray-500">
+                      Record attendance for guests who do not have an app account
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Visitor full name (e.g. Sister Grace Oladele)"
+                    value={newGuestName}
+                    onChange={(e) => setNewGuestName(e.target.value)}
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 w-full"
+                  />
+                  <input
+                    type="tel"
+                    placeholder="Visitor WhatsApp Number (e.g. +234 801 234 5678)"
+                    value={newGuestPhone}
+                    onChange={(e) => setNewGuestPhone(e.target.value)}
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 w-full"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!newGuestName.trim()) return
+                      setGuestList((prev) => [
+                        ...prev,
+                        {
+                          id: `guest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                          name: newGuestName.trim(),
+                          phone: newGuestPhone.trim(),
+                          status: 'present',
+                        },
+                      ])
+                      setNewGuestName('')
+                      setNewGuestPhone('')
+                      toast.success('Visitor contact added to attendance!')
+                    }}
+                    className="px-4 py-1.5 bg-amber-500 text-white font-bold text-xs rounded-xl hover:bg-amber-600 whitespace-nowrap w-full sm:w-auto"
+                  >
+                    + Add Visitor
+                  </button>
+                </div>
+
+                {guestList.length > 0 && (
+                  <div className="divide-y divide-gray-100 border border-amber-100 rounded-xl p-2 bg-amber-50/30">
+                    {guestList.map((guest) => (
+                      <div key={guest.id} className="py-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-900">{guest.name}</span>
+                          {guest.phone && (
+                            <span className="text-[10px] text-gray-500 font-mono">📱 {guest.phone}</span>
+                          )}
+                          <span className="px-1.5 py-0.5 bg-amber-100 text-amber-800 text-[9px] font-bold rounded">Guest</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex gap-1">
+                            {(['present', 'late', 'absent', 'excused'] as const).map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() =>
+                                  setGuestList((prev) =>
+                                    prev.map((g) => (g.id === guest.id ? { ...g, status: s } : g))
+                                  )
+                                }
+                                className={`px-2 py-0.5 text-[10px] font-bold rounded capitalize transition-all ${
+                                  guest.status === s
+                                    ? s === 'present'
+                                      ? 'bg-emerald-500 text-white'
+                                      : s === 'absent'
+                                      ? 'bg-rose-500 text-white'
+                                      : s === 'late'
+                                      ? 'bg-amber-500 text-white'
+                                      : 'bg-blue-500 text-white'
+                                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                }`}
+                              >
+                                {s}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setGuestList((prev) => prev.filter((g) => g.id !== guest.id))}
+                            className="text-gray-400 hover:text-rose-500 text-xs px-1"
+                            title="Remove visitor"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
           )}
 

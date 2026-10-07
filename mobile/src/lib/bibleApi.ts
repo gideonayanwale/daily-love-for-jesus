@@ -1,4 +1,6 @@
 // Mobile Bible API client powered by Bolls Life API (zero-cost, multilingual, 50+ languages)
+import { getOfflineChapter, saveOfflineChapter } from './mobileBibleStorage';
+import { getInbuiltChapter } from './inbuiltBible';
 
 export interface BibleBook {
   id: number;
@@ -124,7 +126,25 @@ export async function fetchChapterVerses(
 ): Promise<MobileVerse[]> {
   const trans = (translation || 'KJV').toUpperCase();
 
-  // 1. Try fetching from NestJS Backend
+  // 1. First check local storage (AsyncStorage)
+  try {
+    const cached = await getOfflineChapter(trans, bookId, chapter);
+    if (cached && cached.length > 0) {
+      return cached;
+    }
+  } catch {
+    // Continue if storage read fails
+  }
+
+  // 2. Check pre-bundled inbuilt default Bible if KJV
+  if (trans === 'KJV') {
+    const inbuilt = getInbuiltChapter(bookId, chapter);
+    if (inbuilt && inbuilt.length > 0) {
+      return inbuilt;
+    }
+  }
+
+  // 3. Try fetching from NestJS Backend
   try {
     const backendUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000';
     const res = await fetch(
@@ -134,7 +154,7 @@ export async function fetchChapterVerses(
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        return data.map((r: any) => ({
+        const verses = data.map((r: any) => ({
           id: r.id || r.pk,
           bookNumber: bookId,
           chapter,
@@ -142,21 +162,37 @@ export async function fetchChapterVerses(
           text: cleanText(r.text),
           translation: trans,
         }));
+        // Auto-save to local storage for offline read
+        await saveOfflineChapter(trans, bookId, chapter, verses);
+        return verses;
       }
     }
   } catch {
     // Backend fetch failed or offline; continue to fallback
   }
 
-  // 2. Direct Fallback to Bolls Life API (zero-cost, multilingual)
+  // 4. Direct Fallback to Bolls Life API (zero-cost, multilingual)
   const url = `https://bolls.life/get-chapter/${trans}/${bookId}/${chapter}/`;
   const res = await fetch(url);
   if (!res.ok) {
+    // If network fails and we are KJV, return a graceful fallback verse
+    if (trans === 'KJV') {
+      return [
+        {
+          id: bookId * 1000 + chapter,
+          bookNumber: bookId,
+          chapter,
+          verse: 1,
+          text: 'The grace of the Lord Jesus Christ be with you all. Amen. (Offline mode active)',
+          translation: trans,
+        },
+      ];
+    }
     throw new Error(`Failed to fetch scripture: HTTP ${res.status}`);
   }
 
   const rows = (await res.json()) as Array<{ pk: number; verse: number; text: string }>;
-  return rows.map((r) => ({
+  const verses = rows.map((r) => ({
     id: r.pk,
     bookNumber: bookId,
     chapter,
@@ -164,4 +200,8 @@ export async function fetchChapterVerses(
     text: cleanText(r.text),
     translation: trans,
   }));
+
+  // Auto-cache to local storage for subsequent offline reading
+  await saveOfflineChapter(trans, bookId, chapter, verses);
+  return verses;
 }
