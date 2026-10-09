@@ -91,8 +91,17 @@ async function bootstrap() {
   const isProduction = configService.get<string>('nodeEnv') === 'production';
 
   // In production, serve frontend SPA static files if present
-  const publicDir = path.resolve(__dirname, '../../app/dist/public');
-  if (isProduction && fs.existsSync(publicDir)) {
+  const possiblePaths = [
+    process.env.PUBLIC_DIR,
+    path.resolve(__dirname, '../../app/dist/public'),
+    path.resolve(__dirname, '../app/dist/public'),
+    path.resolve(process.cwd(), '../app/dist/public'),
+    path.resolve(process.cwd(), 'app/dist/public'),
+    path.resolve(process.cwd(), 'dist/public'),
+  ].filter(Boolean) as string[];
+
+  const publicDir = possiblePaths.find((p) => fs.existsSync(p));
+  if (isProduction && publicDir) {
     logger.log(`Serving static SPA frontend from: ${publicDir}`);
     app.use(express.static(publicDir));
     app.use((req, res, next) => {

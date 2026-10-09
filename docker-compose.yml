@@ -23,4 +23,8 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
       - TELEGRAM_CHANNEL_ID=${TELEGRAM_CHANNEL_ID:-}
     env_file:
-      - .env
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+

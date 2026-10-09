@@ -46,7 +46,7 @@ ENV PORT=4000
 # Install production dependencies only
 COPY package.json ./
 COPY backend/package.json ./backend/
-RUN npm --prefix backend install --only=production --legacy-peer-deps
+RUN npm --prefix backend install --omit=dev --legacy-peer-deps
 
 # Copy built backend files
 COPY --from=backend-builder /workspace/backend/dist ./backend/dist
