@@ -22,6 +22,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
+    const isProduction = process.env.NODE_ENV === 'production';
+
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -30,28 +32,34 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const exceptionResponse =
       exception instanceof HttpException ? exception.getResponse() : null;
 
-    let errorMessage = 'Internal server error';
+    let errorMessage: string;
     let errorDetails: any = null;
 
     if (typeof exceptionResponse === 'string') {
       errorMessage = exceptionResponse;
     } else if (exceptionResponse && typeof exceptionResponse === 'object') {
-      errorMessage = (exceptionResponse as any).message || (exceptionResponse as any).error || errorMessage;
+      errorMessage = (exceptionResponse as any).message || (exceptionResponse as any).error || 'Request failed';
       errorDetails = (exceptionResponse as any).details || (exceptionResponse as any).errors || null;
     } else if (exception instanceof Error) {
-      errorMessage = exception.message;
+      // In production, never leak internal error messages or stack traces
+      errorMessage = isProduction ? 'Internal server error' : exception.message;
+    } else {
+      errorMessage = 'Internal server error';
     }
 
     if (status >= 500) {
       this.logger.error(`[${request.method}] ${request.url} - ${errorMessage}`, (exception as any)?.stack);
     }
 
+    // Never include internal details in production responses
+    const safeDetails = isProduction && status >= 500 ? null : errorDetails;
+
     response.status(status).json({
       statusCode: status,
       timestamp: new Date().toISOString(),
       path: request.url,
       error: errorMessage,
-      details: errorDetails,
+      details: safeDetails,
     });
   }
 }

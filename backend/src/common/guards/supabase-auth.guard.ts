@@ -77,15 +77,29 @@ export class SupabaseAuthGuard implements CanActivate {
     }
 
     try {
+      const isProduction =
+        this.configService?.get<string>('nodeEnv') === 'production' ||
+        process.env.NODE_ENV === 'production';
+
       const supabaseAdmin = this.getSupabaseAdmin();
       if (!supabaseAdmin) {
+        if (isProduction) {
+          throw new UnauthorizedException(
+            'Authentication service unavailable. Please try again later.',
+          );
+        }
         if (isPublic) return true;
-        // In local dev without Supabase configured, create a mock user
+        // In local dev without Supabase configured, create a mock user with limited role
+        // so anonymous requests can still probe the API. This mode is dev-only.
+        const isDevEnv = !isProduction;
+        if (!isDevEnv) {
+          throw new UnauthorizedException('Authentication service not configured.');
+        }
         request.user = {
           id: 'dev-user-00000000-0000-0000-0000-000000000000',
           email: 'dev@dailyloveforjesus.org',
           name: 'Developer Mode',
-          role: 'admin',
+          role: 'user',
         };
         return true;
       }

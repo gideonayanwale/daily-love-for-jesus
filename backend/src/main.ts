@@ -33,7 +33,7 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
   // CORS - Support Web SPA and Mobile (Expo, Android/iOS Emulators, Physical Devices)
   const frontendUrl = configService.get<string>('frontendUrl') || 'http://localhost:3000';
   const isProduction = configService.get<string>('nodeEnv') === 'production';
-  const allowedOrigins = [
+  const allowedOrigins = new Set<string>([
     frontendUrl,
     'http://localhost:3000',
     'http://localhost:5173',
@@ -43,20 +43,26 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:8081',
-  ];
+  ]);
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow non-browser requests (mobile apps, curl, server-to-server) or matching origins
-      if (!origin || !isProduction || allowedOrigins.includes(origin) || origin.startsWith('http://192.168.') || origin.startsWith('http://10.')) {
+      // Allow non-browser requests (mobile apps, curl, server-to-server) with no Origin header
+      if (!origin) {
         callback(null, true);
-      } else {
-        callback(null, true);
+        return;
       }
+      // Strict allowlist check - reject everything not explicitly permitted
+      if (allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS: origin '${origin}' is not allowed`), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret', 'Accept', 'x-requested-with'],
+    maxAge: 86400,
   });
 
   // Swagger OpenAPI Documentation

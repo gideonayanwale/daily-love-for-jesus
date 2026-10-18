@@ -50,7 +50,7 @@ export default (): AppConfig => ({
   },
   security: {
     appId: process.env.APP_ID || 'daily-love-app',
-    appSecret: process.env.APP_SECRET || 'daily-love-secret-jwt-key',
+    appSecret: process.env.APP_SECRET || '',
     adminUserId: process.env.ADMIN_USER_ID || '',
     adminEmail: process.env.ADMIN_EMAIL || '',
   },
