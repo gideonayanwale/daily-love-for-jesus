@@ -1,4 +1,11 @@
-import { Injectable, Logger, OnModuleInit, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  NotFoundException,
+  Inject,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import * as crypto from 'crypto';
@@ -28,11 +35,11 @@ export class ChatArchiveService implements OnModuleInit {
   private isSecondaryProject = false;
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly dbService: DatabaseService,
+    @Optional() @Inject(ConfigService) private readonly configService?: ConfigService,
+    @Optional() @Inject(DatabaseService) private readonly dbService?: DatabaseService,
   ) {
     this.bucketName =
-      this.configService.get<string>('ARCHIVE_SUPABASE_BUCKET') ||
+      this.configService?.get<string>('ARCHIVE_SUPABASE_BUCKET') ||
       process.env.ARCHIVE_SUPABASE_BUCKET ||
       'chat-bulk-archives';
 
@@ -46,18 +53,18 @@ export class ChatArchiveService implements OnModuleInit {
   private initArchiveClient(): void {
     // Check for Secondary Supabase Project credentials first
     const secondaryUrl =
-      this.configService.get<string>('ARCHIVE_SUPABASE_URL') ||
+      this.configService?.get<string>('ARCHIVE_SUPABASE_URL') ||
       process.env.ARCHIVE_SUPABASE_URL;
     const secondaryKey =
-      this.configService.get<string>('ARCHIVE_SUPABASE_SERVICE_ROLE_KEY') ||
+      this.configService?.get<string>('ARCHIVE_SUPABASE_SERVICE_ROLE_KEY') ||
       process.env.ARCHIVE_SUPABASE_SERVICE_ROLE_KEY;
 
     // Primary project credentials as fallback
     const primaryUrl =
-      this.configService.get<string>('SUPABASE_URL') ||
+      this.configService?.get<string>('SUPABASE_URL') ||
       process.env.SUPABASE_URL;
     const primaryKey =
-      this.configService.get<string>('SUPABASE_SERVICE_ROLE_KEY') ||
+      this.configService?.get<string>('SUPABASE_SERVICE_ROLE_KEY') ||
       process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (secondaryUrl && secondaryKey) {
