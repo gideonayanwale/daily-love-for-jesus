@@ -31,10 +31,16 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
   );
 
   // CORS - Support Web SPA and Mobile (Expo, Android/iOS Emulators, Physical Devices)
-  const frontendUrl = configService.get<string>('frontendUrl') || 'http://localhost:3000';
+  const frontendUrlRaw = configService.get<string>('frontendUrl') || 'http://localhost:3000';
   const isProduction = configService.get<string>('nodeEnv') === 'production';
-  const allowedOrigins = new Set<string>([
-    frontendUrl,
+
+  // Parse comma-separated domains and normalize by removing trailing slashes
+  const configuredOrigins = frontendUrlRaw
+    .split(',')
+    .map((url) => url.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+
+  const defaultLocalOrigins = [
     'http://localhost:3000',
     'http://localhost:5173',
     'http://localhost:8081',
@@ -43,7 +49,11 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
     'http://127.0.0.1:3000',
     'http://127.0.0.1:5173',
     'http://127.0.0.1:8081',
-  ]);
+    'capacitor://localhost',
+    'ionic://localhost',
+  ];
+
+  const allowedOrigins = new Set<string>([...configuredOrigins, ...defaultLocalOrigins]);
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -52,11 +62,32 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
         callback(null, true);
         return;
       }
-      // Strict allowlist check - reject everything not explicitly permitted
-      if (allowedOrigins.has(origin)) {
+
+      const normalizedOrigin = origin.replace(/\/$/, '');
+
+      // 1. Direct match with configured origins
+      if (allowedOrigins.has(normalizedOrigin)) {
         callback(null, true);
         return;
       }
+
+      // 2. Allow preview and branch deployments from trusted hosts (Vercel, Netlify, Cloudflare Pages)
+      const isTrustedPreview =
+        /^https:\/\/[a-zA-Z0-9_-]+\.netlify\.app$/.test(normalizedOrigin) ||
+        /^https:\/\/[a-zA-Z0-9_-]+\.pages\.dev$/.test(normalizedOrigin) ||
+        /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(normalizedOrigin);
+
+      if (isTrustedPreview) {
+        callback(null, true);
+        return;
+      }
+
+      // 3. In non-production, allow all localhost ports
+      if (!isProduction && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin)) {
+        callback(null, true);
+        return;
+      }
+
       callback(new Error(`CORS: origin '${origin}' is not allowed`), false);
     },
     credentials: true,

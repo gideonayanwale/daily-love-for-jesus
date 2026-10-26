@@ -10,10 +10,12 @@ import { getSupabaseAccessToken } from "@/lib/supabase";
 export const trpc = createTRPCReact<AppRouter>();
 
 const queryClient = new QueryClient();
+const apiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: `${apiBase}/api/trpc`,
       transformer: superjson,
       headers() {
         const token = getSupabaseAccessToken();

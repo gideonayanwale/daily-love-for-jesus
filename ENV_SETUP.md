@@ -23,21 +23,28 @@ Templates available:
 
 | Variable | Scope | Required? | Where to find / How to obtain |
 | :--- | :--- | :--- | :--- |
-| `PORT` | Backend | Optional (Default: `4000`) | Port on which the NestJS server listens. |
-| `NODE_ENV` | Backend | Optional (`development`/`production`) | Controls static file serving and error formatting. |
-| `FRONTEND_URL` | Backend | Optional (Default: `http://localhost:3000`) | Allowed CORS origin for the React SPA. |
+| `PORT` | Backend | Optional (Default: `4000`) | Port on which the NestJS server listens. Automatically provided by Railway/Render/Fly. |
+| `NODE_ENV` | Backend | Optional (`development`/`production`) | Controls static file serving, CORS strictness, and error formatting. |
+| `FRONTEND_URL` | Backend | Recommended | Allowed CORS origin(s) for the React SPA. Supports comma-separated origins (e.g. `https://dailylove.pages.dev,https://dailyloveforjesus.org`). |
+| `VITE_API_URL` | Frontend SPA | Optional (Default: `/api`) | Public backend base URL (e.g. `https://daily-love-backend.up.railway.app`). Set in Netlify/Cloudflare Pages/Vercel dashboards. |
 | `SUPABASE_URL` / `VITE_SUPABASE_URL` | Both | Required for Auth | [Supabase Dashboard](https://supabase.com/dashboard) &rarr; Project Settings &rarr; API &rarr; Project URL. |
 | `SUPABASE_ANON_KEY` / `VITE_SUPABASE_ANON_KEY` | Both | Required for Auth | [Supabase Dashboard](https://supabase.com/dashboard) &rarr; Project Settings &rarr; API &rarr; Project API keys (`anon` / `public`). Safe for client-side use. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend ONLY | Optional (Recommended) | [Supabase Dashboard](https://supabase.com/dashboard) &rarr; Project Settings &rarr; API &rarr; `service_role` (secret). **NEVER expose in frontend or git commits.** Enables admin user verification and role elevation. |
+| `ARCHIVE_SUPABASE_URL` | Backend ONLY | Optional | Secondary Supabase Project URL for cold storage, bulk chat history snapshots, and long-term backups. |
+| `ARCHIVE_SUPABASE_SERVICE_ROLE_KEY` | Backend ONLY | Optional | Secondary Supabase Project Service Role key for cold archive management. |
+| `ARCHIVE_SUPABASE_BUCKET` | Backend ONLY | Optional (Default: `chat-bulk-archives`) | Supabase Storage bucket name for chat archives. |
 | `DATABASE_URL` | Backend ONLY | Optional / Dual DB | [Supabase Dashboard](https://supabase.com/dashboard) &rarr; Project Settings &rarr; Database &rarr; Connection string (Transaction Pooler port `6543`). |
 | `NEON_DATABASE_URL` | Backend ONLY | Recommended | [Neon Console](https://console.neon.tech) &rarr; Dashboard &rarr; Connection Details. High-speed serverless PostgreSQL used for Drizzle ORM operations. |
 | `APP_ID` | Backend | Optional (Default: `daily-love-app`) | Application identifier for internal token generation. |
-| `APP_SECRET` | Backend | Recommended | Strong random secret string used to sign session cookies and verify `x-admin-secret` API headers. |
+| `APP_SECRET` | Backend | Recommended | Strong random secret string used to sign session cookies and verify `x-admin-secret` API headers. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
 | `ADMIN_USER_ID` | Backend | Optional | Supabase User UUID (from Supabase Auth table) to automatically grant the `admin` role upon sign-in. |
 | `ADMIN_EMAIL` | Backend | Optional | Email address (e.g. `pastor@dailyloveforjesus.org`) automatically granted the `admin` role upon sign-in. |
 | `API_BIBLE_KEY` | Backend | Optional | [American Bible Society API.Bible](https://scripture.api.bible/signup). Default Bible engine uses Bolls Life API (completely free, 50+ translations, 0 keys needed). |
 | `TELEGRAM_BOT_TOKEN` | Backend | Optional | Generated via [@BotFather](https://t.me/BotFather) on Telegram for automated channel message ingestion. |
 | `TELEGRAM_CHANNEL_ID` | Backend | Optional | The Telegram channel ID (e.g. `@dailyloveforjesus` or `-100xxxxxx`) from which devotionals are ingested. |
+| `GEMINI_API_KEY` | Backend | Optional | [Google AI Studio](https://aistudio.google.com/app/apikey) for AI scripture commentary, reflection questions, and study assistance. |
+| `OPENROUTER_API_KEY` | Backend | Optional | [OpenRouter Console](https://openrouter.ai/keys) for unified multi-LLM access and fallback routing. |
+| `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` / `CLOUDINARY_API_SECRET` | Backend | Optional | [Cloudinary Console](https://console.cloudinary.com/settings/api-keys) for ministry media, photos, audio attachments, and PDF uploads. |
 | `EXPO_PUBLIC_API_URL` | Mobile App | Optional (Default: `http://localhost:4000`) | Base API URL pointing to the NestJS backend. (Use `http://10.0.2.2:4000` for Android emulator or LAN IP `http://192.168.x.x:4000` for physical devices). |
 | `EXPO_PUBLIC_SUPABASE_URL` | Mobile App | Required for Mobile Auth | Public URL of your Supabase project. |
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Mobile App | Required for Mobile Auth | Public anon key for mobile auth client. |

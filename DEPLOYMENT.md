@@ -124,34 +124,30 @@ The repository is configured for **Vercel Services** via [`vercel.json`](vercel.
 
 The NestJS backend runs on port `4000` (or `process.env.PORT`). It provides REST endpoints, Swagger OpenAPI docs at `/api/docs`, and tRPC endpoints at `/api/trpc`.
 
-### Option A: Railway (Recommended - Instant One-Click)
+### Option A: Railway (Instant 1-Click via `railway.json`)
 1. Sign in to [Railway.app](https://railway.app).
 2. Click **New Project** &rarr; **Deploy from GitHub repo**.
-3. In Service Settings:
-   - **Build Command:** `npm --prefix backend install --legacy-peer-deps && npm --prefix backend run build`
-   - **Start Command:** `npm --prefix backend run start:prod`
-   - Or deploy via the included [`backend/Dockerfile`](backend/Dockerfile).
+3. Railway automatically detects [`railway.json`](railway.json) and builds using the root multi-stage [`Dockerfile`](Dockerfile).
 4. Add all Backend Environment Variables (from Section 2).
 5. Generate a public domain (e.g. `https://daily-love-backend.up.railway.app`).
-6. Verify live health at `https://your-railway-app.up.railway.app/api/sync/health` and docs at `/api/docs`.
+6. Verify live health:
+   ```bash
+   npm run deploy:check https://daily-love-backend.up.railway.app
+   ```
 
-### Option B: Render (Free Web Service)
-1. Sign in to [Render.com](https://render.com) &rarr; **New Web Service**.
+### Option B: Render (Infrastructure as Code via `render.yaml`)
+1. Sign in to [Render.com](https://render.com) &rarr; **Blueprints** &rarr; **New Blueprint Instance**.
 2. Connect your GitHub repository.
-3. Settings:
-   - **Environment:** `Node`
-   - **Build Command:** `npm install && npm --prefix backend install --legacy-peer-deps && npm --prefix backend run build`
-   - **Start Command:** `npm --prefix backend run start:prod`
-4. Under **Advanced**, add `NODE_VERSION` = `24.21.0`.
-5. Enter your environment variables (`NEON_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`).
-6. Deploy!
+3. Render automatically discovers [`render.yaml`](render.yaml) and provisions the web service on Node 24 with auto-generated `APP_SECRET` and health probe at `/api/sync/health`.
+4. Supply your secret environment variables (`NEON_DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`).
+5. Deploy! Verify health and docs at `/api/docs`.
 
 ### Option C: Fly.io (Docker Deployment)
 1. Install Fly CLI: `winget install flyctl` or `curl -L https://fly.io/install.sh | sh`
 2. Authenticate: `fly auth login`
-3. Launch app using the root docker context and [`backend/Dockerfile`](backend/Dockerfile):
+3. Launch app using the root docker context and [`Dockerfile`](Dockerfile):
    ```bash
-   fly launch --dockerfile backend/Dockerfile
+   fly launch --dockerfile Dockerfile
    ```
 4. Set production secrets:
    ```bash
@@ -179,6 +175,22 @@ docker-compose up -d --build
 # 4. View logs
 docker-compose logs -f
 ```
+
+---
+
+## 4B. 🤖 Continuous Integration & Continuous Delivery (CI/CD)
+
+The repository features an enterprise GitHub Actions pipeline in [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml):
+
+- **Job 1: Quality Check**: Runs strict TypeScript checking (`npm run check`) across backend and frontend, and executes test suites.
+- **Job 2: Production Build Verification**: Compiles both Vite React SPA and NestJS backend bundles to verify zero regressions.
+- **Job 3: Multi-Stage Container Validation**: Validates that the Alpine Node 24 Dockerfile builds cleanly.
+- **Job 4: Automated Deploy Triggers**: On push to `main`, optionally fires webhooks to Railway (`RAILWAY_DEPLOY_WEBHOOK`) or Render (`RENDER_DEPLOY_WEBHOOK`).
+
+To enable zero-click deployments upon Git push:
+1. Copy the Deploy Hook URL from Railway or Render service settings.
+2. Go to **GitHub Repository** &rarr; **Settings** &rarr; **Secrets and variables** &rarr; **Actions**.
+3. Add `RAILWAY_DEPLOY_WEBHOOK` or `RENDER_DEPLOY_WEBHOOK`.
 
 ---
 

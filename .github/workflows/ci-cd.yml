@@ -1,0 +1,123 @@
+name: CI/CD Pipeline & Deployment Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─── Job 1: Code Quality & Type Integrity ──────────────────────────────────
+  quality-check:
+    name: Type Integrity & Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Monorepo Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm --prefix backend install --legacy-peer-deps
+          npm --prefix app install --legacy-peer-deps
+
+      - name: TypeScript Type-Check (Backend & App)
+        run: |
+          npm run check
+
+      - name: Run Test Suites
+        run: |
+          npm run test
+
+  # ─── Job 2: Monorepo Build Verification ────────────────────────────────────
+  build-production:
+    name: Build Production Bundles
+    needs: quality-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm --prefix backend install --legacy-peer-deps
+          npm --prefix app install --legacy-peer-deps
+
+      - name: Build Frontend SPA & Backend API
+        env:
+          NODE_ENV: production
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
+        run: |
+          npm run build:all
+
+      - name: Verify Build Artifacts
+        run: |
+          test -d app/dist/public || { echo "Frontend output missing"; exit 1; }
+          test -f app/dist/public/index.html || { echo "Frontend index.html missing"; exit 1; }
+          test -d backend/dist || { echo "Backend dist missing"; exit 1; }
+          test -f backend/dist/main.js || { echo "Backend main.js missing"; exit 1; }
+          echo "✅ All production bundles compiled successfully."
+
+  # ─── Job 3: Multi-Stage Container Build ─────────────────────────────────────
+  docker-build:
+    name: Docker Image Build & Validation
+    needs: quality-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Full-Stack Container Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: daily-love-for-jesus:latest
+
+  # ─── Job 4: Automated Deploy Trigger (Main branch only) ──────────────────────
+  deploy-trigger:
+    name: Trigger Production Deployments
+    needs: [build-production, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway Deploy Webhook (if configured)
+        if: ${{ env.RAILWAY_DEPLOY_WEBHOOK != '' }}
+        env:
+          RAILWAY_DEPLOY_WEBHOOK: ${{ secrets.RAILWAY_DEPLOY_WEBHOOK }}
+        run: |
+          curl -X POST -s -S -f "$RAILWAY_DEPLOY_WEBHOOK" || echo "Railway deploy webhook trigger skipped or failed"
+
+      - name: Trigger Render Deploy Webhook (if configured)
+        if: ${{ env.RENDER_DEPLOY_WEBHOOK != '' }}
+        env:
+          RENDER_DEPLOY_WEBHOOK: ${{ secrets.RENDER_DEPLOY_WEBHOOK }}
+        run: |
+          curl -X POST -s -S -f "$RENDER_DEPLOY_WEBHOOK" || echo "Render deploy webhook trigger skipped or failed"
+
+      - name: Deployment Instructions Summary
+        run: |
+          echo "🚀 CI verification complete."
+          echo "Cloudflare Pages, Netlify, and Vercel automatically deploy from Git commits to main."
