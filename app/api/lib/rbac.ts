@@ -112,3 +112,44 @@ export async function assertCommunityAdmin(userId: string, communityId: string) 
 
   return membership;
 }
+
+/**
+ * Ensures the requesting user is an admin or elevated_admin,
+ * allowing them to assign Sunday School teachers.
+ */
+export async function assertCanAssignTeacher(requestingUserId: string): Promise<void> {
+  const db = getDb();
+  const userRecord = await db.query.users.findFirst({
+    where: eq(users.id, requestingUserId),
+  });
+  if (!userRecord || !['admin', 'elevated_admin'].includes(userRecord.role)) {
+    throw new AuthorizationError('Only elevated admins can assign Sunday School teachers', 403);
+  }
+}
+
+/**
+ * Ensures the requesting user can manage a group:
+ * either globally as admin/elevated_admin, or as a teacher within the group.
+ */
+export async function assertCanManageGroup(requestingUserId: string, groupId: number): Promise<void> {
+  const db = getDb();
+  const userRecord = await db.query.users.findFirst({
+    where: eq(users.id, requestingUserId),
+  });
+  if (userRecord && ['admin', 'elevated_admin'].includes(userRecord.role)) {
+    return;
+  }
+  const membership = await db.query.groupMembers.findFirst({
+    where: and(
+      eq(groupMembers.groupId, groupId),
+      eq(groupMembers.userId, requestingUserId),
+      eq(groupMembers.status, 'active')
+    ),
+  });
+  if (!membership || membership.role !== 'teacher') {
+    throw new AuthorizationError(
+      `Access denied: teacher or admin role required to manage group ${groupId}`,
+      403
+    );
+  }
+}
