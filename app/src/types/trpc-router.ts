@@ -17,6 +17,9 @@ export const appRouter = t.router({
       )
       .mutation(async () => ({} as any)),
     logout: t.procedure.mutation(async () => ({ success: true })),
+    promoteToElevatedAdmin: t.procedure
+      .input(z.object({ userId: z.string() }))
+      .mutation(async () => ({ success: true })),
   }),
   bible: t.router({
     translations: t.procedure.query(async () => [] as any[]),
@@ -105,11 +108,22 @@ export const appRouter = t.router({
       )
       .query(async () => ({ items: [] as any[], total: 0 })),
     create: t.procedure.input(z.any()).mutation(async () => ({} as any)),
+    update: t.procedure.input(z.any()).mutation(async () => ({} as any)),
+    delete: t.procedure.input(z.any()).mutation(async () => ({ success: true })),
+    publish: t.procedure.input(z.any()).mutation(async () => ({} as any)),
   }),
   telegram: t.router({
     webhook: t.procedure.input(z.any()).mutation(async () => ({} as any)),
     messages: t.procedure.input(z.any()).query(async () => ({ items: [] as any[], total: 0 })),
     processMessage: t.procedure.input(z.any()).mutation(async () => ({} as any)),
+  }),
+  media: t.router({
+    uploadUrl: t.procedure
+      .input(z.object({ fileName: z.string(), mimeType: z.string(), folder: z.string().optional() }))
+      .mutation(async () => ({ uploadUrl: '' as string, fields: {} as Record<string, string | number> })),
+    archiveToSupabase: t.procedure
+      .input(z.object({ cloudinaryUrl: z.string(), fileName: z.string() }))
+      .mutation(async () => ({ supabaseUrl: '' as string })),
   }),
   favorite: t.router({
     list: t.procedure.input(z.any()).query(async () => [] as any[]),

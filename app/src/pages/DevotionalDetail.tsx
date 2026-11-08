@@ -12,11 +12,14 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
+import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
 
 export default function DevotionalDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+
+  useDevotionalRealtime();
 
   const { data: devotional, isLoading } =
     trpc.devotional.byId.useQuery({

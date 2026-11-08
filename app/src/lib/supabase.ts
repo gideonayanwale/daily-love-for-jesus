@@ -2,6 +2,87 @@
 // Daily Love For Jesus - Supabase Client (Web)
 // ==============================================================================
 
+// ── Realtime channel (lightweight broadcast subscriber using WebSocket) ────────
+type BroadcastHandler = (payload: unknown) => void;
+
+class RealtimeChannel {
+  public readonly name: string;
+  private url: string;
+  private anonKey: string;
+  private getSession: () => SupabaseSession | null;
+  private handlers: Map<string, BroadcastHandler[]> = new Map();
+  private ws: WebSocket | null = null;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+  constructor(name: string, url: string, anonKey: string, getSession: () => SupabaseSession | null) {
+    this.name = name;
+    this.url = url;
+    this.anonKey = anonKey;
+    this.getSession = getSession;
+  }
+
+  public on(
+    type: 'broadcast',
+    filter: { event: string },
+    handler: BroadcastHandler,
+  ): this {
+    const key = `${type}:${filter.event}`;
+    if (!this.handlers.has(key)) this.handlers.set(key, []);
+    this.handlers.get(key)!.push(handler);
+    return this;
+  }
+
+  public subscribe(): this {
+    if (!this.url || !this.anonKey) return this;
+    try {
+      const wsUrl = this.url
+        .replace(/^https?/, (m) => (m === 'https' ? 'wss' : 'ws'))
+        .replace(/\/$/, '');
+      const session = this.getSession();
+      const token = session?.access_token || this.anonKey;
+      const ws = new WebSocket(`${wsUrl}/realtime/v1/websocket?apikey=${this.anonKey}&vsn=1.0.0`);
+      this.ws = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ topic: `realtime:${this.name}`, event: 'phx_join', payload: { access_token: token, config: { broadcast: { self: true } } }, ref: '1' }));
+        this.heartbeatTimer = setInterval(() => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: null }));
+          }
+        }, 30_000);
+      };
+
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data as string) as { event?: string; payload?: { event?: string; payload?: unknown } };
+          if (msg.event === 'broadcast') {
+            const broadcastEvent = msg.payload?.event ?? '';
+            const key = `broadcast:${broadcastEvent}`;
+            const fns = this.handlers.get(key);
+            if (fns) fns.forEach((fn) => fn(msg.payload?.payload));
+          }
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      ws.onerror = () => {/* silent */};
+    } catch {
+      // realtime not available in test/dev without env
+    }
+    return this;
+  }
+
+  public unsubscribe(): void {
+    if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ topic: `realtime:${this.name}`, event: 'phx_leave', payload: {}, ref: '2' }));
+      this.ws.close();
+    }
+    this.ws = null;
+  }
+}
+
 export interface SupabaseUser {
   id: string;
   email?: string;
@@ -263,6 +344,21 @@ class SupabaseClient {
       }
     },
   };
+
+  // ── Realtime channel (lightweight broadcast listener) ──────────────────────
+  private channels: Map<string, RealtimeChannel> = new Map();
+
+  public channel(name: string): RealtimeChannel {
+    if (this.channels.has(name)) return this.channels.get(name)!;
+    const ch = new RealtimeChannel(name, this.url, this.anonKey, this.getStoredSession.bind(this));
+    this.channels.set(name, ch);
+    return ch;
+  }
+
+  public removeChannel(channel: RealtimeChannel): void {
+    channel.unsubscribe();
+    this.channels.delete(channel.name);
+  }
 }
 
 export const supabase = new SupabaseClient();

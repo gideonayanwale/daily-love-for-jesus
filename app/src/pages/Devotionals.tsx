@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router';
 import { trpc } from '@/providers/trpc';
 import { Heart, CalendarHeart, ArrowRight, Search, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
+import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
 
 export default function Devotionals() {
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+
+  useDevotionalRealtime();
 
   const { data: devotionalsData, isLoading } =
     trpc.devotional.list.useQuery({

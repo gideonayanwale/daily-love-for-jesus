@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router'
 import { lazy, Suspense } from 'react'
 import AppLayout from './components/AppLayout'
+import AdminRoute from './components/AdminRoute'
 
 const Home = lazy(() => import('./pages/Home'))
 const Bible = lazy(() => import('./pages/Bible'))
@@ -14,6 +15,7 @@ const Settings = lazy(() => import('./pages/Settings'))
 const Community = lazy(() => import('./pages/Community'))
 const Login = lazy(() => import('./pages/Login'))
 const NotFound = lazy(() => import('./pages/NotFound'))
+const DevotionalAdmin = lazy(() => import('./pages/admin/DevotionalAdmin'))
 
 function App() {
   return (
@@ -29,6 +31,16 @@ function App() {
         <Route path="devotionals/:id" element={<Suspense fallback={<Loading />}><DevotionalDetail /></Suspense>} />
         <Route path="community" element={<Suspense fallback={<Loading />}><Community /></Suspense>} />
         <Route path="settings" element={<Suspense fallback={<Loading />}><Settings /></Suspense>} />
+        <Route
+          path="admin/devotionals"
+          element={
+            <AdminRoute>
+              <Suspense fallback={<Loading />}>
+                <DevotionalAdmin />
+              </Suspense>
+            </AdminRoute>
+          }
+        />
       </Route>
       <Route path="/login" element={<Suspense fallback={<Loading />}><Login /></Suspense>} />
       <Route path="*" element={<Suspense fallback={<Loading />}><NotFound /></Suspense>} />

@@ -14,6 +14,7 @@ import {
   Sparkles,
   User,
   Heart,
+  ShieldCheck,
 } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
@@ -121,6 +122,19 @@ export default function AppLayout() {
                 </button>
               );
             })}
+            {(user?.role === 'admin' || user?.role === 'elevated_admin') && (
+              <button
+                onClick={() => navigate('/admin/devotionals')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  location.pathname.startsWith('/admin')
+                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-semibold'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                }`}
+              >
+                <ShieldCheck className={`w-4 h-4 ${location.pathname.startsWith('/admin') ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                <span>Admin</span>
+              </button>
+            )}
           </nav>
 
           {/* Right Header Actions: Theme Switcher & Profile */}
@@ -197,6 +211,23 @@ export default function AppLayout() {
               </button>
             );
           })}
+          {(user?.role === 'admin' || user?.role === 'elevated_admin') && (
+            <button
+              onClick={() => navigate('/admin/devotionals')}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all duration-150 ${
+                location.pathname.startsWith('/admin')
+                  ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              <ShieldCheck
+                className={`w-5 h-5 transition-transform ${
+                  location.pathname.startsWith('/admin') ? 'scale-110 stroke-[2.5px]' : 'stroke-2'
+                }`}
+              />
+              <span className="text-[10px] tracking-tight">Admin</span>
+            </button>
+          )}
         </div>
       </nav>
     </div>
