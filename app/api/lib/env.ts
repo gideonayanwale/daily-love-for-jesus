@@ -30,4 +30,14 @@ export const env = {
   // Admin Configuration
   adminUserId: process.env.ADMIN_USER_ID ?? "",
   adminEmail: process.env.ADMIN_EMAIL ?? "",
+
+  // Telegram Bot Configuration
+  telegramBotToken: get("TELEGRAM_BOT_TOKEN"),
+  telegramWebhookSecret: get("TELEGRAM_WEBHOOK_SECRET"),
+  telegramChannelId: get("TELEGRAM_CHANNEL_ID", ""),
+
+  // Cloudinary Media Storage
+  cloudinaryCloudName: get("CLOUDINARY_CLOUD_NAME"),
+  cloudinaryApiKey: get("CLOUDINARY_API_KEY"),
+  cloudinaryApiSecret: get("CLOUDINARY_API_SECRET"),
 };

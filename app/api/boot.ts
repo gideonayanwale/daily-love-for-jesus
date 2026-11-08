@@ -6,19 +6,64 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { Paths } from "@contracts/constants";
 import { getDb } from "./queries/connection";
-import { telegramMessages, devotionals } from "@db/schema";
+import { telegramMessages, devotionals, auditLogs } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
+import * as cookie from "cookie";
 import { communityRestRouter } from "./routes/community";
 import { syncRouter } from "./syncRouter";
 import { env } from "./lib/env";
+import { insertTelegramMessage } from "./queries/telegram";
 
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 
+app.use('*', async (c, next) => {
+  // Only track anonymous GET requests
+  if (c.req.method === 'GET') {
+    const authHeader = c.req.header('authorization');
+    const cookieHeader = c.req.header('cookie') || '';
+    const cookies = cookie.parse(cookieHeader);
+    const hasToken =
+      (authHeader && authHeader.toLowerCase().startsWith('bearer ')) ||
+      cookies['sb-access-token'] ||
+      cookies['daily_love_token'];
+
+    if (!hasToken) {
+      const ip =
+        c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
+        c.req.header('x-real-ip') ||
+        null;
+      const ua = c.req.header('user-agent') || null;
+      const path = new URL(c.req.url).pathname;
+
+      getDb().insert(auditLogs).values({
+        action: 'anonymous_visit',
+        resourceType: 'page',
+        resourceId: path,
+        actorId: null,
+        ipAddress: ip,
+        userAgent: ua,
+        metadata: { method: 'GET', timestamp: new Date().toISOString() },
+      }).catch((err: unknown) => {
+        console.error('[anonymous-tracking] Failed to log visit:', err);
+      });
+    }
+  }
+  return next();
+});
+
 // Telegram webhook endpoint - receives bot updates directly
 app.post("/api/telegram/webhook", async (c) => {
+  // Validate webhook secret token (skip if not configured — dev mode)
+  if (env.telegramWebhookSecret) {
+    const incomingSecret = c.req.header("x-telegram-bot-api-secret-token");
+    if (incomingSecret !== env.telegramWebhookSecret) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+  }
+
   try {
     const update = await c.req.json();
 
@@ -113,7 +158,79 @@ if (env.isProduction && !isServerless) {
   });
 }
 
-// Helper to parse devotional from Telegram text
+// ─── Telegram Polling Scheduler (2am & 4am) ───────────────────────────────────
+// Only runs in non-serverless environments when bot token is configured
+let updateOffset = 0;
+
+async function pollTelegramMessages(): Promise<void> {
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${env.telegramBotToken}/getUpdates?offset=${updateOffset}&timeout=0`
+    );
+    const data: any = await response.json();
+
+    if (!data.ok || !Array.isArray(data.result)) {
+      console.error("[scheduler] Telegram getUpdates returned non-ok response:", data);
+      return;
+    }
+
+    const db = getDb();
+
+    for (const update of data.result) {
+      const message = update.message ?? update.channel_post;
+      if (!message) continue;
+
+      const text = message.text ?? message.caption ?? "";
+      if (!text.trim()) continue;
+
+      try {
+        await insertTelegramMessage({
+          messageId: message.message_id,
+          chatId: message.chat.id,
+          chatTitle: message.chat.title ?? null,
+          senderId: message.from?.id ?? null,
+          senderName: message.from?.first_name ?? null,
+          text,
+          processed: false,
+          receivedAt: new Date((message.date ?? Math.floor(Date.now() / 1000)) * 1000),
+        });
+
+        await tryCreateDevotional(db, update.update_id, text);
+      } catch (err) {
+        console.error("[scheduler] Error processing update:", err);
+      }
+    }
+
+    if (data.result.length > 0) {
+      updateOffset = data.result[data.result.length - 1].update_id + 1;
+    }
+  } catch (err) {
+    console.error("[scheduler] pollTelegramMessages error:", err);
+  }
+}
+
+if (env.telegramBotToken && !isServerless) {
+  const lastFiredSlot: Record<string, Date | null> = { "2": null, "4": null };
+
+  setInterval(() => {
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+
+    if (m === 0 && (h === 2 || h === 4)) {
+      const slot = String(h);
+      if (
+        !lastFiredSlot[slot] ||
+        now.getTime() - lastFiredSlot[slot]!.getTime() > 60 * 60 * 1000
+      ) {
+        lastFiredSlot[slot] = now;
+        pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
+      }
+    }
+  }, 60_000);
+}
+
+// ─── Helper to parse devotional from Telegram text ────────────────────────────
 async function tryCreateDevotional(db: any, telegramMessageId: number, text: string): Promise<number | null> {
   try {
     const lines = text.split("\n").filter((l) => l.trim());
@@ -131,7 +248,7 @@ async function tryCreateDevotional(db: any, telegramMessageId: number, text: str
       if (match) {
         scripture = match[0];
         let j = i + 1;
-        const scriptureLines = [];
+        const scriptureLines: string[] = [];
         while (
           j < lines.length &&
           !lines[j].match(/^(Reflection|Mediation|Prayer|Thought|Body)/i)

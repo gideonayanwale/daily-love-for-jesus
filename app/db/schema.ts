@@ -21,7 +21,7 @@ export const users = pgTable(
     email: varchar("email", { length: 320 }),
     name: varchar("name", { length: 255 }),
     avatar: text("avatar"),
-    role: varchar("role", { length: 50 }).default("user").notNull(), // 'user' | 'admin'
+    role: varchar("role", { length: 50 }).default("user").notNull(), // 'user' | 'admin' | 'elevated_admin'
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     lastSignInAt: timestamp("last_sign_in_at", { withTimezone: true }).defaultNow().notNull(),
@@ -111,7 +111,14 @@ export const devotionals = pgTable(
     body: text("body").notNull(),
     reflection: text("reflection"),
     prayer: text("prayer"),
+    topic: varchar("topic", { length: 500 }),
+    declarationOfFaith: text("declaration_of_faith"),
+    dailyCapsule: text("daily_capsule"),
+    brothersKeeper: text("brothers_keeper"),
+    dailyBibleReading: text("daily_bible_reading"),
+    otherInfo: text("other_info"),
     author: varchar("author", { length: 255 }),
+    mediaUrl: text("media_url"),
     source: varchar("source", { length: 50 }).default("manual").notNull(), // 'telegram' | 'manual' | 'api'
     telegramMessageId: bigint("telegram_message_id", { mode: "number" }),
     devotionalDate: timestamp("devotional_date", { withTimezone: true }).defaultNow().notNull(),
@@ -577,4 +584,25 @@ export const auditLogs = pgTable(
 
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// ─── Media Uploads (Cloudinary + Supabase Storage Archive) ───────────────────
+export const mediaUploads = pgTable(
+  "media_uploads",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    cloudinaryUrl: text("cloudinary_url").notNull(),
+    supabaseUrl: text("supabase_url"),
+    fileName: varchar("file_name", { length: 500 }).notNull(),
+    mimeType: varchar("mime_type", { length: 100 }).notNull(),
+    fileSize: integer("file_size"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_media_uploads_user").on(table.userId),
+  ]
+);
+
+export type MediaUpload = typeof mediaUploads.$inferSelect;
+export type InsertMediaUpload = typeof mediaUploads.$inferInsert;
 

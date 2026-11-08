@@ -522,3 +522,46 @@ create table if not exists public.notifications (
 create index if not exists idx_notifications_user_read on public.notifications(user_id, is_read);
 alter table public.notifications enable row level security;
 
+
+-- ─── Additions: Media Support ─────────────────────────────────────────────────
+
+-- Add media_url column to devotionals (idempotent)
+ALTER TABLE public.devotionals ADD COLUMN IF NOT EXISTS media_url TEXT;
+
+-- ─── Media Uploads (Cloudinary + Supabase Storage Archive) ───────────────────
+CREATE TABLE IF NOT EXISTS public.media_uploads (
+  id serial PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  cloudinary_url text NOT NULL,
+  supabase_url text,
+  file_name varchar(500) NOT NULL,
+  mime_type varchar(100) NOT NULL,
+  file_size integer,
+  created_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_uploads_user ON public.media_uploads(user_id);
+
+ALTER TABLE public.media_uploads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert own media"
+  ON public.media_uploads FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own media"
+  ON public.media_uploads FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all media"
+  ON public.media_uploads FOR SELECT
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.users
+      WHERE id = auth.uid()
+        AND role IN ('admin', 'elevated_admin')
+    )
+  );
+

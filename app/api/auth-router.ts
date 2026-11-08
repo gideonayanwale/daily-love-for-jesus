@@ -1,7 +1,10 @@
 import { z } from "zod";
 import * as cookie from "cookie";
-import { createRouter, authedQuery } from "./middleware";
+import { eq } from "drizzle-orm";
+import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { upsertUser } from "./queries/users";
+import { getDb } from "./queries/connection";
+import * as schema from "@db/schema";
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
@@ -9,7 +12,7 @@ export const authRouter = createRouter({
   updateProfile: authedQuery
     .input(
       z.object({
-        name: z.string().min(1).max(255).optional(),
+        name: z.string().trim().min(1).max(255).optional(),
         avatar: z.string().url().optional(),
       })
     )
@@ -34,4 +37,15 @@ export const authRouter = createRouter({
     );
     return { success: true };
   }),
+
+  promoteToElevatedAdmin: adminQuery
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db
+        .update(schema.users)
+        .set({ role: "elevated_admin", updatedAt: new Date() })
+        .where(eq(schema.users.id, input.userId));
+      return { success: true };
+    }),
 });

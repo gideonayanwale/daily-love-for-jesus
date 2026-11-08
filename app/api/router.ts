@@ -6,6 +6,7 @@ import { devotionalRouter } from "./devotionalRouter";
 import { telegramRouter } from "./telegramRouter";
 import { favoritesRouter } from "./favoritesRouter";
 import { communityRouter } from "./communityRouter";
+import { mediaRouter } from "./mediaRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -16,6 +17,7 @@ export const appRouter = createRouter({
   telegram: telegramRouter,
   favorite: favoritesRouter,
   community: communityRouter,
+  media: mediaRouter,
 });
 
 export type AppRouter = typeof appRouter;

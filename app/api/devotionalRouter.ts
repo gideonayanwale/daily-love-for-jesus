@@ -1,48 +1,85 @@
 import { z } from "zod";
-import { createRouter, publicQuery } from "./middleware";
-import { getDb } from "./queries/connection";
-import { devotionals } from "@db/schema";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { createRouter, publicQuery, elevatedAdminQuery } from "./middleware";
+import { env } from "./lib/env";
+import {
+  getTodayDevotional,
+  getDevotionalById,
+  listDevotionals,
+  createDevotional,
+  updateDevotional,
+  deleteDevotional,
+  publishDevotional,
+} from "./queries/devotionals";
+
+// Fire-and-forget realtime broadcast after mutations
+async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+  try {
+    await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+      },
+      body: JSON.stringify({
+        topic: "devotionals",
+        event: "devotional_changed",
+        payload: { id, action },
+      }),
+    });
+  } catch (err) {
+    console.error("[devotionalRouter] broadcast error:", err);
+  }
+}
+
+const devotionalCreateInput = z.object({
+  title: z.string().trim().min(1).max(500),
+  scripture: z.string().trim().max(500).optional(),
+  scriptureText: z.string().trim().optional(),
+  body: z.string().trim().min(1).max(10000),
+  reflection: z.string().trim().max(3000).optional(),
+  prayer: z.string().trim().max(3000).optional(),
+  topic: z.string().trim().max(500).optional(),
+  declarationOfFaith: z.string().trim().optional(),
+  dailyCapsule: z.string().trim().optional(),
+  brothersKeeper: z.string().trim().optional(),
+  dailyBibleReading: z.string().trim().optional(),
+  otherInfo: z.string().trim().optional(),
+  author: z.string().trim().max(255).optional(),
+  mediaUrl: z.string().url().optional(),
+  source: z.enum(["telegram", "manual", "api"]).default("manual"),
+  devotionalDate: z.date().optional(),
+});
+
+const devotionalUpdateInput = z.object({
+  title: z.string().trim().min(1).max(500).optional(),
+  scripture: z.string().trim().max(500).optional(),
+  scriptureText: z.string().trim().optional(),
+  body: z.string().trim().min(1).max(10000).optional(),
+  reflection: z.string().trim().max(3000).optional(),
+  prayer: z.string().trim().max(3000).optional(),
+  topic: z.string().trim().max(500).optional(),
+  declarationOfFaith: z.string().trim().optional(),
+  dailyCapsule: z.string().trim().optional(),
+  brothersKeeper: z.string().trim().optional(),
+  dailyBibleReading: z.string().trim().optional(),
+  otherInfo: z.string().trim().optional(),
+  author: z.string().trim().max(255).optional(),
+  mediaUrl: z.string().url().optional(),
+  source: z.enum(["telegram", "manual", "api"]).optional(),
+  devotionalDate: z.date().optional(),
+  isPublished: z.boolean().optional(),
+});
 
 export const devotionalRouter = createRouter({
   today: publicQuery.query(async () => {
-    const db = getDb();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Get today's devotional, or the most recent one
-    const result = await db
-      .select()
-      .from(devotionals)
-      .where(
-        and(
-          gte(devotionals.devotionalDate, today),
-          eq(devotionals.isPublished, true)
-        )
-      )
-      .orderBy(devotionals.devotionalDate)
-      .limit(1);
-
-    if (result.length > 0) return result[0];
-
-    // Fallback to most recent devotional
-    const fallback = await db
-      .select()
-      .from(devotionals)
-      .where(eq(devotionals.isPublished, true))
-      .orderBy(desc(devotionals.devotionalDate))
-      .limit(1);
-
-    return fallback[0] ?? null;
+    return getTodayDevotional();
   }),
 
   byId: publicQuery
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
-      return db.query.devotionals.findFirst({
-        where: eq(devotionals.id, input.id),
-      });
+      return getDevotionalById(input.id);
     }),
 
   list: publicQuery
@@ -51,59 +88,73 @@ export const devotionalRouter = createRouter({
         .object({
           limit: z.number().min(1).max(100).default(20),
           offset: z.number().min(0).default(0),
+          publishedOnly: z.boolean().default(true),
         })
         .optional()
     )
     .query(async ({ input }) => {
-      const db = getDb();
-      const limit = input?.limit ?? 20;
-      const offset = input?.offset ?? 0;
-
-      const items = await db
-        .select()
-        .from(devotionals)
-        .where(eq(devotionals.isPublished, true))
-        .orderBy(desc(devotionals.devotionalDate))
-        .limit(limit)
-        .offset(offset);
-
-      const countResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(devotionals)
-        .where(eq(devotionals.isPublished, true));
-
-      return {
-        items,
-        total: countResult[0]?.count ?? 0,
-      };
+      return listDevotionals({
+        limit: input?.limit ?? 20,
+        offset: input?.offset ?? 0,
+        publishedOnly: input?.publishedOnly ?? true,
+      });
     }),
 
-  create: publicQuery
+  create: elevatedAdminQuery
+    .input(devotionalCreateInput)
+    .mutation(async ({ input }) => {
+      const devotional = await createDevotional({
+        ...input,
+        devotionalDate: input.devotionalDate ?? new Date(),
+      });
+      if (devotional) {
+        broadcastDevotionalChanged(devotional.id, "create").catch(() => void 0);
+      }
+      return devotional;
+    }),
+
+  update: elevatedAdminQuery
     .input(
       z.object({
-        title: z.string().min(1),
-        scripture: z.string().optional(),
-        scriptureText: z.string().optional(),
-        body: z.string().min(1),
-        reflection: z.string().optional(),
-        prayer: z.string().optional(),
-        author: z.string().optional(),
-        source: z.enum(["telegram", "manual", "api"]).default("manual"),
-        devotionalDate: z.date().optional(),
+        id: z.number(),
+        data: devotionalUpdateInput,
       })
     )
     .mutation(async ({ input }) => {
-      const db = getDb();
-      const result = await db
-        .insert(devotionals)
-        .values({
-          ...input,
-          devotionalDate: input.devotionalDate ?? new Date(),
-        })
-        .$returningId();
+      const existing = await getDevotionalById(input.id);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
+      }
+      const devotional = await updateDevotional(input.id, input.data);
+      if (devotional) {
+        broadcastDevotionalChanged(devotional.id, "update").catch(() => void 0);
+      }
+      return devotional;
+    }),
 
-      return db.query.devotionals.findFirst({
-        where: eq(devotionals.id, result[0].id),
-      });
+  delete: elevatedAdminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const existing = await getDevotionalById(input.id);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
+      }
+      await deleteDevotional(input.id);
+      broadcastDevotionalChanged(input.id, "delete").catch(() => void 0);
+      return { success: true, id: input.id };
+    }),
+
+  publish: elevatedAdminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const existing = await getDevotionalById(input.id);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
+      }
+      const devotional = await publishDevotional(input.id);
+      if (devotional) {
+        broadcastDevotionalChanged(devotional.id, "publish").catch(() => void 0);
+      }
+      return devotional;
     }),
 });

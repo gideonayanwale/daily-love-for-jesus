@@ -1,12 +1,17 @@
 import { z } from "zod";
-import { createRouter, publicQuery } from "./middleware";
+import { createRouter, publicQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import {
+  listTelegramMessages,
+  getTelegramMessageById,
+  markTelegramMessageProcessed,
+} from "./queries/telegram";
 
 export const telegramRouter = createRouter({
-  // Webhook endpoint for Telegram bot
+  // Webhook endpoint for Telegram bot (public — called by Telegram servers)
   webhook: publicQuery
     .input(
       z.object({
@@ -47,7 +52,6 @@ export const telegramRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
 
-      // Handle both regular messages and channel posts
       const message = input.message ?? input.channelPost;
       if (!message) {
         throw new TRPCError({
@@ -103,7 +107,8 @@ export const telegramRouter = createRouter({
       };
     }),
 
-  messages: publicQuery
+  // Admin-only: list stored Telegram messages
+  messages: adminQuery
     .input(
       z
         .object({
@@ -114,40 +119,20 @@ export const telegramRouter = createRouter({
         .optional()
     )
     .query(async ({ input }) => {
-      const db = getDb();
-      const limit = input?.limit ?? 20;
-      const offset = input?.offset ?? 0;
-
-      const conditions = [];
-      if (input?.processed !== undefined) {
-        conditions.push(eq(telegramMessages.processed, input.processed));
-      }
-
-      const items = await db
-        .select()
-        .from(telegramMessages)
-        .orderBy(desc(telegramMessages.receivedAt))
-        .limit(limit)
-        .offset(offset);
-
-      const countResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(telegramMessages);
-
-      return {
-        items,
-        total: countResult[0]?.count ?? 0,
-      };
+      return listTelegramMessages({
+        limit: input?.limit ?? 20,
+        offset: input?.offset ?? 0,
+        processedFilter: input?.processed,
+      });
     }),
 
-  processMessage: publicQuery
+  // Admin-only: manually process a stored Telegram message into a devotional
+  processMessage: adminQuery
     .input(z.object({ messageId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
 
-      const message = await db.query.telegramMessages.findFirst({
-        where: eq(telegramMessages.id, input.messageId),
-      });
+      const message = await getTelegramMessageById(input.messageId);
 
       if (!message) {
         throw new TRPCError({
@@ -166,6 +151,10 @@ export const telegramRouter = createRouter({
         message.text
       );
 
+      if (devotionalId !== null) {
+        await markTelegramMessageProcessed(message.id, devotionalId);
+      }
+
       return { status: "processed", devotionalId };
     }),
 });
@@ -177,27 +166,22 @@ async function tryCreateDevotionalFromMessage(
   text: string
 ): Promise<number | null> {
   try {
-    // Simple parsing: extract title (first line), scripture (line with reference), and body
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length < 2) return null;
 
-    // Try to identify patterns in the message
     let title = lines[0].substring(0, 200);
     let scripture = "";
     let scriptureText = "";
     let body = "";
-    let reflection = "";
     let prayer = "";
 
-    // Look for scripture reference pattern (e.g., "John 3:16", "Psalm 23:1-4")
     const scripturePattern = /(\d?\s?[A-Za-z]+\s?\d+[:\d\-]+)/;
     for (let i = 0; i < lines.length; i++) {
       const match = lines[i].match(scripturePattern);
       if (match) {
         scripture = match[0];
-        // Use subsequent lines as scripture text until empty line or marker
         let j = i + 1;
-        const scriptureLines = [];
+        const scriptureLines: string[] = [];
         while (j < lines.length && !lines[j].match(/^(Reflection|Mediation|Prayer|Thought|Body)/i)) {
           scriptureLines.push(lines[j]);
           j++;
@@ -207,10 +191,7 @@ async function tryCreateDevotionalFromMessage(
       }
     }
 
-    // The rest is body/reflection/prayer
     const bodyText = text.substring(title.length).trim();
-
-    // Try to split into body and prayer
     const prayerMarkers = ["prayer:", "let us pray:", "prayer"];
     let prayerIndex = -1;
     for (const marker of prayerMarkers) {
@@ -235,7 +216,7 @@ async function tryCreateDevotionalFromMessage(
         scripture: scripture || null,
         scriptureText: scriptureText || null,
         body,
-        reflection: reflection || null,
+        reflection: null,
         prayer: prayer || null,
         source: "telegram",
         telegramMessageId: telegramMessageId,
@@ -244,7 +225,6 @@ async function tryCreateDevotionalFromMessage(
       })
       .$returningId();
 
-    // Mark the telegram message as processed
     await db
       .update(telegramMessages)
       .set({ processed: true, devotionalId: result[0].id })

@@ -3,6 +3,11 @@
 // Neon (primary fast serverless) + Supabase PostgreSQL (auth/fallback)
 // ==============================================================================
 
+// Priority chain: 1. Neon (NEON_DATABASE_URL) — preferred for fast serverless reads/writes and branching.
+// 2. Supabase PostgreSQL (DATABASE_URL) — auth source-of-truth and fallback.
+// 3. Dev stub — graceful no-op for local dev without any DB configured.
+// The getDb() function implements this chain automatically.
+
 import { env } from "./env";
 import * as schema from "@db/schema";
 import * as relations from "@db/relations";
