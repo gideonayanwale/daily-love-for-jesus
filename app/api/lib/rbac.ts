@@ -146,9 +146,9 @@ export async function assertCanManageGroup(requestingUserId: string, groupId: nu
       eq(groupMembers.status, 'active')
     ),
   });
-  if (!membership || membership.role !== 'teacher') {
+  if (!membership || !['teacher', 'assistant_teacher'].includes(membership.role)) {
     throw new AuthorizationError(
-      `Access denied: teacher or admin role required to manage group ${groupId}`,
+      `Access denied: teacher, assistant_teacher, or admin role required to manage group ${groupId}`,
       403
     );
   }

@@ -38,6 +38,15 @@ app.use('*', async (c, next) => {
       const ua = c.req.header('user-agent') || null;
       const path = new URL(c.req.url).pathname;
 
+      // Skip static assets — only track meaningful API traffic
+      const isStaticAsset =
+        path.startsWith('/assets/') ||
+        path.startsWith('/_next/') ||
+        /\.(js|css|ico|png|jpg|jpeg|woff|woff2|map)$/i.test(path);
+      if (isStaticAsset) {
+        return next();
+      }
+
       getDb().insert(auditLogs).values({
         action: 'anonymous_visit',
         resourceType: 'page',
@@ -230,30 +239,105 @@ if (env.telegramBotToken && !isServerless) {
   }, 60_000);
 }
 
+// ─── Section markers recognised in Telegram devotional messages ───────────────
+// Each entry maps a case-insensitive prefix to the field it populates.
+// Order matters: more specific markers must appear before any prefix they share.
+const SECTION_MARKERS: Array<{ pattern: RegExp; field: string }> = [
+  { pattern: /^declaration of faith\s*:/i,   field: "declarationOfFaith" },
+  { pattern: /^be your brother'?s keeper\s*:/i, field: "brothersKeeper" },
+  { pattern: /^daily bible reading\s*:/i,    field: "dailyBibleReading" },
+  { pattern: /^daily capsule\s*:/i,          field: "dailyCapsule" },
+  { pattern: /^other info\s*:/i,             field: "otherInfo" },
+  { pattern: /^topic\s*:/i,                  field: "topic" },
+  // Legacy / general markers kept from the original parser
+  { pattern: /^prayer\s*:/i,                 field: "prayer" },
+  { pattern: /^let us pray\s*:/i,            field: "prayer" },
+];
+
+/**
+ * Returns the name of the section field whose marker matches the line,
+ * or null if the line does not start a known section.
+ */
+function matchSectionMarker(line: string): string | null {
+  for (const { pattern, field } of SECTION_MARKERS) {
+    if (pattern.test(line.trim())) return field;
+  }
+  return null;
+}
+
+/**
+ * Strips the leading marker label from a line so only the value remains.
+ * e.g. "TOPIC: Grace" → "Grace"
+ */
+function stripMarkerLabel(line: string): string {
+  return line.replace(/^[^:]+:\s*/, "").trim();
+}
+
 // ─── Helper to parse devotional from Telegram text ────────────────────────────
 async function tryCreateDevotional(db: any, telegramMessageId: number, text: string): Promise<number | null> {
   try {
-    const lines = text.split("\n").filter((l) => l.trim());
-    if (lines.length < 2) return null;
+    const lines = text.split("\n");
+    const nonEmptyLines = lines.filter((l) => l.trim());
+    if (nonEmptyLines.length < 2) return null;
 
-    const title = lines[0].substring(0, 200);
+    const title = nonEmptyLines[0].substring(0, 200);
+
+    // ── Section extraction ───────────────────────────────────────────────────
+    // Walk through all lines (including blank ones to preserve spacing within
+    // sections). When a line matches a known marker, start accumulating its
+    // content until the next marker is hit.
+    const sections: Record<string, string[]> = {};
+    let currentField: string | null = null;
+    let currentLines: string[] = [];
+
+    // Skip the title line (index 0 in the raw split)
+    for (let i = 1; i < lines.length; i++) {
+      const field = matchSectionMarker(lines[i]);
+      if (field !== null) {
+        // Flush previous section
+        if (currentField !== null) {
+          sections[currentField] = currentLines;
+        }
+        currentField = field;
+        // Inline value after the colon (if any) starts the section content
+        const inline = stripMarkerLabel(lines[i]);
+        currentLines = inline ? [inline] : [];
+      } else {
+        if (currentField !== null) {
+          currentLines.push(lines[i]);
+        }
+      }
+    }
+    // Flush the last open section
+    if (currentField !== null) {
+      sections[currentField] = currentLines;
+    }
+
+    /** Join section lines, trim, and cap to maxLen. Returns null if empty. */
+    function extractSection(field: string, maxLen: number): string | null {
+      const raw = sections[field];
+      if (!raw) return null;
+      const value = raw.join("\n").trim();
+      return value ? value.substring(0, maxLen) : null;
+    }
+
+    // ── Legacy body / scripture extraction (unchanged logic) ────────────────
     const scripturePattern = /(\d?\s?[A-Za-z]+\s?\d+[:\d\-]+)/;
     let scripture = "";
     let scriptureText = "";
-    let body = "";
-    let prayer = "";
 
-    for (let i = 0; i < lines.length; i++) {
-      const match = lines[i].match(scripturePattern);
+    for (let i = 0; i < nonEmptyLines.length; i++) {
+      const match = nonEmptyLines[i].match(scripturePattern);
       if (match) {
         scripture = match[0];
         let j = i + 1;
         const scriptureLines: string[] = [];
         while (
-          j < lines.length &&
-          !lines[j].match(/^(Reflection|Mediation|Prayer|Thought|Body)/i)
+          j < nonEmptyLines.length &&
+          !nonEmptyLines[j].match(/^(Reflection|Mediation|Prayer|Thought|Body)/i) &&
+          matchSectionMarker(nonEmptyLines[j]) === null
         ) {
-          scriptureLines.push(lines[j]);
+          scriptureLines.push(nonEmptyLines[j]);
           j++;
         }
         scriptureText = scriptureLines.join("\n").substring(0, 1000);
@@ -261,23 +345,19 @@ async function tryCreateDevotional(db: any, telegramMessageId: number, text: str
       }
     }
 
+    // Body: everything after the title up to the first recognised section marker
     const bodyText = text.substring(title.length).trim();
-    const prayerMarkers = ["prayer:", "let us pray:", "prayer"];
-    let prayerIndex = -1;
-    for (const marker of prayerMarkers) {
-      const idx = bodyText.toLowerCase().indexOf(marker);
-      if (idx !== -1) {
-        prayerIndex = idx;
-        break;
+    let firstMarkerIndex = bodyText.length;
+    for (const { pattern } of SECTION_MARKERS) {
+      // Find earliest line in bodyText that matches a marker
+      const lineIdx = bodyText.split("\n").findIndex((l) => pattern.test(l.trim()));
+      if (lineIdx !== -1) {
+        const charIdx = bodyText.split("\n").slice(0, lineIdx).join("\n").length;
+        if (charIdx < firstMarkerIndex) firstMarkerIndex = charIdx;
       }
     }
-
-    if (prayerIndex !== -1) {
-      body = bodyText.substring(0, prayerIndex).trim().substring(0, 2000);
-      prayer = bodyText.substring(prayerIndex).trim().substring(0, 1000);
-    } else {
-      body = bodyText.substring(0, 2000);
-    }
+    const body = bodyText.substring(0, firstMarkerIndex).trim().substring(0, 2000) ||
+      bodyText.substring(0, 2000);
 
     const result = await db
       .insert(devotionals)
@@ -286,7 +366,13 @@ async function tryCreateDevotional(db: any, telegramMessageId: number, text: str
         scripture: scripture || null,
         scriptureText: scriptureText || null,
         body,
-        prayer: prayer || null,
+        prayer:              extractSection("prayer", 3000),
+        topic:               extractSection("topic", 500),
+        declarationOfFaith:  extractSection("declarationOfFaith", 5000),
+        dailyCapsule:        extractSection("dailyCapsule", 5000),
+        brothersKeeper:      extractSection("brothersKeeper", 5000),
+        dailyBibleReading:   extractSection("dailyBibleReading", 5000),
+        otherInfo:           extractSection("otherInfo", 5000),
         source: "telegram",
         telegramMessageId,
         devotionalDate: new Date(),
