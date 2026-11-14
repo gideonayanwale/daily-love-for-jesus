@@ -51,3 +51,33 @@ app/docs/
 *.bak
 .expo/*.*
 .expo/
+.claude/
+.venv/
+
+# Wrangler / Cloudflare
+.wrangler/
+
+# Caches and build tools
+.cache/
+.turbo/
+
+# Windows junk
+Thumbs.db
+desktop.ini
+
+# Vim swap files
+*.swp
+*.swo
+
+# Test output
+test-results/
+playwright-report/
+
+# Agent task files
+.agents/
+
+# Snapshot tool output
+.snapshots/
+
+# Stray env saves
+*.env.save
