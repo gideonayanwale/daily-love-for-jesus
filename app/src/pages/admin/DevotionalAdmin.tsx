@@ -329,6 +329,11 @@ function ManageDevotionsTab() {
     onError: (err) => toast.error(err.message),
   });
 
+  const sendToTelegramMutation = trpc.devotional.sendToTelegram.useMutation({
+    onSuccess: () => toast.success('Sent to Telegram!'),
+    onError: (err) => toast.error(err.message),
+  });
+
   const startEdit = (d: Devotional) => {
     setEditingId(d.id);
     setEditForm({
@@ -425,6 +430,21 @@ function ManageDevotionsTab() {
               >
                 {d.isPublished ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
               </Button>
+              {d.isPublished && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => sendToTelegramMutation.mutate({ id: d.id })}
+                  disabled={sendToTelegramMutation.isPending}
+                  title="Send to Telegram"
+                >
+                  {sendToTelegramMutation.isPending ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Send className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -531,41 +551,87 @@ function ManageDevotionsTab() {
 // ── Telegram Messages Tab ──────────────────────────────────────────────────────
 function TelegramMessagesTab() {
   const { data } = trpc.telegram.messages.useQuery({ processed: false });
+  const [pasteText, setPasteText] = useState('');
 
   const processMutation = trpc.telegram.processMessage.useMutation({
     onSuccess: () => toast.success('Message converted to devotional!'),
     onError: (err) => toast.error(err.message),
   });
 
+  const ingestPastedMutation = trpc.telegram.ingestPasted.useMutation({
+    onSuccess: (data) => {
+      if (data.devotionalId) {
+        toast.success('Message processed! Devotional created.');
+      } else {
+        toast.success('Message saved — no devotional auto-created.');
+      }
+      setPasteText('');
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
   const messages = (data as { items?: Array<{ id: number; messageText?: string | null; processedAt?: string | null }> } | undefined)?.items ?? [];
 
   return (
-    <div className="space-y-3 max-w-2xl">
-      {messages.length === 0 && (
-        <div className="text-center py-8 space-y-2">
-          <MessageSquare className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto" />
-          <p className="text-sm text-zinc-500">No unprocessed Telegram messages.</p>
-        </div>
-      )}
-      {messages.map((msg) => (
-        <div key={msg.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
-          <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-4">
-            {msg.messageText || '(no text)'}
-          </p>
-          <Button
-            size="sm"
-            onClick={() => processMutation.mutate({ messageId: msg.id })}
-            disabled={processMutation.isPending}
-            className="bg-amber-500 hover:bg-amber-600 text-slate-950"
-          >
-            {processMutation.isPending ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Converting...</>
-            ) : (
-              <><Send className="w-3.5 h-3.5" /> Convert to Devotional</>
-            )}
-          </Button>
-        </div>
-      ))}
+    <div className="space-y-4 max-w-2xl">
+      {/* Paste form */}
+      <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Paste Telegram Message</h3>
+        <Textarea
+          rows={8}
+          placeholder="Paste the Telegram message text here..."
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+        />
+        <Button
+          size="sm"
+          onClick={() => ingestPastedMutation.mutate({ text: pasteText })}
+          disabled={ingestPastedMutation.isPending || pasteText.trim().length < 10}
+          className="bg-amber-500 hover:bg-amber-600 text-slate-950"
+        >
+          {ingestPastedMutation.isPending ? (
+            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Submitting...</>
+          ) : (
+            'Submit Message'
+          )}
+        </Button>
+      </div>
+
+      {/* Divider */}
+      <div className="flex items-center gap-3 text-xs text-zinc-400">
+        <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+        <span>— or paste manually —</span>
+        <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+      </div>
+
+      {/* Existing unprocessed messages */}
+      <div className="space-y-3">
+        {messages.length === 0 && (
+          <div className="text-center py-8 space-y-2">
+            <MessageSquare className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mx-auto" />
+            <p className="text-sm text-zinc-500">No unprocessed Telegram messages.</p>
+          </div>
+        )}
+        {messages.map((msg) => (
+          <div key={msg.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
+            <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-4">
+              {msg.messageText || '(no text)'}
+            </p>
+            <Button
+              size="sm"
+              onClick={() => processMutation.mutate({ messageId: msg.id })}
+              disabled={processMutation.isPending}
+              className="bg-amber-500 hover:bg-amber-600 text-slate-950"
+            >
+              {processMutation.isPending ? (
+                <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Converting...</>
+              ) : (
+                <><Send className="w-3.5 h-3.5" /> Convert to Devotional</>
+              )}
+            </Button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

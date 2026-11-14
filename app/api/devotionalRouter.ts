@@ -159,4 +159,15 @@ export const devotionalRouter = createRouter({
       }
       return devotional;
     }),
+
+  sendToTelegram: elevatedAdminQuery
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const existing = await getDevotionalById(input.id);
+      if (!existing) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
+      }
+      await sendDevotionalToTelegram(existing);
+      return { success: true };
+    }),
 });

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, publicQuery, adminQuery } from "./middleware";
+import { createRouter, publicQuery, adminQuery, elevatedAdminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -9,6 +9,7 @@ import {
   getTelegramMessageById,
   markTelegramMessageProcessed,
 } from "./queries/telegram";
+import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 export const telegramRouter = createRouter({
   // Webhook endpoint for Telegram bot (public — called by Telegram servers)
@@ -156,6 +157,33 @@ export const telegramRouter = createRouter({
       }
 
       return { status: "processed", devotionalId };
+    }),
+
+  // Elevated admin: paste raw Telegram message text and ingest it directly
+  ingestPasted: elevatedAdminQuery
+    .input(z.object({ text: z.string().trim().min(10).max(10000) }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+
+      const result = await db
+        .insert(telegramMessages)
+        .values({
+          messageId: Date.now(),
+          chatId: 0,
+          chatTitle: "manual",
+          senderId: null,
+          senderName: null,
+          text: input.text,
+          processed: false,
+          receivedAt: new Date(),
+        })
+        .$returningId();
+
+      const messageId = result[0].id;
+
+      const devotionalId = await parseAndCreateDevotional(db, messageId, input.text);
+
+      return { devotionalId: devotionalId ?? null, messageId };
     }),
 });
 

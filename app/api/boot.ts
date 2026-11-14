@@ -6,13 +6,14 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { Paths } from "@contracts/constants";
 import { getDb } from "./queries/connection";
-import { telegramMessages, devotionals, auditLogs } from "@db/schema";
-import { eq, sql } from "drizzle-orm";
+import { telegramMessages, auditLogs } from "@db/schema";
+import { sql } from "drizzle-orm";
 import * as cookie from "cookie";
 import { communityRestRouter } from "./routes/community";
 import { syncRouter } from "./syncRouter";
 import { env } from "./lib/env";
 import { insertTelegramMessage } from "./queries/telegram";
+import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -125,7 +126,7 @@ app.post("/api/telegram/webhook", async (c) => {
       .$returningId();
 
     // Try auto-create devotional
-    const devotionalId = await tryCreateDevotional(db, result[0].id, text);
+    const devotionalId = await parseAndCreateDevotional(db, result[0].id, text);
 
     return c.json({
       status: "processed",
@@ -210,7 +211,7 @@ async function pollTelegramMessages(): Promise<void> {
           receivedAt: new Date((message.date ?? Math.floor(Date.now() / 1000)) * 1000),
         });
 
-        await tryCreateDevotional(db, update.update_id, text);
+        await parseAndCreateDevotional(db, update.update_id, text);
       } catch (err) {
         console.error("[scheduler] Error processing update:", err);
       }
@@ -245,155 +246,3 @@ if (env.telegramBotToken && !isServerless) {
   }, 60_000);
 }
 
-// ─── Section markers recognised in Telegram devotional messages ───────────────
-// Each entry maps a case-insensitive prefix to the field it populates.
-// Order matters: more specific markers must appear before any prefix they share.
-const SECTION_MARKERS: Array<{ pattern: RegExp; field: string }> = [
-  { pattern: /^declaration of faith\s*:/i,   field: "declarationOfFaith" },
-  { pattern: /^be your brother'?s keeper\s*:/i, field: "brothersKeeper" },
-  { pattern: /^daily bible reading\s*:/i,    field: "dailyBibleReading" },
-  { pattern: /^daily capsule\s*:/i,          field: "dailyCapsule" },
-  { pattern: /^other info\s*:/i,             field: "otherInfo" },
-  { pattern: /^topic\s*:/i,                  field: "topic" },
-  // Legacy / general markers kept from the original parser
-  { pattern: /^prayer\s*:/i,                 field: "prayer" },
-  { pattern: /^let us pray\s*:/i,            field: "prayer" },
-];
-
-/**
- * Returns the name of the section field whose marker matches the line,
- * or null if the line does not start a known section.
- */
-function matchSectionMarker(line: string): string | null {
-  for (const { pattern, field } of SECTION_MARKERS) {
-    if (pattern.test(line.trim())) return field;
-  }
-  return null;
-}
-
-/**
- * Strips the leading marker label from a line so only the value remains.
- * e.g. "TOPIC: Grace" → "Grace"
- */
-function stripMarkerLabel(line: string): string {
-  return line.replace(/^[^:]+:\s*/, "").trim();
-}
-
-// ─── Helper to parse devotional from Telegram text ────────────────────────────
-async function tryCreateDevotional(db: any, telegramMessageId: number, text: string): Promise<number | null> {
-  try {
-    const lines = text.split("\n");
-    const nonEmptyLines = lines.filter((l) => l.trim());
-    if (nonEmptyLines.length < 2) return null;
-
-    const title = nonEmptyLines[0].substring(0, 200);
-
-    // ── Section extraction ───────────────────────────────────────────────────
-    // Walk through all lines (including blank ones to preserve spacing within
-    // sections). When a line matches a known marker, start accumulating its
-    // content until the next marker is hit.
-    const sections: Record<string, string[]> = {};
-    let currentField: string | null = null;
-    let currentLines: string[] = [];
-
-    // Skip the title line (index 0 in the raw split)
-    for (let i = 1; i < lines.length; i++) {
-      const field = matchSectionMarker(lines[i]);
-      if (field !== null) {
-        // Flush previous section
-        if (currentField !== null) {
-          sections[currentField] = currentLines;
-        }
-        currentField = field;
-        // Inline value after the colon (if any) starts the section content
-        const inline = stripMarkerLabel(lines[i]);
-        currentLines = inline ? [inline] : [];
-      } else {
-        if (currentField !== null) {
-          currentLines.push(lines[i]);
-        }
-      }
-    }
-    // Flush the last open section
-    if (currentField !== null) {
-      sections[currentField] = currentLines;
-    }
-
-    /** Join section lines, trim, and cap to maxLen. Returns null if empty. */
-    function extractSection(field: string, maxLen: number): string | null {
-      const raw = sections[field];
-      if (!raw) return null;
-      const value = raw.join("\n").trim();
-      return value ? value.substring(0, maxLen) : null;
-    }
-
-    // ── Legacy body / scripture extraction (unchanged logic) ────────────────
-    const scripturePattern = /(\d?\s?[A-Za-z]+\s?\d+[:\d\-]+)/;
-    let scripture = "";
-    let scriptureText = "";
-
-    for (let i = 0; i < nonEmptyLines.length; i++) {
-      const match = nonEmptyLines[i].match(scripturePattern);
-      if (match) {
-        scripture = match[0];
-        let j = i + 1;
-        const scriptureLines: string[] = [];
-        while (
-          j < nonEmptyLines.length &&
-          !nonEmptyLines[j].match(/^(Reflection|Mediation|Prayer|Thought|Body)/i) &&
-          matchSectionMarker(nonEmptyLines[j]) === null
-        ) {
-          scriptureLines.push(nonEmptyLines[j]);
-          j++;
-        }
-        scriptureText = scriptureLines.join("\n").substring(0, 1000);
-        break;
-      }
-    }
-
-    // Body: everything after the title up to the first recognised section marker
-    const bodyText = text.substring(title.length).trim();
-    let firstMarkerIndex = bodyText.length;
-    for (const { pattern } of SECTION_MARKERS) {
-      // Find earliest line in bodyText that matches a marker
-      const lineIdx = bodyText.split("\n").findIndex((l) => pattern.test(l.trim()));
-      if (lineIdx !== -1) {
-        const charIdx = bodyText.split("\n").slice(0, lineIdx).join("\n").length;
-        if (charIdx < firstMarkerIndex) firstMarkerIndex = charIdx;
-      }
-    }
-    const body = bodyText.substring(0, firstMarkerIndex).trim().substring(0, 2000) ||
-      bodyText.substring(0, 2000);
-
-    const result = await db
-      .insert(devotionals)
-      .values({
-        title,
-        scripture: scripture || null,
-        scriptureText: scriptureText || null,
-        body,
-        prayer:              extractSection("prayer", 3000),
-        topic:               extractSection("topic", 500),
-        declarationOfFaith:  extractSection("declarationOfFaith", 5000),
-        dailyCapsule:        extractSection("dailyCapsule", 5000),
-        brothersKeeper:      extractSection("brothersKeeper", 5000),
-        dailyBibleReading:   extractSection("dailyBibleReading", 5000),
-        otherInfo:           extractSection("otherInfo", 5000),
-        source: "telegram",
-        telegramMessageId,
-        devotionalDate: new Date(),
-        isPublished: true,
-      })
-      .$returningId();
-
-    await db
-      .update(telegramMessages)
-      .set({ processed: true, devotionalId: result[0].id })
-      .where(eq(telegramMessages.id, telegramMessageId));
-
-    return result[0].id;
-  } catch (error) {
-    console.error("Failed to create devotional from message:", error);
-    return null;
-  }
-}
