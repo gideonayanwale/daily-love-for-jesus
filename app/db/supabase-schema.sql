@@ -137,6 +137,13 @@ create table if not exists public.devotionals (
   body text not null,
   reflection text,
   prayer text,
+  -- Structured devotional sections (admin-authored or Telegram-parsed)
+  topic varchar(500),
+  declaration_of_faith text,
+  daily_capsule text,
+  brothers_keeper text,
+  daily_bible_reading text,
+  other_info text,
   author varchar(255),
   source varchar(50) default 'manual' not null check (source in ('telegram', 'manual', 'api')),
   telegram_message_id bigint,
