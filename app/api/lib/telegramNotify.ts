@@ -2,10 +2,15 @@ import { env } from './env';
 import { Devotional } from '@db/schema';
 import { format } from 'date-fns';
 
+// Escapes characters that are special in Telegram's HTML parse mode.
+function escHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 // Formats a devotional as an HTML Telegram message.
 // Only sections with content are included.
 export async function sendDevotionalToTelegram(devotional: Devotional): Promise<void> {
-  if (!env.telegramBotToken || !env.telegramChannelId) return;
+  if (!env.telegramBotToken || !env.telegramChannelId.trim()) return;
 
   const lines: string[] = [];
 
@@ -16,55 +21,55 @@ export async function sendDevotionalToTelegram(devotional: Devotional): Promise<
 
   if (devotional.topic) {
     lines.push('');
-    lines.push(`<b>TOPIC: ${devotional.topic}</b>`);
+    lines.push(`<b>TOPIC: ${escHtml(devotional.topic)}</b>`);
   }
 
   if (devotional.declarationOfFaith) {
     lines.push('');
     lines.push(`<b>DECLARATION OF FAITH:</b>`);
-    lines.push(`<i>${devotional.declarationOfFaith}</i>`);
+    lines.push(`<i>${escHtml(devotional.declarationOfFaith)}</i>`);
   }
 
   if (devotional.scripture) {
     lines.push('');
-    lines.push(`\uD83D\uDCD6 <b>${devotional.scripture}</b>`);
+    lines.push(`\uD83D\uDCD6 <b>${escHtml(devotional.scripture)}</b>`);
     if (devotional.scriptureText) {
-      lines.push(`<i>${devotional.scriptureText}</i>`);
+      lines.push(`<i>${escHtml(devotional.scriptureText)}</i>`);
     }
   }
 
   if (devotional.body) {
     lines.push('');
-    lines.push(devotional.body);
+    lines.push(escHtml(devotional.body));
   }
 
   if (devotional.prayer) {
     lines.push('');
     lines.push(`\uD83D\uDE4F <b>PRAYER:</b>`);
-    lines.push(`<i>${devotional.prayer}</i>`);
+    lines.push(`<i>${escHtml(devotional.prayer)}</i>`);
   }
 
   if (devotional.dailyCapsule) {
     lines.push('');
     lines.push(`\uD83D\uDC8A <b>DAILY CAPSULE:</b>`);
-    lines.push(devotional.dailyCapsule);
+    lines.push(escHtml(devotional.dailyCapsule));
   }
 
   if (devotional.brothersKeeper) {
     lines.push('');
     lines.push(`\uD83E\uDD1D <b>BE YOUR BROTHER'S KEEPER:</b>`);
-    lines.push(devotional.brothersKeeper);
+    lines.push(escHtml(devotional.brothersKeeper));
   }
 
   if (devotional.dailyBibleReading) {
     lines.push('');
     lines.push(`\uD83D\uDCDA <b>DAILY BIBLE READING:</b>`);
-    lines.push(devotional.dailyBibleReading);
+    lines.push(escHtml(devotional.dailyBibleReading));
   }
 
   if (devotional.otherInfo) {
     lines.push('');
-    lines.push(`\u2139\uFE0F ${devotional.otherInfo}`);
+    lines.push(`\u2139\uFE0F ${escHtml(devotional.otherInfo)}`);
   }
 
   const text = lines.join('\n');
