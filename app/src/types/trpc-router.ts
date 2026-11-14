@@ -104,13 +104,20 @@ export const appRouter = t.router({
         z.object({
           limit: z.number().optional(),
           offset: z.number().optional(),
+          publishedOnly: z.boolean().optional(),
         }).optional(),
       )
       .query(async () => ({ items: [] as any[], total: 0 })),
     create: t.procedure.input(z.any()).mutation(async () => ({} as any)),
-    update: t.procedure.input(z.any()).mutation(async () => ({} as any)),
-    delete: t.procedure.input(z.any()).mutation(async () => ({ success: true })),
-    publish: t.procedure.input(z.any()).mutation(async () => ({} as any)),
+    update: t.procedure
+      .input(z.object({ id: z.number(), data: z.any() }))
+      .mutation(async () => ({} as any)),
+    delete: t.procedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async () => ({ success: true })),
+    publish: t.procedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async () => ({} as any)),
   }),
   telegram: t.router({
     webhook: t.procedure.input(z.any()).mutation(async () => ({} as any)),

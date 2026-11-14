@@ -36,11 +36,11 @@ export async function assertGroupRole(
 ) {
   const db = getDb();
 
-  // Master admins always have permission
+  // Global admins and elevated admins always have permission
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
-  if (userRecord?.role === "admin") {
+  if (userRecord && ["admin", "elevated_admin"].includes(userRecord.role)) {
     return { role: "teacher" as GroupRole, status: "active" };
   }
 
@@ -91,7 +91,7 @@ export async function assertCommunityAdmin(userId: string, communityId: string) 
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
-  if (userRecord?.role === "admin") {
+  if (userRecord && ["admin", "elevated_admin"].includes(userRecord.role)) {
     return { role: "COMMUNITY_ADMIN" as CommunityRole, status: "active" };
   }
 
@@ -123,7 +123,7 @@ export async function assertCanAssignTeacher(requestingUserId: string): Promise<
     where: eq(users.id, requestingUserId),
   });
   if (!userRecord || !['admin', 'elevated_admin'].includes(userRecord.role)) {
-    throw new AuthorizationError('Only elevated admins can assign Sunday School teachers', 403);
+    throw new AuthorizationError('Only admins or elevated admins can assign Sunday School teachers', 403);
   }
 }
 

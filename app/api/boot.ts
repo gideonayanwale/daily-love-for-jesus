@@ -47,17 +47,23 @@ app.use('*', async (c, next) => {
         return next();
       }
 
-      getDb().insert(auditLogs).values({
-        action: 'anonymous_visit',
-        resourceType: 'page',
-        resourceId: path,
-        actorId: null,
-        ipAddress: ip,
-        userAgent: ua,
-        metadata: { method: 'GET', timestamp: new Date().toISOString() },
-      }).catch((err: unknown) => {
-        console.error('[anonymous-tracking] Failed to log visit:', err);
-      });
+      // Fire-and-forget — wrapped so a synchronous throw from getDb() is caught,
+      // not turned into an unhandled rejection that could crash the process.
+      try {
+        getDb().insert(auditLogs).values({
+          action: 'anonymous_visit',
+          resourceType: 'page',
+          resourceId: path,
+          actorId: null,
+          ipAddress: ip,
+          userAgent: ua,
+          metadata: { method: 'GET', timestamp: new Date().toISOString() },
+        }).catch((err: unknown) => {
+          console.error('[anonymous-tracking] Failed to log visit:', err);
+        });
+      } catch (err: unknown) {
+        console.error('[anonymous-tracking] getDb() threw synchronously:', err);
+      }
     }
   }
   return next();
