@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ShieldCheck, Trash2, Edit, Send, MessageSquare, Plus, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import TeacherAssignmentAdmin from './TeacherAssignmentAdmin';
+import AnonymousLogAdmin from './AnonymousLogAdmin';
 
 // ── Sanitise helper ────────────────────────────────────────────────────────────
 const sanitise = (s: string): string => s.trim().replace(/(<([^>]+)>)/gi, '');
@@ -596,6 +598,12 @@ export default function DevotionalAdmin() {
           <TabsTrigger value="new">New Devotion</TabsTrigger>
           <TabsTrigger value="manage">Manage Devotions</TabsTrigger>
           <TabsTrigger value="telegram">Telegram Messages</TabsTrigger>
+          {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
+            <TabsTrigger value="teacher-assignment">Teacher Assignment</TabsTrigger>
+          )}
+          {user?.role === 'admin' && (
+            <TabsTrigger value="visitor-log">Visitor Log</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="new">
@@ -609,6 +617,17 @@ export default function DevotionalAdmin() {
         <TabsContent value="telegram">
           <TelegramMessagesTab />
         </TabsContent>
+
+        {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
+          <TabsContent value="teacher-assignment">
+            <TeacherAssignmentAdmin />
+          </TabsContent>
+        )}
+        {user?.role === 'admin' && (
+          <TabsContent value="visitor-log">
+            <AnonymousLogAdmin />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

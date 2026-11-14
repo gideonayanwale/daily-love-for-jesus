@@ -59,3 +59,5 @@ function requireRoles(roles: string[]) {
 export const elevatedAdminQuery = authedQuery.use(
   requireRoles(["admin", "elevated_admin"])
 );
+
+export const superAdminQuery = authedQuery.use(requireRole('admin'));
