@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, elevatedAdminQuery } from "./middleware";
 import { env } from "./lib/env";
+import { sendDevotionalToTelegram } from './lib/telegramNotify';
 import {
   getTodayDevotional,
   getDevotionalById,
@@ -154,6 +155,7 @@ export const devotionalRouter = createRouter({
       const devotional = await publishDevotional(input.id);
       if (devotional) {
         broadcastDevotionalChanged(devotional.id, "publish").catch(() => void 0);
+        sendDevotionalToTelegram(devotional).catch(() => void 0);
       }
       return devotional;
     }),

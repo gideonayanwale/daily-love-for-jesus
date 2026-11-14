@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router';
 import { trpc } from '@/providers/trpc';
+import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
 import {
   BookOpen,
   Music,
@@ -21,6 +22,7 @@ import { useState } from 'react';
 export default function Home() {
   const navigate = useNavigate();
   const [copiedVerse, setCopiedVerse] = useState(false);
+  useDevotionalRealtime();
 
   // Queries from NestJS tRPC Backend
   const { data: devotional, isLoading: devLoading } =

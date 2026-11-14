@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { trpc } from '@/providers/trpc';
 import { useAuth } from '@/hooks/useAuth';
 import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
+import type { Devotional } from '@db/schema';
 import MediaUpload from '@/components/MediaUpload';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -326,7 +327,7 @@ function ManageDevotionsTab() {
     onError: (err) => toast.error(err.message),
   });
 
-  const startEdit = (d: { id: number; title: string; body: string; scripture?: string | null; scriptureText?: string | null; reflection?: string | null; prayer?: string | null; author?: string | null; source?: string | null; devotionalDate?: string | null; topic?: string | null; declarationOfFaith?: string | null; dailyBibleReading?: string | null; dailyCapsule?: string | null; brothersKeeper?: string | null; otherInfo?: string | null }) => {
+  const startEdit = (d: Devotional) => {
     setEditingId(d.id);
     setEditForm({
       title: d.title || '',
