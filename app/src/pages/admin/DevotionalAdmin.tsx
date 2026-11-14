@@ -36,6 +36,12 @@ const LIMITS = {
   prayer: 3000,
   author: 255,
   source: 500,
+  topic: 500,
+  declarationOfFaith: 5000,
+  dailyCapsule: 5000,
+  brothersKeeper: 5000,
+  dailyBibleReading: 5000,
+  otherInfo: 5000,
 } as const;
 
 // ── New devotion form state type ───────────────────────────────────────────────
@@ -51,6 +57,12 @@ interface DevotionForm {
   mediaUrl: string;
   source: string;
   isPublished: boolean;
+  topic: string;
+  declarationOfFaith: string;
+  dailyCapsule: string;
+  brothersKeeper: string;
+  dailyBibleReading: string;
+  otherInfo: string;
 }
 
 const EMPTY_FORM: DevotionForm = {
@@ -65,6 +77,12 @@ const EMPTY_FORM: DevotionForm = {
   mediaUrl: '',
   source: '',
   isPublished: false,
+  topic: '',
+  declarationOfFaith: '',
+  dailyCapsule: '',
+  brothersKeeper: '',
+  dailyBibleReading: '',
+  otherInfo: '',
 };
 
 // ── Inline field error component ───────────────────────────────────────────────
@@ -113,6 +131,18 @@ function NewDevotionTab() {
       newErrors.author = `Author must be ≤ ${LIMITS.author} characters.`;
     if (form.source && sanitise(form.source).length > LIMITS.source)
       newErrors.source = `Source must be ≤ ${LIMITS.source} characters.`;
+    if (form.topic && sanitise(form.topic).length > LIMITS.topic)
+      newErrors.topic = `Topic must be ≤ ${LIMITS.topic} characters.`;
+    if (form.declarationOfFaith && sanitise(form.declarationOfFaith).length > LIMITS.declarationOfFaith)
+      newErrors.declarationOfFaith = `Declaration of Faith must be ≤ ${LIMITS.declarationOfFaith} characters.`;
+    if (form.dailyCapsule && sanitise(form.dailyCapsule).length > LIMITS.dailyCapsule)
+      newErrors.dailyCapsule = `Daily Capsule must be ≤ ${LIMITS.dailyCapsule} characters.`;
+    if (form.brothersKeeper && sanitise(form.brothersKeeper).length > LIMITS.brothersKeeper)
+      newErrors.brothersKeeper = `Be Your Brother's Keeper must be ≤ ${LIMITS.brothersKeeper} characters.`;
+    if (form.dailyBibleReading && sanitise(form.dailyBibleReading).length > LIMITS.dailyBibleReading)
+      newErrors.dailyBibleReading = `Daily Bible Reading must be ≤ ${LIMITS.dailyBibleReading} characters.`;
+    if (form.otherInfo && sanitise(form.otherInfo).length > LIMITS.otherInfo)
+      newErrors.otherInfo = `Other Information must be ≤ ${LIMITS.otherInfo} characters.`;
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -129,10 +159,18 @@ function NewDevotionTab() {
       reflection: sanitise(form.reflection) || undefined,
       prayer: sanitise(form.prayer) || undefined,
       author: sanitise(form.author) || undefined,
-      devotionalDate: form.date || new Date().toISOString().split('T')[0],
+      // devotionalDate must be a Date object — the z.date() schema rejects strings
+      devotionalDate: form.date ? new Date(form.date) : new Date(),
       mediaUrl: form.mediaUrl || undefined,
-      source: sanitise(form.source) || undefined,
+      // source is an enum ("telegram" | "manual" | "api") — always send "manual" here
+      source: 'manual' as const,
       isPublished: form.isPublished,
+      topic: sanitise(form.topic) || undefined,
+      declarationOfFaith: sanitise(form.declarationOfFaith) || undefined,
+      dailyCapsule: sanitise(form.dailyCapsule) || undefined,
+      brothersKeeper: sanitise(form.brothersKeeper) || undefined,
+      dailyBibleReading: sanitise(form.dailyBibleReading) || undefined,
+      otherInfo: sanitise(form.otherInfo) || undefined,
     });
   };
 
@@ -164,9 +202,21 @@ function NewDevotionTab() {
       </div>
 
       <div className="space-y-1.5">
+        <Label htmlFor="d-topic">Topic / Theme</Label>
+        <Input id="d-topic" value={form.topic} onChange={set('topic')} placeholder="e.g. Faith in Trials" maxLength={500} />
+        <FieldError msg={errors.topic} />
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="d-body">Devotional Body *</Label>
         <Textarea id="d-body" value={form.body} onChange={set('body')} placeholder="Write the devotional message..." rows={8} />
         <FieldError msg={errors.body} />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label htmlFor="d-declarationOfFaith">Declaration of Faith</Label>
+        <Textarea id="d-declarationOfFaith" value={form.declarationOfFaith} onChange={set('declarationOfFaith')} placeholder="Enter the declaration of faith for today..." rows={3} />
+        <FieldError msg={errors.declarationOfFaith} />
       </div>
 
       <div className="space-y-1.5">
@@ -176,14 +226,36 @@ function NewDevotionTab() {
       </div>
 
       <div className="space-y-1.5">
+        <Label htmlFor="d-otherInfo">Other Information</Label>
+        <Textarea id="d-otherInfo" value={form.otherInfo} onChange={set('otherInfo')} placeholder="Any additional notes or announcements..." rows={2} />
+        <FieldError msg={errors.otherInfo} />
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="d-prayer">Prayer</Label>
         <Textarea id="d-prayer" value={form.prayer} onChange={set('prayer')} placeholder="Closing prayer..." rows={3} />
         <FieldError msg={errors.prayer} />
       </div>
 
+      <div className="space-y-1.5">
+        <Label htmlFor="d-dailyCapsule">Daily Capsule</Label>
+        <Textarea id="d-dailyCapsule" value={form.dailyCapsule} onChange={set('dailyCapsule')} placeholder="The daily capsule message..." rows={3} />
+        <FieldError msg={errors.dailyCapsule} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="d-brothersKeeper">Be Your Brother's Keeper</Label>
+        <Textarea id="d-brothersKeeper" value={form.brothersKeeper} onChange={set('brothersKeeper')} placeholder="Today's social/community challenge..." rows={3} />
+        <FieldError msg={errors.brothersKeeper} />
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="d-dailyBibleReading">Daily Bible Reading</Label>
+        <Textarea id="d-dailyBibleReading" value={form.dailyBibleReading} onChange={set('dailyBibleReading')} placeholder="e.g. Genesis 1–3 | Today read about creation..." rows={2} />
+        <FieldError msg={errors.dailyBibleReading} />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
-          <Label htmlFor="d-date">Devotional Date</Label>
+          <Label htmlFor="d-date">Devotional Date (auto-set to today)</Label>
           <Input id="d-date" type="date" value={form.date} onChange={set('date')} />
         </div>
         <div className="space-y-1.5">
@@ -254,7 +326,7 @@ function ManageDevotionsTab() {
     onError: (err) => toast.error(err.message),
   });
 
-  const startEdit = (d: { id: number; title: string; body: string; scripture?: string | null; scriptureText?: string | null; reflection?: string | null; prayer?: string | null; author?: string | null; source?: string | null; devotionalDate?: string | null }) => {
+  const startEdit = (d: { id: number; title: string; body: string; scripture?: string | null; scriptureText?: string | null; reflection?: string | null; prayer?: string | null; author?: string | null; source?: string | null; devotionalDate?: string | null; topic?: string | null; declarationOfFaith?: string | null; dailyBibleReading?: string | null; dailyCapsule?: string | null; brothersKeeper?: string | null; otherInfo?: string | null }) => {
     setEditingId(d.id);
     setEditForm({
       title: d.title || '',
@@ -265,6 +337,12 @@ function ManageDevotionsTab() {
       prayer: d.prayer || '',
       author: d.author || '',
       source: d.source || '',
+      topic: d.topic || '',
+      declarationOfFaith: d.declarationOfFaith || '',
+      dailyCapsule: d.dailyCapsule || '',
+      brothersKeeper: d.brothersKeeper || '',
+      dailyBibleReading: d.dailyBibleReading || '',
+      otherInfo: d.otherInfo || '',
     });
     setEditErrors({});
   };
@@ -278,22 +356,42 @@ function ManageDevotionsTab() {
     else if (sanitise(editForm.title).length > LIMITS.title) newErrors.title = `Title must be ≤ ${LIMITS.title} characters.`;
     if (!editForm.body?.trim()) newErrors.body = 'Body is required.';
     else if (sanitise(editForm.body).length > LIMITS.body) newErrors.body = `Body must be ≤ ${LIMITS.body} characters.`;
+    if (editForm.topic && sanitise(editForm.topic).length > LIMITS.topic)
+      newErrors.topic = `Topic must be ≤ ${LIMITS.topic} characters.`;
+    if (editForm.declarationOfFaith && sanitise(editForm.declarationOfFaith).length > LIMITS.declarationOfFaith)
+      newErrors.declarationOfFaith = `Declaration of Faith must be ≤ ${LIMITS.declarationOfFaith} characters.`;
+    if (editForm.dailyCapsule && sanitise(editForm.dailyCapsule).length > LIMITS.dailyCapsule)
+      newErrors.dailyCapsule = `Daily Capsule must be ≤ ${LIMITS.dailyCapsule} characters.`;
+    if (editForm.brothersKeeper && sanitise(editForm.brothersKeeper).length > LIMITS.brothersKeeper)
+      newErrors.brothersKeeper = `Be Your Brother's Keeper must be ≤ ${LIMITS.brothersKeeper} characters.`;
+    if (editForm.dailyBibleReading && sanitise(editForm.dailyBibleReading).length > LIMITS.dailyBibleReading)
+      newErrors.dailyBibleReading = `Daily Bible Reading must be ≤ ${LIMITS.dailyBibleReading} characters.`;
+    if (editForm.otherInfo && sanitise(editForm.otherInfo).length > LIMITS.otherInfo)
+      newErrors.otherInfo = `Other Information must be ≤ ${LIMITS.otherInfo} characters.`;
     setEditErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const saveEdit = () => {
     if (editingId === null || !validateEdit()) return;
+    // Router expects { id, data: {...} } — not flat fields
     updateMutation.mutate({
       id: editingId,
-      title: sanitise(editForm.title || ''),
-      body: sanitise(editForm.body || ''),
-      scripture: sanitise(editForm.scripture || '') || undefined,
-      scriptureText: sanitise(editForm.scriptureText || '') || undefined,
-      reflection: sanitise(editForm.reflection || '') || undefined,
-      prayer: sanitise(editForm.prayer || '') || undefined,
-      author: sanitise(editForm.author || '') || undefined,
-      source: sanitise(editForm.source || '') || undefined,
+      data: {
+        title: sanitise(editForm.title || ''),
+        body: sanitise(editForm.body || ''),
+        scripture: sanitise(editForm.scripture || '') || undefined,
+        scriptureText: sanitise(editForm.scriptureText || '') || undefined,
+        reflection: sanitise(editForm.reflection || '') || undefined,
+        prayer: sanitise(editForm.prayer || '') || undefined,
+        author: sanitise(editForm.author || '') || undefined,
+        topic: sanitise(editForm.topic || '') || undefined,
+        declarationOfFaith: sanitise(editForm.declarationOfFaith || '') || undefined,
+        dailyCapsule: sanitise(editForm.dailyCapsule || '') || undefined,
+        brothersKeeper: sanitise(editForm.brothersKeeper || '') || undefined,
+        dailyBibleReading: sanitise(editForm.dailyBibleReading || '') || undefined,
+        otherInfo: sanitise(editForm.otherInfo || '') || undefined,
+      },
     });
   };
 
@@ -318,7 +416,7 @@ function ManageDevotionsTab() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => publishMutation.mutate({ id: d.id, isPublished: !d.isPublished })}
+                onClick={() => publishMutation.mutate({ id: d.id })}
                 disabled={publishMutation.isPending}
                 title={d.isPublished ? 'Unpublish' : 'Publish'}
               >
@@ -382,6 +480,31 @@ function ManageDevotionsTab() {
               <div className="space-y-1">
                 <Label htmlFor={`e-prayer-${d.id}`} className="text-xs">Prayer</Label>
                 <Textarea id={`e-prayer-${d.id}`} value={editForm.prayer || ''} onChange={setEdit('prayer')} rows={2} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`e-topic-${d.id}`} className="text-xs">Topic / Theme</Label>
+                <Input id={`e-topic-${d.id}`} value={editForm.topic || ''} onChange={setEdit('topic')} />
+                <FieldError msg={editErrors.topic} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`e-declarationOfFaith-${d.id}`} className="text-xs">Declaration of Faith</Label>
+                <Textarea id={`e-declarationOfFaith-${d.id}`} value={editForm.declarationOfFaith || ''} onChange={setEdit('declarationOfFaith')} rows={2} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`e-dailyCapsule-${d.id}`} className="text-xs">Daily Capsule</Label>
+                <Textarea id={`e-dailyCapsule-${d.id}`} value={editForm.dailyCapsule || ''} onChange={setEdit('dailyCapsule')} rows={2} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`e-brothersKeeper-${d.id}`} className="text-xs">Be Your Brother's Keeper</Label>
+                <Textarea id={`e-brothersKeeper-${d.id}`} value={editForm.brothersKeeper || ''} onChange={setEdit('brothersKeeper')} rows={2} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`e-dailyBibleReading-${d.id}`} className="text-xs">Daily Bible Reading</Label>
+                <Textarea id={`e-dailyBibleReading-${d.id}`} value={editForm.dailyBibleReading || ''} onChange={setEdit('dailyBibleReading')} rows={2} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`e-otherInfo-${d.id}`} className="text-xs">Other Information</Label>
+                <Textarea id={`e-otherInfo-${d.id}`} value={editForm.otherInfo || ''} onChange={setEdit('otherInfo')} rows={2} />
               </div>
               <div className="flex gap-2">
                 <Button

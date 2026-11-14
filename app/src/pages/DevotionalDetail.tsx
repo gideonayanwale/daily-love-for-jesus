@@ -9,6 +9,8 @@ import {
   Calendar,
   Check,
   Bookmark,
+  Sparkles,
+  Users,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useState } from 'react';
@@ -184,6 +186,90 @@ export default function DevotionalDetail() {
             </div>
             <p className="text-sm italic leading-relaxed text-zinc-900 dark:text-zinc-100 font-serif">
               {devotional.prayer}
+            </p>
+          </div>
+        )}
+
+        {/* Daily Capsule */}
+        {devotional.dailyCapsule && (
+          <div className="bg-blue-500/10 dark:bg-blue-500/15 border border-blue-500/20 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+              <Sparkles className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Daily Capsule
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+              {devotional.dailyCapsule}
+            </p>
+          </div>
+        )}
+
+        {/* Declaration of Faith */}
+        {devotional.declarationOfFaith && (
+          <div className="bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <Heart className="w-4 h-4 fill-current" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Declaration of Faith
+              </span>
+            </div>
+            <p className="text-sm italic font-bold leading-relaxed text-zinc-900 dark:text-zinc-100 font-serif">
+              {devotional.declarationOfFaith}
+            </p>
+          </div>
+        )}
+
+        {/* Be Your Brother's Keeper */}
+        {devotional.brothersKeeper && (
+          <div className="bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+              <Users className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Be Your Brother's Keeper
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+              {devotional.brothersKeeper}
+            </p>
+          </div>
+        )}
+
+        {/* Daily Bible Reading */}
+        {devotional.dailyBibleReading && (
+          <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-2">
+            <div className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400">
+              <BookOpen className="w-4 h-4" />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                Today's Reading
+              </span>
+            </div>
+            <p className="text-sm leading-relaxed text-zinc-800 dark:text-zinc-200">
+              {devotional.dailyBibleReading}
+            </p>
+          </div>
+        )}
+
+        {/* Topic */}
+        {devotional.topic && (
+          <div className="bg-purple-500/10 dark:bg-purple-500/15 border border-purple-500/20 rounded-2xl p-5 space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-700 dark:text-purple-400 block">
+              Topic / Theme
+            </span>
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              {devotional.topic}
+            </p>
+          </div>
+        )}
+
+        {/* Other Info */}
+        {devotional.otherInfo && (
+          <div className="bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 space-y-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 block">
+              Other Information
+            </span>
+            <p className="text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+              {devotional.otherInfo}
             </p>
           </div>
         )}

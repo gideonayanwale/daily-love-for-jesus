@@ -339,6 +339,56 @@ export default function Home() {
                   </div>
                 )}
 
+                {devotional.dailyCapsule && (
+                  <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    <span className="text-xs font-bold uppercase tracking-wider text-blue-700 dark:text-blue-400 block mb-1">
+                      Daily Capsule
+                    </span>
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                      {devotional.dailyCapsule}
+                    </p>
+                  </div>
+                )}
+
+                {devotional.declarationOfFaith && (
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400 block mb-1">
+                      Declaration of Faith
+                    </span>
+                    <p className="text-xs italic font-bold text-zinc-900 dark:text-zinc-100 font-serif leading-relaxed">
+                      {devotional.declarationOfFaith}
+                    </p>
+                  </div>
+                )}
+
+                {devotional.brothersKeeper && (
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Users className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                        Be Your Brother's Keeper
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                      {devotional.brothersKeeper}
+                    </p>
+                  </div>
+                )}
+
+                {devotional.dailyBibleReading && (
+                  <div className="p-3.5 rounded-xl bg-zinc-100 dark:bg-zinc-900/60 border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <BookOpen className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-zinc-600 dark:text-zinc-400">
+                        Today's Reading
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed">
+                      {devotional.dailyBibleReading}
+                    </p>
+                  </div>
+                )}
+
                 <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <button
