@@ -7,37 +7,43 @@ on:
     branches: [ main ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{github.workflow}}-${{github.ref}}
   cancel-in-progress: true
 
 jobs:
   # ─── Job 1: Code Quality & Type Integrity ──────────────────────────────────
   quality-check:
-    name: Type Integrity & Lint
+    name: Type Integrity, Lint & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
+          cache-dependency-path: app/package-lock.json
 
-      - name: Install Monorepo Dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm --prefix backend install --legacy-peer-deps
-          npm --prefix app install --legacy-peer-deps
+      - name: Install App Dependencies
+        run: npm --prefix app install --legacy-peer-deps
 
-      - name: TypeScript Type-Check (Backend & App)
-        run: |
-          npm run check
+      - name: TypeScript Type-Check
+        run: npm --prefix app run check
+
+      - name: Lint
+        run: npm --prefix app run lint
 
       - name: Run Test Suites
-        run: |
-          npm run test
+        run: npm --prefix app run test -- --run
 
   # ─── Job 2: Monorepo Build Verification ────────────────────────────────────
   build-production:
@@ -53,28 +59,25 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
+          cache-dependency-path: app/package-lock.json
 
-      - name: Install Dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm --prefix backend install --legacy-peer-deps
-          npm --prefix app install --legacy-peer-deps
+      - name: Install App Dependencies
+        run: npm --prefix app install --legacy-peer-deps
 
       - name: Build Frontend SPA & Backend API
         env:
           NODE_ENV: production
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key' }}
-        run: |
-          npm run build:all
+          APP_SECRET: ${{secrets.APP_SECRET || 'ci-build-placeholder-not-used-at-runtime'}}
+          VITE_SUPABASE_URL: ${{secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co'}}
+          VITE_SUPABASE_ANON_KEY: ${{secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key'}}
+        run: npm --prefix app run build
 
       - name: Verify Build Artifacts
         run: |
-          test -d app/dist/public || { echo "Frontend output missing"; exit 1; }
+          test -d app/dist/public || { echo "Frontend output missing at app/dist/public"; exit 1; }
           test -f app/dist/public/index.html || { echo "Frontend index.html missing"; exit 1; }
-          test -d backend/dist || { echo "Backend dist missing"; exit 1; }
-          test -f backend/dist/main.js || { echo "Backend main.js missing"; exit 1; }
-          echo "✅ All production bundles compiled successfully."
+          test -f app/dist/index.js || { echo "Backend bundle missing at app/dist/index.js"; exit 1; }
+          echo "All production bundles compiled successfully."
 
   # ─── Job 3: Multi-Stage Container Build ─────────────────────────────────────
   docker-build:
@@ -104,20 +107,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Railway Deploy Webhook (if configured)
-        if: ${{ env.RAILWAY_DEPLOY_WEBHOOK != '' }}
+        if: ${{env.RAILWAY_DEPLOY_WEBHOOK != ''}}
         env:
-          RAILWAY_DEPLOY_WEBHOOK: ${{ secrets.RAILWAY_DEPLOY_WEBHOOK }}
+          RAILWAY_DEPLOY_WEBHOOK: ${{secrets.RAILWAY_DEPLOY_WEBHOOK}}
         run: |
           curl -X POST -s -S -f "$RAILWAY_DEPLOY_WEBHOOK" || echo "Railway deploy webhook trigger skipped or failed"
 
       - name: Trigger Render Deploy Webhook (if configured)
-        if: ${{ env.RENDER_DEPLOY_WEBHOOK != '' }}
+        if: ${{env.RENDER_DEPLOY_WEBHOOK != ''}}
         env:
-          RENDER_DEPLOY_WEBHOOK: ${{ secrets.RENDER_DEPLOY_WEBHOOK }}
+          RENDER_DEPLOY_WEBHOOK: ${{secrets.RENDER_DEPLOY_WEBHOOK}}
         run: |
           curl -X POST -s -S -f "$RENDER_DEPLOY_WEBHOOK" || echo "Render deploy webhook trigger skipped or failed"
 
       - name: Deployment Instructions Summary
         run: |
-          echo "🚀 CI verification complete."
+          echo "CI verification complete."
           echo "Cloudflare Pages, Netlify, and Vercel automatically deploy from Git commits to main."

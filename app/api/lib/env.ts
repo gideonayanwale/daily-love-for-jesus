@@ -1,12 +1,16 @@
 import "dotenv/config";
 
-function get(name: string, defaultValue = ""): string {
+function get(name: string, defaultValue?: string): string {
   const value = process.env[name];
-  if (!value && process.env.NODE_ENV === "production") {
-    // In production, log warning if key missing
-    console.warn(`[env] Missing environment variable: ${name}`);
+  if (!value) {
+    if (process.env.NODE_ENV === 'production' && defaultValue === undefined) {
+      throw new Error(`${name} environment variable is required in production`);
+    }
+    if (process.env.NODE_ENV === 'production') {
+      console.warn(`[env] Missing environment variable: ${name}`);
+    }
   }
-  return value ?? defaultValue;
+  return value ?? (defaultValue ?? '');
 }
 
 export const env = {
@@ -24,7 +28,7 @@ export const env = {
 
   // App & Security
   appId: get("APP_ID", "daily-love-app"),
-  appSecret: get("APP_SECRET", "daily_love_default_secret"),
+  appSecret: get("APP_SECRET"),
   isProduction: process.env.NODE_ENV === "production",
 
   // Admin Configuration
