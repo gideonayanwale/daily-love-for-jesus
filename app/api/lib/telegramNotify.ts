@@ -10,7 +10,7 @@ function escHtml(s: string): string {
 // Formats a devotional as an HTML Telegram message.
 // Only sections with content are included.
 export async function sendDevotionalToTelegram(devotional: Devotional): Promise<void> {
-  if (!env.telegramBotToken || !env.telegramChannelId.trim()) return;
+  if (!env.telegramBotToken?.trim() || !env.telegramChannelId?.trim()) return;
 
   const lines: string[] = [];
 

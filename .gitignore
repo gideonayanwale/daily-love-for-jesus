@@ -46,7 +46,7 @@ app/ACTION_PLAN.md
 app/VALIDATION.md
 app/info.md
 app/ARCHITECTURE.md
-app/docs/
+
 *.tmp
 *.bak
 .expo/*.*

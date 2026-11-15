@@ -16,6 +16,9 @@ import { insertTelegramMessage } from "./queries/telegram";
 import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 
+const anonLogCache = new Map<string, number>();
+setInterval(() => anonLogCache.clear(), 10 * 60 * 1000).unref();
+
 const app = new Hono<{ Bindings: HttpBindings }>();
 
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
@@ -50,6 +53,10 @@ app.use('*', async (c, next) => {
 
       // Fire-and-forget — wrapped so a synchronous throw from getDb() is caught,
       // not turned into an unhandled rejection that could crash the process.
+      const cacheKey = ip ?? 'unknown';
+      const lastLogged = anonLogCache.get(cacheKey) ?? 0;
+      if (Date.now() - lastLogged < 60_000) return next();
+      anonLogCache.set(cacheKey, Date.now());
       try {
         getDb().insert(auditLogs).values({
           action: 'anonymous_visit',
@@ -78,6 +85,8 @@ app.post("/api/telegram/webhook", async (c) => {
     if (incomingSecret !== env.telegramWebhookSecret) {
       return c.json({ error: "Unauthorized" }, 401);
     }
+  } else if (env.isProduction) {
+    return c.json({ error: "Webhook secret required in production" }, 401);
   }
 
   try {
@@ -200,7 +209,7 @@ async function pollTelegramMessages(): Promise<void> {
       if (!text.trim()) continue;
 
       try {
-        await insertTelegramMessage({
+        const inserted = await insertTelegramMessage({
           messageId: message.message_id,
           chatId: message.chat.id,
           chatTitle: message.chat.title ?? null,
@@ -211,7 +220,9 @@ async function pollTelegramMessages(): Promise<void> {
           receivedAt: new Date((message.date ?? Math.floor(Date.now() / 1000)) * 1000),
         });
 
-        await parseAndCreateDevotional(db, update.update_id, text);
+        if (inserted) {
+          await parseAndCreateDevotional(db, inserted.id, text);
+        }
       } catch (err) {
         console.error("[scheduler] Error processing update:", err);
       }

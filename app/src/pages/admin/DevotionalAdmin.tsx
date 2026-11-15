@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { trpc } from '@/providers/trpc';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,8 +23,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ShieldCheck, Trash2, Edit, Send, MessageSquare, Plus, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
-import TeacherAssignmentAdmin from './TeacherAssignmentAdmin';
-import AnonymousLogAdmin from './AnonymousLogAdmin';
+const TeacherAssignmentAdmin = lazy(() => import('./TeacherAssignmentAdmin'));
+const AnonymousLogAdmin = lazy(() => import('./AnonymousLogAdmin'));
 
 // ── Sanitise helper ────────────────────────────────────────────────────────────
 const sanitise = (s: string): string => s.trim().replace(/(<([^>]+)>)/gi, '');
@@ -311,8 +311,10 @@ function ManageDevotionsTab() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<DevotionForm>>({});
   const [editErrors, setEditErrors] = useState<Partial<Record<string, string>>>({});
+  const [offset, setOffset] = useState(0);
+  const PAGE_SIZE = 20;
 
-  const { data } = trpc.devotional.list.useQuery({ limit: 100, offset: 0 });
+  const { data } = trpc.devotional.list.useQuery({ limit: PAGE_SIZE, offset, publishedOnly: false });
 
   const updateMutation = trpc.devotional.update.useMutation({
     onSuccess: () => { toast.success('Devotional updated!'); setEditingId(null); setEditForm({}); },
@@ -544,6 +546,14 @@ function ManageDevotionsTab() {
           )}
         </div>
       ))}
+      {data && (data.total ?? 0) > offset + PAGE_SIZE && (
+        <Button variant="outline" size="sm" onClick={() => setOffset(o => o + PAGE_SIZE)} className="w-full mt-2">
+          Load more ({(data.total ?? 0) - offset - PAGE_SIZE} remaining)
+        </Button>
+      )}
+      <p className="text-xs text-zinc-400 text-center mt-1">
+        Showing {Math.min(offset + PAGE_SIZE, data?.total ?? 0)} of {data?.total ?? 0}
+      </p>
     </div>
   );
 }
@@ -686,12 +696,16 @@ export default function DevotionalAdmin() {
 
         {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
           <TabsContent value="teacher-assignment">
-            <TeacherAssignmentAdmin />
+            <Suspense fallback={<div className="py-8 text-center text-sm text-zinc-400">Loading...</div>}>
+              <TeacherAssignmentAdmin />
+            </Suspense>
           </TabsContent>
         )}
         {user?.role === 'admin' && (
           <TabsContent value="visitor-log">
-            <AnonymousLogAdmin />
+            <Suspense fallback={<div className="py-8 text-center text-sm text-zinc-400">Loading...</div>}>
+              <AnonymousLogAdmin />
+            </Suspense>
           </TabsContent>
         )}
       </Tabs>

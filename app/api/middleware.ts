@@ -60,4 +60,4 @@ export const elevatedAdminQuery = authedQuery.use(
   requireRoles(["admin", "elevated_admin"])
 );
 
-export const superAdminQuery = authedQuery.use(requireRole('admin'));
+export const strictAdminQuery = authedQuery.use(requireRole('admin'));

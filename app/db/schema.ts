@@ -129,6 +129,7 @@ export const devotionals = pgTable(
   (table) => [
     index("idx_devotionals_date").on(table.devotionalDate),
     index("idx_devotionals_published").on(table.isPublished),
+    index("idx_devotionals_pub_date").on(table.isPublished, table.devotionalDate),
   ]
 );
 

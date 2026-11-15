@@ -13,6 +13,8 @@ import {
   publishDevotional,
 } from "./queries/devotionals";
 
+const stripHtml = (s: string): string => s.replace(/(<([^>]+)>)/gi, '').trim();
+
 // Fire-and-forget realtime broadcast after mutations
 async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
   try {
@@ -34,39 +36,40 @@ async function broadcastDevotionalChanged(id: number, action: string): Promise<v
 }
 
 const devotionalCreateInput = z.object({
-  title: z.string().trim().min(1).max(500),
-  scripture: z.string().trim().max(500).optional(),
-  scriptureText: z.string().trim().optional(),
-  body: z.string().trim().min(1).max(10000),
-  reflection: z.string().trim().max(3000).optional(),
-  prayer: z.string().trim().max(3000).optional(),
-  topic: z.string().trim().max(500).optional(),
-  declarationOfFaith: z.string().trim().max(5000).optional(),
-  dailyCapsule: z.string().trim().max(5000).optional(),
-  brothersKeeper: z.string().trim().max(5000).optional(),
-  dailyBibleReading: z.string().trim().max(5000).optional(),
-  otherInfo: z.string().trim().max(5000).optional(),
+  title: z.string().trim().min(1).max(500).transform(stripHtml),
+  scripture: z.string().trim().max(500).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  scriptureText: z.string().trim().optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  body: z.string().trim().min(1).max(10000).transform(stripHtml),
+  reflection: z.string().trim().max(3000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  prayer: z.string().trim().max(3000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  topic: z.string().trim().max(500).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  declarationOfFaith: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  dailyCapsule: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  brothersKeeper: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  dailyBibleReading: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  otherInfo: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
   author: z.string().trim().max(255).optional(),
-  mediaUrl: z.string().url().optional(),
+  mediaUrl: z.string().url().refine(url => url.startsWith('https://'), { message: 'Only HTTPS media URLs are accepted' }).optional(),
   source: z.enum(["telegram", "manual", "api"]).default("manual"),
   devotionalDate: z.date().optional(),
+  isPublished: z.boolean().optional(),
 });
 
 const devotionalUpdateInput = z.object({
-  title: z.string().trim().min(1).max(500).optional(),
-  scripture: z.string().trim().max(500).optional(),
-  scriptureText: z.string().trim().optional(),
-  body: z.string().trim().min(1).max(10000).optional(),
-  reflection: z.string().trim().max(3000).optional(),
-  prayer: z.string().trim().max(3000).optional(),
-  topic: z.string().trim().max(500).optional(),
-  declarationOfFaith: z.string().trim().max(5000).optional(),
-  dailyCapsule: z.string().trim().max(5000).optional(),
-  brothersKeeper: z.string().trim().max(5000).optional(),
-  dailyBibleReading: z.string().trim().max(5000).optional(),
-  otherInfo: z.string().trim().max(5000).optional(),
+  title: z.string().trim().min(1).max(500).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  scripture: z.string().trim().max(500).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  scriptureText: z.string().trim().optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  body: z.string().trim().min(1).max(10000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  reflection: z.string().trim().max(3000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  prayer: z.string().trim().max(3000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  topic: z.string().trim().max(500).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  declarationOfFaith: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  dailyCapsule: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  brothersKeeper: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  dailyBibleReading: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
+  otherInfo: z.string().trim().max(5000).optional().transform(v => v !== undefined ? stripHtml(v) : v),
   author: z.string().trim().max(255).optional(),
-  mediaUrl: z.string().url().optional(),
+  mediaUrl: z.string().url().refine(url => url.startsWith('https://'), { message: 'Only HTTPS media URLs are accepted' }).optional(),
   source: z.enum(["telegram", "manual", "api"]).optional(),
   devotionalDate: z.date().optional(),
   isPublished: z.boolean().optional(),

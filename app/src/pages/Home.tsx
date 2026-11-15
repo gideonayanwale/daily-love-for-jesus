@@ -90,14 +90,14 @@ export default function Home() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-2xl font-extrabold text-zinc-950 dark:text-zinc-50">
-              7 Days
+              —
             </span>
-            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-              Active
+            <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-zinc-100 text-zinc-500">
+              Coming soon
             </span>
           </div>
           <p className="text-[11px] text-zinc-400 dark:text-zinc-500 mt-1">
-            Faithful reading this week
+            Track your reading streak
           </p>
         </div>
 

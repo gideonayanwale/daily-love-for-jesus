@@ -3,14 +3,12 @@ import { getDb } from './queries/connection';
 import { groups, communities, groupMembers, users } from '@db/schema';
 import { eq, and, notInArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { assertCanAssignTeacher } from './lib/rbac';
 import { communityMembers } from '@db/schema';
 import { TRPCError } from '@trpc/server';
 
 export const teacherAssignmentRouter = createRouter({
   // ── List all active groups with their current teacher ──────────────────────
-  listGroups: elevatedAdminQuery.query(async ({ ctx }) => {
-    await assertCanAssignTeacher(ctx.user.id);
+  listGroups: elevatedAdminQuery.query(async () => {
     const db = getDb();
 
     const rows = await db
@@ -58,8 +56,7 @@ export const teacherAssignmentRouter = createRouter({
   // ── List users eligible to be assigned as teacher for a group ─────────────
   listEligibleUsers: elevatedAdminQuery
     .input(z.object({ groupId: z.number() }))
-    .query(async ({ ctx, input }) => {
-      await assertCanAssignTeacher(ctx.user.id);
+    .query(async ({ input }) => {
       const db = getDb();
 
       const group = await db.query.groups.findFirst({
@@ -121,8 +118,7 @@ export const teacherAssignmentRouter = createRouter({
   // ── Assign a user as teacher of a group ───────────────────────────────────
   assign: elevatedAdminQuery
     .input(z.object({ groupId: z.number(), userId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertCanAssignTeacher(ctx.user.id);
+    .mutation(async ({ input }) => {
       const db = getDb();
 
       const existing = await db.query.groupMembers.findFirst({
@@ -157,8 +153,7 @@ export const teacherAssignmentRouter = createRouter({
   // ── Remove teacher role from a group member ───────────────────────────────
   remove: elevatedAdminQuery
     .input(z.object({ groupId: z.number(), userId: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      await assertCanAssignTeacher(ctx.user.id);
+    .mutation(async ({ input }) => {
       const db = getDb();
 
       await db

@@ -9,3 +9,6 @@ ALTER TABLE devotionals ADD COLUMN IF NOT EXISTS daily_capsule TEXT;
 ALTER TABLE devotionals ADD COLUMN IF NOT EXISTS brothers_keeper TEXT;
 ALTER TABLE devotionals ADD COLUMN IF NOT EXISTS daily_bible_reading TEXT;
 ALTER TABLE devotionals ADD COLUMN IF NOT EXISTS other_info TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_devotionals_pub_date
+  ON public.devotionals(is_published, devotional_date DESC);

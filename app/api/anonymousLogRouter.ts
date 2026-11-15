@@ -1,11 +1,11 @@
-import { createRouter, superAdminQuery } from './middleware';
+import { createRouter, strictAdminQuery } from './middleware';
 import { getDb } from './queries/connection';
 import { auditLogs } from '@db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 export const anonymousLogRouter = createRouter({
-  list: superAdminQuery
+  list: strictAdminQuery
     .input(
       z.object({
         limit: z.number().min(1).max(200).default(50),

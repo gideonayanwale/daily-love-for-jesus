@@ -155,6 +155,7 @@ create table if not exists public.devotionals (
 
 create index if not exists idx_devotionals_date on public.devotionals(devotional_date);
 create index if not exists idx_devotionals_published on public.devotionals(is_published);
+CREATE INDEX IF NOT EXISTS idx_devotionals_pub_date ON public.devotionals(is_published, devotional_date DESC);
 
 alter table public.devotionals enable row level security;
 create policy "Published devotionals are publicly viewable"
@@ -572,3 +573,124 @@ CREATE POLICY "Admins can view all media"
     )
   );
 
+-- ─── 18. Audit Logs ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+  id serial PRIMARY KEY,
+  community_id uuid,
+  group_id int,
+  actor_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  action varchar(100) NOT NULL,
+  resource_type varchar(50) NOT NULL,
+  resource_id varchar(100),
+  metadata jsonb,
+  ip_address varchar(50),
+  user_agent text,
+  occurred_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON public.audit_logs(actor_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_comm ON public.audit_logs(community_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_occurred ON public.audit_logs(occurred_at);
+
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can view audit logs"
+  ON public.audit_logs FOR SELECT
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role IN ('admin', 'elevated_admin')));
+
+-- ─── 19. Announcement Reads ───────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.announcement_reads (
+  id serial PRIMARY KEY,
+  announcement_id int NOT NULL REFERENCES public.announcements(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  read_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcement_reads_ann_user ON public.announcement_reads(announcement_id, user_id);
+
+ALTER TABLE public.announcement_reads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own announcement reads"
+  ON public.announcement_reads FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert their own announcement reads"
+  ON public.announcement_reads FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+-- ─── 20. Reading Plans ────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.reading_plans (
+  id serial PRIMARY KEY,
+  community_id uuid REFERENCES public.communities(id) ON DELETE CASCADE,
+  group_id int REFERENCES public.groups(id) ON DELETE CASCADE,
+  title varchar(255) NOT NULL,
+  description text,
+  author_id uuid REFERENCES public.users(id) ON DELETE SET NULL,
+  duration_days int DEFAULT 7 NOT NULL,
+  is_public boolean DEFAULT true NOT NULL,
+  schedule jsonb NOT NULL,
+  created_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reading_plans_community ON public.reading_plans(community_id);
+CREATE INDEX IF NOT EXISTS idx_reading_plans_group ON public.reading_plans(group_id);
+
+ALTER TABLE public.reading_plans ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Members can view public reading plans"
+  ON public.reading_plans FOR SELECT
+  TO authenticated
+  USING (is_public = true OR auth.uid() = author_id OR EXISTS (
+    SELECT 1 FROM public.community_members cm
+    WHERE cm.community_id = public.reading_plans.community_id
+      AND cm.user_id = auth.uid()
+  ));
+
+-- ─── 21. Reflections ─────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.reflections (
+  id serial PRIMARY KEY,
+  submission_id int REFERENCES public.assignment_submissions(id) ON DELETE CASCADE,
+  reading_assignment_id int REFERENCES public.reading_assignments(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  group_id int REFERENCES public.groups(id) ON DELETE CASCADE,
+  content text NOT NULL,
+  visibility varchar(50) DEFAULT 'teacher_only' NOT NULL,
+  created_at timestamptz DEFAULT now() NOT NULL,
+  updated_at timestamptz DEFAULT now() NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_reflections_user ON public.reflections(user_id);
+CREATE INDEX IF NOT EXISTS idx_reflections_assignment ON public.reflections(reading_assignment_id);
+
+ALTER TABLE public.reflections ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their own reflections"
+  ON public.reflections FOR SELECT
+  TO authenticated
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Teachers can view reflections in their group"
+  ON public.reflections FOR SELECT
+  TO authenticated
+  USING (
+    visibility IN ('teacher_only', 'group_members') AND
+    EXISTS (
+      SELECT 1 FROM public.group_members gm
+      WHERE gm.group_id = public.reflections.group_id
+        AND gm.user_id = auth.uid()
+        AND gm.role IN ('teacher', 'assistant_teacher')
+    )
+  );
+
+CREATE POLICY "Users can insert their own reflections"
+  ON public.reflections FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own reflections"
+  ON public.reflections FOR UPDATE
+  TO authenticated
+  USING (auth.uid() = user_id);
