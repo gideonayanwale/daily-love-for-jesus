@@ -130,7 +130,7 @@ export class CommunityService {
       .where(eq(schema.users.id, userId))
       .limit(1);
 
-    if (users[0]?.role === 'admin') {
+    if (['admin', 'elevated_admin', 'superadmin'].includes(users[0]?.role)) {
       return { role: 'teacher', status: 'active' };
     }
 
@@ -333,10 +333,28 @@ export class CommunityService {
     const skippedDuplicateIds: string[] = [];
 
     for (const log of logs) {
+      if (log.groupId !== undefined && log.groupId !== null) {
+        const membership = await db
+          .select({ id: schema.groupMembers.id })
+          .from(schema.groupMembers)
+          .where(and(
+            eq(schema.groupMembers.groupId, log.groupId),
+            eq(schema.groupMembers.userId, userId),
+            eq(schema.groupMembers.status, 'active'),
+          ))
+          .limit(1);
+        if (!membership.length) {
+          throw new ForbiddenException('Reading logs can only be assigned to one of your active groups.');
+        }
+      }
+
       const existing = await db
         .select()
         .from(schema.readingLogs)
-        .where(eq(schema.readingLogs.clientLogId, log.clientLogId))
+        .where(and(
+          eq(schema.readingLogs.userId, userId),
+          eq(schema.readingLogs.clientLogId, log.clientLogId),
+        ))
         .limit(1);
 
       if (existing.length > 0) {
@@ -423,7 +441,7 @@ export class CommunityService {
         lastCompletedAt: sql<string>`max(${schema.readingLogs.completedAt})`,
       })
       .from(schema.readingLogs)
-      .where(inArray(schema.readingLogs.userId, studentUserIds))
+      .where(and(inArray(schema.readingLogs.userId, studentUserIds), eq(schema.readingLogs.groupId, groupId)))
       .groupBy(schema.readingLogs.userId);
 
     const aggMap = new Map<string, any>(
@@ -439,6 +457,7 @@ export class CommunityService {
       .where(
         and(
           inArray(schema.readingLogs.userId, studentUserIds),
+          eq(schema.readingLogs.groupId, groupId),
           sql`${schema.readingLogs.completedAt} >= now() - interval '60 days'`,
         ),
       )
@@ -627,6 +646,21 @@ export class CommunityService {
     if (!session) throw new NotFoundException('Attendance session not found');
 
     await this.assertGroupRole(userId, session.groupId, ['teacher', 'assistant_teacher']);
+    const targetIds = [...new Set(records.filter((r) => !r.isGuest && r.userId).map((r) => r.userId!))];
+    if (targetIds.length > 0) {
+      const validStudents = await db
+        .select({ userId: schema.groupMembers.userId })
+        .from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, session.groupId),
+          eq(schema.groupMembers.status, 'active'),
+          eq(schema.groupMembers.role, 'student'),
+          inArray(schema.groupMembers.userId, targetIds),
+        ));
+      if (validStudents.length !== targetIds.length) {
+        throw new ForbiddenException('Attendance can only be recorded for active students in this group.');
+      }
+    }
 
     let recordedCount = 0;
     for (const rec of records) {
@@ -707,6 +741,7 @@ export class CommunityService {
             .where(
               and(
                 inArray(schema.readingLogs.userId, studentIds),
+                eq(schema.readingLogs.groupId, groupId),
                 sql`${schema.readingLogs.completedAt} >= now() - interval '7 days'`,
               ),
             )
@@ -723,6 +758,7 @@ export class CommunityService {
             .where(
               and(
                 inArray(schema.readingLogs.userId, studentIds),
+                eq(schema.readingLogs.groupId, groupId),
                 sql`${schema.readingLogs.completedAt} >= now() - interval '14 days' AND ${schema.readingLogs.completedAt} < now() - interval '7 days'`,
               ),
             )
@@ -803,6 +839,20 @@ export class CommunityService {
       .limit(1);
 
     const group = groups[0];
+    if (!group) throw new NotFoundException('Group not found.');
+    const studentMembership = await db
+      .select({ id: schema.groupMembers.id })
+      .from(schema.groupMembers)
+      .where(and(
+        eq(schema.groupMembers.groupId, data.groupId),
+        eq(schema.groupMembers.userId, data.studentId),
+        eq(schema.groupMembers.status, 'active'),
+        eq(schema.groupMembers.role, 'student'),
+      ))
+      .limit(1);
+    if (!studentMembership.length) {
+      throw new ForbiddenException('Follow-up target must be an active student in this group.');
+    }
 
     if (data.actionType === 'reminder_sent') {
       const reminderText =
@@ -912,6 +962,10 @@ export class CommunityService {
 
     const group = groups[0];
     if (!group) throw new NotFoundException('Group not found');
+    const requesterRole = await this.getUserRole(userId);
+    if (!membership.length && !['admin', 'elevated_admin', 'superadmin'].includes(requesterRole)) {
+      throw new ForbiddenException('You are not an active member of this group.');
+    }
 
     const recentAnnouncements = await db
       .select({
@@ -1054,18 +1108,25 @@ export class CommunityService {
     return user[0]?.role || 'user';
   }
 
+  async assertPlatformRole(userId: string, allowedRoles: string[] = ['admin', 'superadmin']) {
+    const role = await this.getUserRole(userId);
+    if (!allowedRoles.includes(role)) {
+      throw new ForbiddenException('This operation requires platform administrator privileges.');
+    }
+    return role;
+  }
+
   async elevateUser(
     requesterId: string,
     targetUserId: string,
     targetRole: 'elevated_admin' | 'admin' | 'user',
   ) {
     const requesterRole = await this.getUserRole(requesterId);
-    if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
-      throw new ForbiddenException('Only superadmin or elevated_admin can assign administrative roles.');
+    if (requesterRole !== 'admin' && requesterRole !== 'superadmin') {
+      throw new ForbiddenException('Only a platform admin can assign administrative roles.');
     }
-
-    if (requesterRole === 'elevated_admin' && targetRole === 'elevated_admin') {
-      throw new ForbiddenException('Only superadmin can appoint an elevated_admin.');
+    if (targetRole === 'admin' && requesterRole !== 'superadmin') {
+      throw new ForbiddenException('Only superadmin can appoint another admin.');
     }
 
     const db = this.dbService.getDb();
@@ -1223,6 +1284,19 @@ export class CommunityService {
 
   async getCommunityMembers(requesterId: string, communityId: string) {
     const db = this.dbService.getDb();
+    const requesterRole = await this.getUserRole(requesterId);
+    const membership = await db
+      .select({ id: schema.communityMembers.id })
+      .from(schema.communityMembers)
+      .where(and(
+        eq(schema.communityMembers.communityId, communityId),
+        eq(schema.communityMembers.userId, requesterId),
+        eq(schema.communityMembers.status, 'active'),
+      ))
+      .limit(1);
+    if (!membership.length && !['admin', 'elevated_admin', 'superadmin'].includes(requesterRole)) {
+      throw new ForbiddenException('You are not a member of this community.');
+    }
     return db
       .select({
         id: schema.communityMembers.id,
