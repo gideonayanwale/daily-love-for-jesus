@@ -157,12 +157,15 @@ app.post("/api/telegram/webhook", async (c) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            apikey: env.supabaseServiceRoleKey,
             Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
           },
           body: JSON.stringify({
-            topic: "devotionals",
-            event: "devotional_changed",
-            payload: { id: devotionalId, action: "import" },
+            messages: [{
+              topic: "devotionals",
+              event: "devotional_changed",
+              payload: { id: devotionalId, action: "import" },
+            }],
           }),
         });
       } catch (broadcastError) {
