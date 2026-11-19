@@ -52,6 +52,22 @@ USING ranked
 WHERE duplicate.id = ranked.id
   AND ranked.row_num > 1;
 
+WITH ranked_devotionals AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (PARTITION BY telegram_message_id ORDER BY id) AS row_num
+  FROM public.devotionals
+  WHERE telegram_message_id IS NOT NULL
+)
+UPDATE public.devotionals AS duplicate
+SET telegram_message_id = NULL
+FROM ranked_devotionals AS ranked
+WHERE duplicate.id = ranked.id
+  AND ranked.row_num > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_devotional_telegram_message
+  ON public.devotionals(telegram_message_id);
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_telegram_message_chat
   ON public.telegram_messages(message_id, chat_id);
 
