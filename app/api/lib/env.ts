@@ -20,7 +20,7 @@ export const env = {
   supabaseServiceRoleKey: get("SUPABASE_SERVICE_ROLE_KEY"),
 
   // Supabase Postgres connection string (fallback / migrations)
-  databaseUrl: get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"),
+  databaseUrl: process.env.DATABASE_URL ?? "",
 
   // Neon Serverless PostgreSQL (primary app data - fast serverless reads/writes)
   // Get from: https://console.neon.tech → your project → Connection string
