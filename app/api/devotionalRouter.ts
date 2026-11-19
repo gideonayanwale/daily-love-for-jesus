@@ -83,7 +83,8 @@ export const devotionalRouter = createRouter({
   byId: publicQuery
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      return getDevotionalById(input.id);
+      const devotional = await getDevotionalById(input.id);
+      return devotional?.isPublished ? devotional : null;
     }),
 
   list: publicQuery
@@ -92,7 +93,7 @@ export const devotionalRouter = createRouter({
         .object({
           limit: z.number().min(1).max(100).default(20),
           offset: z.number().min(0).default(0),
-          publishedOnly: z.boolean().default(true),
+          
         })
         .optional()
     )
@@ -100,9 +101,13 @@ export const devotionalRouter = createRouter({
       return listDevotionals({
         limit: input?.limit ?? 20,
         offset: input?.offset ?? 0,
-        publishedOnly: input?.publishedOnly ?? true,
+        publishedOnly: true,
       });
     }),
+
+  adminList: elevatedAdminQuery
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20), offset: z.number().int().min(0).default(0) }).optional())
+    .query(async ({ input }) => listDevotionals({ limit: input?.limit ?? 20, offset: input?.offset ?? 0, publishedOnly: false })),
 
   create: elevatedAdminQuery
     .input(devotionalCreateInput)
@@ -149,13 +154,13 @@ export const devotionalRouter = createRouter({
     }),
 
   publish: elevatedAdminQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive(), isPublished: z.boolean().default(true) }))
     .mutation(async ({ input }) => {
       const existing = await getDevotionalById(input.id);
       if (!existing) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
       }
-      const devotional = await publishDevotional(input.id);
+      const devotional = await publishDevotional(input.id, input.isPublished);
       if (devotional) {
         broadcastDevotionalChanged(devotional.id, "publish").catch(() => void 0);
         sendDevotionalToTelegram(devotional).catch(() => void 0);
