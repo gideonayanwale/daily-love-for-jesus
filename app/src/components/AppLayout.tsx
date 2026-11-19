@@ -20,6 +20,7 @@ import {
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
 import ExplorePanel from './ExplorePanel';
+import ExplorePanel from './ExplorePanel';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
