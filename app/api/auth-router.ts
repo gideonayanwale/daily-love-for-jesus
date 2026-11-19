@@ -63,12 +63,6 @@ export const authRouter = createRouter({
         .set({ role: "elevated_admin", updatedAt: new Date() })
         .where(eq(schema.users.id, input.userId))
         .returning({ id: schema.users.id, role: schema.users.role });
-      if (secondaryDb && secondaryDb !== db) {
-        await secondaryDb
-          .update(schema.users)
-          .set({ role: "elevated_admin", updatedAt: new Date() })
-          .where(eq(schema.users.id, input.userId));
-      }
       await db.insert(schema.auditLogs).values({
         actorId: ctx.user.id,
         action: "promote_elevated_admin",
@@ -77,6 +71,12 @@ export const authRouter = createRouter({
         metadata: { previousRole: existing[0].role, targetRole: "elevated_admin" },
         occurredAt: new Date(),
       });
+      if (secondaryDb && secondaryDb !== db) {
+        await secondaryDb
+          .update(schema.users)
+          .set({ role: "elevated_admin", updatedAt: new Date() })
+          .where(eq(schema.users.id, input.userId));
+      }
       return { success: true, user: updated[0] };
     }),
 });
