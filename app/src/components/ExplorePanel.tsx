@@ -61,7 +61,11 @@ export default function ExplorePanel({ userId, userName, userRole }: Props) {
 
   const finishTour = () => {
     if (userId) {
-      try { window.localStorage.setItem(`dlfj:onboarding:v1:${userId}`, 'complete'); } catch {}
+      try {
+        window.localStorage.setItem(`dlfj:onboarding:v1:${userId}`, 'complete');
+      } catch {
+        // The tour can still be dismissed for the current session.
+      }
     }
     setTourOpen(false);
   };
