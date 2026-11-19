@@ -36,6 +36,7 @@ export async function sendDevotionalToTelegram(devotional: Devotional): Promise<
     : format(new Date(), 'MMMM d, yyyy');
   const sections = [
     `📅 ${dateStr}`,
+    devotional.title ? devotional.title : '',
     devotional.topic ? `TOPIC: ${devotional.topic}` : '',
     devotional.declarationOfFaith ? `DECLARATION OF FAITH:\n${devotional.declarationOfFaith}` : '',
     devotional.scripture
