@@ -3,7 +3,7 @@ import * as cookie from "cookie";
 import { eq } from "drizzle-orm";
 import { createRouter, authedQuery, strictAdminQuery } from "./middleware";
 import { upsertUser } from "./queries/users";
-import { getDb } from "./queries/connection";
+import { getDb, getNeonDb, getSupabaseDb } from "./queries/connection";
 import * as schema from "@db/schema";
 import { TRPCError } from "@trpc/server";
 
@@ -45,6 +45,8 @@ export const authRouter = createRouter({
         throw new TRPCError({ code: "FORBIDDEN", message: "You cannot change your own platform role." });
       }
       const db = await getDb();
+      const [neonDb, supabaseDb] = await Promise.all([getNeonDb(), getSupabaseDb()]);
+      const secondaryDb = db === neonDb ? supabaseDb : neonDb;
       const existing = await db
         .select({ role: schema.users.role })
         .from(schema.users)
@@ -61,6 +63,12 @@ export const authRouter = createRouter({
         .set({ role: "elevated_admin", updatedAt: new Date() })
         .where(eq(schema.users.id, input.userId))
         .returning({ id: schema.users.id, role: schema.users.role });
+      if (secondaryDb && secondaryDb !== db) {
+        await secondaryDb
+          .update(schema.users)
+          .set({ role: "elevated_admin", updatedAt: new Date() })
+          .where(eq(schema.users.id, input.userId));
+      }
       await db.insert(schema.auditLogs).values({
         actorId: ctx.user.id,
         action: "promote_elevated_admin",
