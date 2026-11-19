@@ -10,6 +10,7 @@ export default function useDevotionalRealtime(): void {
       .channel('devotionals')
       .on('broadcast', { event: 'devotional_changed' }, () => {
         utils.devotional.list.invalidate();
+        utils.devotional.adminList.invalidate();
         utils.devotional.today.invalidate();
       })
       .subscribe();
