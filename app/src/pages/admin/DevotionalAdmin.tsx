@@ -420,6 +420,11 @@ function ManageDevotionsTab() {
                 <span className={`px-1.5 py-0.5 rounded font-semibold ${d.isPublished ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
                   {d.isPublished ? 'Published' : 'Draft'}
                 </span>
+                {d.source === 'telegram' && (
+                  <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold">
+                    Telegram import
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
