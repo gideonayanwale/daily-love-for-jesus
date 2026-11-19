@@ -111,6 +111,7 @@ export class TelegramService {
     }
 
     const devotionalId = await this.tryCreateDevotionalFromText(db, message.id, message.text);
+    if (devotionalId) await this.broadcastDevotionalChanged(devotionalId, 'import');
     return { status: 'processed', devotionalId };
   }
 
