@@ -202,13 +202,17 @@ app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
 
+const runtime = globalThis as unknown as {
+  WebSocketPair?: unknown;
+  navigator?: { userAgent?: string };
+};
 const isServerless =
   Boolean(process.env.VERCEL) ||
   Boolean(process.env.NETLIFY) ||
   Boolean(process.env.CF_PAGES) ||
   Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
-  typeof (globalThis as any).WebSocketPair !== "undefined" ||
-  Boolean((globalThis as any).navigator?.userAgent?.includes("Cloudflare-Workers"));
+  typeof runtime.WebSocketPair !== "undefined" ||
+  Boolean(runtime.navigator?.userAgent?.includes("Cloudflare-Workers"));
 
 if (env.isProduction && !isServerless) {
   const { serve } = await import("@hono/node-server");
@@ -221,8 +225,8 @@ if (env.isProduction && !isServerless) {
   });
 }
 
-// ─── Telegram Polling Scheduler (2am & 4am) ───────────────────────────────────
-// Only runs in non-serverless environments when bot token is configured
+// ─── Telegram Polling Fallback ────────────────────────────────────────────────
+// Only runs in non-serverless environments when webhook mode is not configured.
 let updateOffset = 0;
 
 async function pollTelegramMessages(): Promise<void> {
@@ -230,7 +234,19 @@ async function pollTelegramMessages(): Promise<void> {
     const response = await fetch(
       `https://api.telegram.org/bot${env.telegramBotToken}/getUpdates?offset=${updateOffset}&timeout=0`
     );
-    const data: any = await response.json();
+    type TelegramChatMessage = {
+      message_id: number;
+      chat: { id: number; username?: string };
+      date: number;
+      text?: string;
+      caption?: string;
+    };
+    type TelegramUpdate = {
+      update_id: number;
+      message?: TelegramChatMessage;
+      channel_post?: TelegramChatMessage;
+    };
+    const data = await response.json() as { ok?: boolean; result?: TelegramUpdate[] };
 
     if (!data.ok || !Array.isArray(data.result)) {
       console.error("[scheduler] Telegram getUpdates returned non-ok response:", data);
