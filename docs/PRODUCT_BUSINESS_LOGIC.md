@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Daily Love For Jesus is a public-first Christian reading and fellowship platform. A visitor must be able to discover and consume public spiritual content before being asked to create an account. Authentication unlocks personalisation and private activity; it does not gate the Bible, public devotionals, public hymns, public calendar information, or public Telegram devotional content.
+Daily Love For Jesus is a public-first Christian reading and fellowship platform. A visitor must be able to discover and consume public spiritual content before being asked to create an account. Authentication unlocks personalisation and private activity; it does not gate the Bible, public devotionals, public hymns, public calendar information, or Telegram-sourced devotionals after administrator review and publication.
 
 ## 1. Identity and access principles
 
-- Supabase Auth is the identity provider and source of truth for authentication.
+- Supabase Auth is the identity provider and source of truth for authentication. The Expo app uses the Supabase JS SDK with persistent AsyncStorage sessions and automatic token refresh.
 - The application database (Neon) stores the profile, preferences, memberships, activity and application roles.
 - A verified Supabase identity is mapped to one application profile by immutable Supabase user UUID.
 - New profiles receive the least-privileged role: `user`.
@@ -172,4 +172,4 @@ Do not implement uncontrolled bidirectional replication of independently writabl
 - Public list, today, and detail reads return published devotionals only. Draft listing is a distinct elevated procedure.
 - Publishing updates the public devotional feed and emits a Realtime invalidation event. The event contains only an ID and action; it does not disclose devotional text or draft data.
 - Sending to Telegram is a separate explicit operation, requires the devotional to be published, and must surface missing configuration or Telegram API errors as failures.
-- The Supabase Realtime channel currently carries refresh signals only. The main application data store is Neon, so database-level RLS policies for application tables must be verified against the actual production database separately from API RBAC.
+- The Supabase Realtime channels carry refresh signals only, never devotional text or drafts. Public readers subscribe to the `devotionals` topic; the `admin:devotionals` topic is separately restricted by `realtime.messages` RLS to authenticated users whose server-controlled `public.users.role` is `admin`, `elevated_admin` or `superadmin`. Apply `app/db/migrations/0003_devotional_realtime_rls.sql` in the actual Supabase project and disable public channel access in Realtime settings. This migration has been committed but not applied because the connected Supabase workspace does not contain a Daily Love For Jesus project. The main application data store is Neon; application-table RLS still requires a separate production database review.
