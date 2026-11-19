@@ -15,6 +15,8 @@ export class HymnsController {
     @Query('search') search?: string,
     @Query('category') category?: string,
   ) {
+    if (search && search.length > 200) search = search.slice(0, 200);
+    if (category && category.length > 100) category = category.slice(0, 100);
     return this.hymnsService.list(search, category);
   }
 
