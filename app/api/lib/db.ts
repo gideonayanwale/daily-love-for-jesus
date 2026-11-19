@@ -48,6 +48,7 @@ let supabaseInstance: any = null;
 
 export async function getSupabaseDb(): Promise<any> {
   if (supabaseInstance) return supabaseInstance;
+  if (!env.databaseUrl) return null;
 
   try {
     const { default: postgres } = await import("postgres");
@@ -86,39 +87,6 @@ export async function getDb(): Promise<any> {
   const supabase = await getSupabaseDb();
   if (supabase) return supabase;
 
-  // Graceful dev stub — returns empty arrays / success stubs
-  console.warn("[db] ⚠️ No database connected — using dev stub");
-  return createDevStub();
+  throw new Error("Database is unavailable. Configure NEON_DATABASE_URL or DATABASE_URL before serving application requests.");
 }
 
-function createDevStub(): any {
-  return new Proxy(
-    {},
-    {
-      get(_, prop) {
-        if (prop === "query") {
-          return new Proxy(
-            {},
-            { get: () => () => Promise.resolve([]) }
-          );
-        }
-        return () => ({
-          from: () => ({
-            where: () => ({
-              orderBy: () => ({ limit: () => Promise.resolve([]) }),
-              limit: () => Promise.resolve([]),
-            }),
-            orderBy: () => ({ limit: () => Promise.resolve([]) }),
-            limit: () => Promise.resolve([]),
-          }),
-          values: () => ({
-            returning: () => Promise.resolve([{ id: 1 }]),
-            onConflictDoUpdate: () => Promise.resolve([{ id: 1 }]),
-          }),
-          set: () => ({ where: () => Promise.resolve({ rowCount: 1 }) }),
-          where: () => Promise.resolve({ rowCount: 1 }),
-        });
-      },
-    }
-  );
-}
