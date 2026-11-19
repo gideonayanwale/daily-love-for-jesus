@@ -3,7 +3,7 @@
 // Bidirectional Supabase ↔ Neon PostgreSQL Sync
 // ==============================================================================
 
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { getSupabaseDb, getNeonDb } from "./db";
 import * as schema from "@db/schema";
 
