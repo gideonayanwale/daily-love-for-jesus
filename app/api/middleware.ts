@@ -55,7 +55,7 @@ export const adminQuery = authedQuery.use(requireRoles(["admin", "elevated_admin
 
 // Elevated-admin and above (alias kept for clarity in devotional/telegram routers)
 export const elevatedAdminQuery = authedQuery.use(
-  requireRoles(["admin", "elevated_admin"])
+  requireRoles(["admin", "elevated_admin", "superadmin"])
 );
 
 // Platform-owner tier: global admin or superadmin (e.g. visitor logs and role elevation).
