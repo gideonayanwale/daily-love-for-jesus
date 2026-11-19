@@ -314,7 +314,7 @@ function ManageDevotionsTab() {
   const [offset, setOffset] = useState(0);
   const PAGE_SIZE = 20;
 
-  const { data } = trpc.devotional.list.useQuery({ limit: PAGE_SIZE, offset, publishedOnly: false });
+  const { data } = trpc.devotional.adminList.useQuery({ limit: PAGE_SIZE, offset });
 
   const updateMutation = trpc.devotional.update.useMutation({
     onSuccess: () => { toast.success('Devotional updated!'); setEditingId(null); setEditForm({}); },
@@ -426,7 +426,7 @@ function ManageDevotionsTab() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => publishMutation.mutate({ id: d.id })}
+                onClick={() => publishMutation.mutate({ id: d.id, isPublished: !d.isPublished })}
                 disabled={publishMutation.isPending}
                 title={d.isPublished ? 'Unpublish' : 'Publish'}
               >
@@ -586,7 +586,7 @@ function TelegramMessagesTab() {
     <div className="space-y-4 max-w-2xl">
       {/* Paste form */}
       <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Paste Telegram Message</h3>
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Import a devotional from Telegram</h3>
         <Textarea
           rows={8}
           placeholder="Paste the Telegram message text here..."
@@ -673,7 +673,7 @@ export default function DevotionalAdmin() {
         <TabsList className="w-full sm:w-auto mb-4">
           <TabsTrigger value="new">New Devotion</TabsTrigger>
           <TabsTrigger value="manage">Manage Devotions</TabsTrigger>
-          <TabsTrigger value="telegram">Telegram Messages</TabsTrigger>
+          <TabsTrigger value="telegram">Import from Telegram</TabsTrigger>
           {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
             <TabsTrigger value="teacher-assignment">Teacher Assignment</TabsTrigger>
           )}
