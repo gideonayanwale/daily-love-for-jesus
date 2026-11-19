@@ -32,8 +32,10 @@ export class DevotionalsController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    const l = limit ? parseInt(limit, 10) : 20;
-    const o = offset ? parseInt(offset, 10) : 0;
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : 20;
+    const parsedOffset = offset ? Number.parseInt(offset, 10) : 0;
+    const l = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20;
+    const o = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
     return this.devotionalsService.list(l, o);
   }
 
