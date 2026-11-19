@@ -42,20 +42,28 @@ export const authRouter = createRouter({
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      const existing = await db
+        .select({ role: schema.users.role })
+        .from(schema.users)
+        .where(eq(schema.users.id, input.userId))
+        .limit(1);
+      if (!existing.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
+      }
+      if (existing[0].role === "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only the platform owner can change another admin's role." });
+      }
       const updated = await db
         .update(schema.users)
         .set({ role: "elevated_admin", updatedAt: new Date() })
         .where(eq(schema.users.id, input.userId))
         .returning({ id: schema.users.id, role: schema.users.role });
-      if (!updated.length) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
-      }
       await db.insert(schema.auditLogs).values({
         actorId: ctx.user.id,
         action: "promote_elevated_admin",
         resourceType: "user",
         resourceId: input.userId,
-        metadata: { previousRole: "user", targetRole: "elevated_admin" },
+        metadata: { previousRole: existing[0].role, targetRole: "elevated_admin" },
         occurredAt: new Date(),
       });
       return { success: true, user: updated[0] };
