@@ -76,7 +76,7 @@ communityRestRouter.post("/groups/invite", async (c) => {
     // Security Check: Requester must be teacher or assistant teacher
     await assertGroupRole(user.id, groupId, ["teacher", "assistant_teacher"]);
 
-    const db = getDb();
+    const db = await getDb();
     const group = await db.query.groups.findFirst({
       where: eq(groups.id, groupId),
     });
@@ -148,7 +148,7 @@ communityRestRouter.post("/groups/join", async (c) => {
     const body = await c.req.json();
     const { inviteCode } = joinGroupSchema.parse(body);
 
-    const db = getDb();
+    const db = await getDb();
     const group = await db.query.groups.findFirst({
       where: eq(groups.inviteCode, inviteCode.toUpperCase()),
     });
@@ -231,7 +231,7 @@ communityRestRouter.post("/tracking/sync", async (c) => {
     const body = await c.req.json();
     const { logs } = syncTrackingSchema.parse(body);
 
-    const db = getDb();
+    const db = await getDb();
     const syncedIds: string[] = [];
     const skippedDuplicateIds: string[] = [];
 
@@ -298,7 +298,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
     // Security Check: Requester must be teacher or assistant teacher in this group
     await assertGroupRole(user.id, groupId, ["teacher", "assistant_teacher"]);
 
-    const db = getDb();
+    const db = await getDb();
 
     // 1. Fetch group details
     const group = await db.query.groups.findFirst({
@@ -456,7 +456,7 @@ communityRestRouter.post("/announcements", async (c) => {
     // Security Check: Must be teacher, assistant teacher, or admin to post
     await assertGroupRole(user.id, data.groupId, ["teacher", "assistant_teacher"]);
 
-    const db = getDb();
+    const db = await getDb();
     const group = await db.query.groups.findFirst({
       where: eq(groups.id, data.groupId),
     });
@@ -531,7 +531,7 @@ communityRestRouter.post("/attendance/session", async (c) => {
 
     await assertGroupRole(user.id, data.groupId, ["teacher", "assistant_teacher"]);
 
-    const db = getDb();
+    const db = await getDb();
     const [session] = await db
       .insert(attendanceSessions)
       .values({
@@ -569,7 +569,7 @@ communityRestRouter.post("/attendance/record", async (c) => {
     });
     const { sessionId, records } = schema.parse(body);
 
-    const db = getDb();
+    const db = await getDb();
     const session = await db.query.attendanceSessions.findFirst({
       where: eq(attendanceSessions.id, sessionId),
     });
@@ -621,7 +621,7 @@ communityRestRouter.get("/dashboard/reports/weekly", async (c) => {
 
     await assertGroupRole(user.id, groupId, ["teacher", "assistant_teacher"]);
 
-    const db = getDb();
+    const db = await getDb();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, groupId) });
     if (!group) return c.json({ error: "Group not found" }, 404);
 
@@ -728,7 +728,7 @@ communityRestRouter.post("/teacher/followup", async (c) => {
 
     await assertGroupRole(user.id, data.groupId, ["teacher", "assistant_teacher"]);
 
-    const db = getDb();
+    const db = await getDb();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, data.groupId) });
 
     if (data.actionType === "reminder_sent") {

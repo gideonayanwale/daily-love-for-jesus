@@ -24,7 +24,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:push:neon": "cross-env NEON_DATABASE_URL=$NEON_DATABASE_URL drizzle-kit push",
-    "db:push:supabase": "cross-env NEON_DATABASE_URL= drizzle-kit push"
+    "db:push:supabase": "cross-env NEON_DATABASE_URL= drizzle-kit push",
+    "db:seed": "tsx db/seed.ts"
   },
   "scripts-windows-help": {
     "fix:windows": "powershell -ExecutionPolicy Bypass -NoProfile -File ./scripts/windows-fix.ps1"

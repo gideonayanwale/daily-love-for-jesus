@@ -3,7 +3,7 @@ import { bibleBooks, bibleVerses, hymns } from "./schema";
 import { sql } from "drizzle-orm";
 
 async function check() {
-  const db = getDb();
+  const db = await getDb();
 
   try {
     const books = await db.select().from(bibleBooks);

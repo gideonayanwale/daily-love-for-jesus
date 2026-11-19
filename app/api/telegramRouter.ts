@@ -51,7 +51,7 @@ export const telegramRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       const message = input.message ?? input.channelPost;
       if (!message) {
@@ -131,7 +131,7 @@ export const telegramRouter = createRouter({
   processMessage: adminQuery
     .input(z.object({ messageId: z.number() }))
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       const message = await getTelegramMessageById(input.messageId);
 
@@ -163,7 +163,7 @@ export const telegramRouter = createRouter({
   ingestPasted: elevatedAdminQuery
     .input(z.object({ text: z.string().trim().min(10).max(10000) }))
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       const result = await db
         .insert(telegramMessages)

@@ -9,7 +9,7 @@ import { TRPCError } from '@trpc/server';
 export const teacherAssignmentRouter = createRouter({
   // ── List all active groups with their current teacher ──────────────────────
   listGroups: elevatedAdminQuery.query(async () => {
-    const db = getDb();
+    const db = await getDb();
 
     const rows = await db
       .select({
@@ -57,7 +57,7 @@ export const teacherAssignmentRouter = createRouter({
   listEligibleUsers: elevatedAdminQuery
     .input(z.object({ groupId: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       const group = await db.query.groups.findFirst({
         where: eq(groups.id, input.groupId),
@@ -119,7 +119,7 @@ export const teacherAssignmentRouter = createRouter({
   assign: elevatedAdminQuery
     .input(z.object({ groupId: z.number(), userId: z.string() }))
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       const existing = await db.query.groupMembers.findFirst({
         where: and(
@@ -154,7 +154,7 @@ export const teacherAssignmentRouter = createRouter({
   remove: elevatedAdminQuery
     .input(z.object({ groupId: z.number(), userId: z.string() }))
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       await db
         .update(groupMembers)

@@ -34,7 +34,7 @@ export async function assertGroupRole(
   groupId: number,
   allowedRoles: GroupRole[] = ["teacher", "assistant_teacher"]
 ) {
-  const db = getDb();
+  const db = await getDb();
 
   // Global admins and elevated admins always have permission
   const userRecord = await db.query.users.findFirst({
@@ -66,7 +66,7 @@ export async function assertGroupRole(
  * Verifies that a user is an active member of the group (any role).
  */
 export async function assertGroupMember(userId: string, groupId: number) {
-  const db = getDb();
+  const db = await getDb();
   const membership = await db.query.groupMembers.findFirst({
     where: and(
       eq(groupMembers.groupId, groupId),
@@ -86,7 +86,7 @@ export async function assertGroupMember(userId: string, groupId: number) {
  * Ensures the user has community administrator privileges.
  */
 export async function assertCommunityAdmin(userId: string, communityId: string) {
-  const db = getDb();
+  const db = await getDb();
 
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, userId),
@@ -118,7 +118,7 @@ export async function assertCommunityAdmin(userId: string, communityId: string) 
  * allowing them to assign Sunday School teachers.
  */
 export async function assertCanAssignTeacher(requestingUserId: string): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, requestingUserId),
   });
@@ -132,7 +132,7 @@ export async function assertCanAssignTeacher(requestingUserId: string): Promise<
  * either globally as admin/elevated_admin, or as a teacher within the group.
  */
 export async function assertCanManageGroup(requestingUserId: string, groupId: number): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, requestingUserId),
   });

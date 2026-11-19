@@ -13,7 +13,7 @@ export const anonymousLogRouter = createRouter({
       })
     )
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       const [items, countResult] = await Promise.all([
         db

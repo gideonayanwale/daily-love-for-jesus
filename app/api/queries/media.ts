@@ -11,7 +11,7 @@ export async function logMediaUpload(params: {
   mimeType: string;
   size?: number;
 }): Promise<MediaUpload | undefined> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db
     .insert(mediaUploads)
     .values({

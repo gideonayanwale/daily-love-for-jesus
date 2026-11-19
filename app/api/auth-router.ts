@@ -41,7 +41,7 @@ export const authRouter = createRouter({
   promoteToElevatedAdmin: strictAdminQuery
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       await db
         .update(schema.users)
         .set({ role: "elevated_admin", updatedAt: new Date() })

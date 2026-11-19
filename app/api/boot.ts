@@ -51,14 +51,15 @@ app.use('*', async (c, next) => {
         return next();
       }
 
-      // Fire-and-forget — wrapped so a synchronous throw from getDb() is caught,
+      // Fire-and-forget — wrapped so errors from getDb() are caught,
       // not turned into an unhandled rejection that could crash the process.
       const cacheKey = ip ?? 'unknown';
       const lastLogged = anonLogCache.get(cacheKey) ?? 0;
       if (Date.now() - lastLogged < 60_000) return next();
       anonLogCache.set(cacheKey, Date.now());
-      try {
-        getDb().insert(auditLogs).values({
+      (async () => {
+        const db = await getDb();
+        await db.insert(auditLogs).values({
           action: 'anonymous_visit',
           resourceType: 'page',
           resourceId: path,
@@ -66,12 +67,10 @@ app.use('*', async (c, next) => {
           ipAddress: ip,
           userAgent: ua,
           metadata: { method: 'GET', timestamp: new Date().toISOString() },
-        }).catch((err: unknown) => {
-          console.error('[anonymous-tracking] Failed to log visit:', err);
         });
-      } catch (err: unknown) {
-        console.error('[anonymous-tracking] getDb() threw synchronously:', err);
-      }
+      })().catch((err: unknown) => {
+        console.error('[anonymous-tracking] Failed to log visit:', err);
+      });
     }
   }
   return next();
@@ -103,7 +102,7 @@ app.post("/api/telegram/webhook", async (c) => {
       return c.json({ status: "ignored", reason: "empty_message" });
     }
 
-    const db = getDb();
+    const db = await getDb();
 
     // Check for duplicate
     const existing = await db
@@ -199,7 +198,7 @@ async function pollTelegramMessages(): Promise<void> {
       return;
     }
 
-    const db = getDb();
+    const db = await getDb();
 
     for (const update of data.result) {
       const message = update.message ?? update.channel_post;

@@ -7,14 +7,13 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function seedBibleBooks() {
-  const db = getDb();
+  const db = await getDb();
   console.log("Seeding Bible books...");
 
   const rawData = JSON.parse(
     fs.readFileSync(path.join(__dirname, "data/bible_books.json"), "utf-8")
   );
 
-  // Map snake_case keys to camelCase schema properties
   const booksData = rawData.map((b: any) => ({
     bookNumber: b.book_number,
     name: b.name,
@@ -30,7 +29,7 @@ async function seedBibleBooks() {
 }
 
 async function seedBibleVerses() {
-  const db = getDb();
+  const db = await getDb();
   console.log("Seeding Bible verses (this may take a few minutes)...");
 
   const fileStream = fs.readFileSync(
@@ -39,11 +38,9 @@ async function seedBibleVerses() {
   );
   const lines = fileStream.split("\n").filter((l) => l.trim());
 
-  // Insert in batches of 500
   const batchSize = 500;
   let inserted = 0;
 
-  // First get book id mapping
   const allBooks = await db.select().from(bibleBooks);
   const bookIdMap = new Map<number, number>();
   for (const book of allBooks) {
@@ -53,7 +50,7 @@ async function seedBibleVerses() {
   for (let i = 0; i < lines.length; i += batchSize) {
     const batch = lines
       .slice(i, i + batchSize)
-      .map((line) => {
+      .map((line: string) => {
         const v = JSON.parse(line);
         return {
           bookId: bookIdMap.get(v.book_number) ?? 1,
@@ -76,14 +73,13 @@ async function seedBibleVerses() {
 }
 
 async function seedHymns() {
-  const db = getDb();
+  const db = await getDb();
   console.log("Seeding hymns...");
 
   const rawData = JSON.parse(
     fs.readFileSync(path.join(__dirname, "data/hymns.json"), "utf-8")
   );
 
-  // Insert in batches
   const batchSize = 50;
   let inserted = 0;
 
@@ -116,6 +112,7 @@ async function main() {
     await seedHymns();
 
     console.log("\nSeed completed successfully!");
+    process.exit(0);
   } catch (error) {
     console.error("Seed failed:", error);
     process.exit(1);

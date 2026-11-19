@@ -4,7 +4,7 @@ import type { Devotional, InsertDevotional } from "@db/schema";
 import { getDb } from "./connection";
 
 export async function getDevotionalById(id: number): Promise<Devotional | undefined> {
-  const db = getDb();
+  const db = await getDb();
   const rows = await db
     .select()
     .from(devotionals)
@@ -14,7 +14,7 @@ export async function getDevotionalById(id: number): Promise<Devotional | undefi
 }
 
 export async function getTodayDevotional(): Promise<Devotional | undefined> {
-  const db = getDb();
+  const db = await getDb();
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -43,7 +43,7 @@ export async function listDevotionals(params: {
   offset: number;
   publishedOnly: boolean;
 }): Promise<{ items: Devotional[]; total: number }> {
-  const db = getDb();
+  const db = await getDb();
   const { limit, offset, publishedOnly } = params;
 
   const whereClause = publishedOnly ? eq(devotionals.isPublished, true) : undefined;
@@ -65,7 +65,7 @@ export async function listDevotionals(params: {
 }
 
 export async function createDevotional(data: InsertDevotional): Promise<Devotional | undefined> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db.insert(devotionals).values(data).$returningId();
   return getDevotionalById(result[0].id);
 }
@@ -74,7 +74,7 @@ export async function updateDevotional(
   id: number,
   data: Partial<InsertDevotional>
 ): Promise<Devotional | undefined> {
-  const db = getDb();
+  const db = await getDb();
   await db
     .update(devotionals)
     .set({ ...data, updatedAt: new Date() })
@@ -83,12 +83,12 @@ export async function updateDevotional(
 }
 
 export async function deleteDevotional(id: number): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   await db.delete(devotionals).where(eq(devotionals.id, id));
 }
 
 export async function publishDevotional(id: number): Promise<Devotional | undefined> {
-  const db = getDb();
+  const db = await getDb();
   await db
     .update(devotionals)
     .set({ isPublished: true, updatedAt: new Date() })
@@ -97,7 +97,7 @@ export async function publishDevotional(id: number): Promise<Devotional | undefi
 }
 
 export async function listDevotionalsBySource(source: string): Promise<Devotional[]> {
-  const db = getDb();
+  const db = await getDb();
   return db
     .select()
     .from(devotionals)

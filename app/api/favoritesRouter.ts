@@ -13,7 +13,7 @@ export const favoritesRouter = createRouter({
       })
     )
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       if (input.type) {
         return db
@@ -45,7 +45,7 @@ export const favoritesRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       // Check if already exists
       const existing = await db
@@ -86,7 +86,7 @@ export const favoritesRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       await db
         .delete(userFavorites)
         .where(

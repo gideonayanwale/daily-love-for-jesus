@@ -20,7 +20,7 @@ import { TRPCError } from "@trpc/server";
 export const communityRouter = createRouter({
   // ─── List Communities current user belongs to ──────────────────────────────
   myCommunities: authedQuery.query(async ({ ctx }) => {
-    const db = getDb();
+    const db = await getDb();
     const rows = await db
       .select({
         id: communities.id,
@@ -43,7 +43,7 @@ export const communityRouter = createRouter({
 
   // ─── List Groups current user belongs to (Sunday School classes, etc.) ──────
   myGroups: authedQuery.query(async ({ ctx }) => {
-    const db = getDb();
+    const db = await getDb();
     const rows = await db
       .select({
         id: groups.id,
@@ -70,7 +70,7 @@ export const communityRouter = createRouter({
   groupDetails: authedQuery
     .input(z.object({ groupId: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       // Check group existence and membership
       const membership = await db.query.groupMembers.findFirst({
@@ -135,7 +135,7 @@ export const communityRouter = createRouter({
       // Must have teacher role
       await assertGroupRole(ctx.user.id, input.groupId, ["teacher", "assistant_teacher"]);
 
-      const db = getDb();
+      const db = await getDb();
 
       // 1. Total student count
       const studentCountResult = await db
@@ -212,7 +212,7 @@ export const communityRouter = createRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const db = getDb();
+      const db = await getDb();
       await db
         .insert(pushTokens)
         .values({

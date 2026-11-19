@@ -15,7 +15,7 @@ export const hymnsRouter = createRouter({
         .optional()
     )
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
 
       if (input?.search) {
         const search = `%${input.search}%`;
@@ -46,7 +46,7 @@ export const hymnsRouter = createRouter({
   byId: publicQuery
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       return db.query.hymns.findFirst({
         where: eq(hymns.id, input.id),
       });
@@ -55,14 +55,14 @@ export const hymnsRouter = createRouter({
   byNumber: publicQuery
     .input(z.object({ hymnNumber: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       return db.query.hymns.findFirst({
         where: eq(hymns.hymnNumber, input.hymnNumber),
       });
     }),
 
   random: publicQuery.query(async () => {
-    const db = getDb();
+    const db = await getDb();
     const result = await db
       .select()
       .from(hymns)
@@ -72,7 +72,7 @@ export const hymnsRouter = createRouter({
   }),
 
   categories: publicQuery.query(async () => {
-    const db = getDb();
+    const db = await getDb();
     const result = await db
       .select({ category: hymns.category })
       .from(hymns)

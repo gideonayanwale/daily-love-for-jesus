@@ -15,7 +15,7 @@ interface SendPushOptions {
  * Sends targeted push notifications to Expo client devices and stores in-app notifications.
  */
 export async function sendTargetedPushNotification(options: SendPushOptions) {
-  const db = getDb();
+  const db = await getDb();
   let recipientIds = options.userIds ?? [];
 
   // If groupId is provided, resolve all active group members

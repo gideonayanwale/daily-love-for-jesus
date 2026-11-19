@@ -4,7 +4,7 @@ import type { TelegramMessage, InsertTelegramMessage } from "@db/schema";
 import { getDb } from "./connection";
 
 export async function getTelegramMessageById(id: number): Promise<TelegramMessage | undefined> {
-  const db = getDb();
+  const db = await getDb();
   const rows = await db
     .select()
     .from(telegramMessages)
@@ -18,7 +18,7 @@ export async function listTelegramMessages(params: {
   offset: number;
   processedFilter?: boolean;
 }): Promise<{ items: TelegramMessage[]; total: number }> {
-  const db = getDb();
+  const db = await getDb();
   const { limit, offset, processedFilter } = params;
 
   const whereClause =
@@ -46,7 +46,7 @@ export async function markTelegramMessageProcessed(
   id: number,
   devotionalId: number
 ): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   await db
     .update(telegramMessages)
     .set({ processed: true, devotionalId })
@@ -56,7 +56,7 @@ export async function markTelegramMessageProcessed(
 export async function insertTelegramMessage(
   data: InsertTelegramMessage
 ): Promise<TelegramMessage | undefined> {
-  const db = getDb();
+  const db = await getDb();
   const result = await db.insert(telegramMessages).values(data).$returningId();
   return getTelegramMessageById(result[0].id);
 }

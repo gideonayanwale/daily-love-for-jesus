@@ -20,14 +20,14 @@ export const bibleRouter = createRouter({
   }),
 
   books: publicQuery.query(async () => {
-    const db = getDb();
+    const db = await getDb();
     return db.select().from(bibleBooks).orderBy(bibleBooks.order);
   }),
 
   bookById: publicQuery
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       return db.query.bibleBooks.findFirst({
         where: eq(bibleBooks.id, input.id),
       });
@@ -36,7 +36,7 @@ export const bibleRouter = createRouter({
   chapters: publicQuery
     .input(z.object({ bookNumber: z.number() }))
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       try {
         const book = await db.query.bibleBooks.findFirst({
           where: eq(bibleBooks.bookNumber, input.bookNumber),
@@ -84,7 +84,7 @@ export const bibleRouter = createRouter({
       // If translation is KJV, try querying local DB first
       if (translation === "KJV") {
         try {
-          const db = getDb();
+          const db = await getDb();
           const rows = await db
             .select()
             .from(bibleVerses)
@@ -125,7 +125,7 @@ export const bibleRouter = createRouter({
 
       if (translation === "KJV") {
         try {
-          const db = getDb();
+          const db = await getDb();
           const row = await db
             .select()
             .from(bibleVerses)
@@ -184,7 +184,7 @@ export const bibleRouter = createRouter({
 
       if (translation === "KJV") {
         try {
-          const db = getDb();
+          const db = await getDb();
           const dbResults = await db
             .select({
               id: bibleVerses.id,
@@ -217,7 +217,7 @@ export const bibleRouter = createRouter({
         .optional()
     )
     .query(async ({ input }) => {
-      const db = getDb();
+      const db = await getDb();
       try {
         const result = await db
           .select()

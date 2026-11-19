@@ -16,7 +16,7 @@ import {
 import { eq } from "drizzle-orm";
 
 export async function seedCommunityData() {
-  const db = getDb();
+  const db = await getDb();
   console.log("🌱 Seeding Love Fellowship Christian International Community Data...");
 
   // 1. Seed or find Community Admin

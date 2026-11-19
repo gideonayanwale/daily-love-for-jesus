@@ -7,6 +7,9 @@
 // 2. Supabase PostgreSQL (DATABASE_URL) — auth source-of-truth and fallback.
 // 3. Dev stub — graceful no-op for local dev without any DB configured.
 // The getDb() function implements this chain automatically.
+//
+// NOTE: All DB functions are async because the package is "type": "module" (ESM),
+// so dynamic import() must be used instead of require(). Call sites must await getDb().
 
 import { env } from "./env";
 import * as schema from "@db/schema";
@@ -17,18 +20,16 @@ const fullSchema = { ...schema, ...relations };
 // ─── Neon Serverless DB (Primary - fast cold starts, HTTP API) ─────────────────
 let neonInstance: any = null;
 
-export function getNeonDb(): any {
+export async function getNeonDb(): Promise<any> {
   if (neonInstance) return neonInstance;
 
   if (!env.neonDatabaseUrl) {
     return null;
   }
 
-  // Neon supports standard PostgreSQL wire protocol.
-  // Using postgres.js provides fast pooled connections without requiring extra SDKs.
   try {
-    const postgres = require("postgres");
-    const { drizzle } = require("drizzle-orm/postgres-js");
+    const { default: postgres } = await import("postgres");
+    const { drizzle } = await import("drizzle-orm/postgres-js");
     const client = postgres(env.neonDatabaseUrl, {
       ssl: "require",
       max: 10,
@@ -42,17 +43,15 @@ export function getNeonDb(): any {
   }
 }
 
-
-
 // ─── Supabase PostgreSQL DB (Fallback / Auth writes) ──────────────────────────
 let supabaseInstance: any = null;
 
-export function getSupabaseDb(): any {
+export async function getSupabaseDb(): Promise<any> {
   if (supabaseInstance) return supabaseInstance;
 
   try {
-    const postgres = require("postgres");
-    const { drizzle } = require("drizzle-orm/postgres-js");
+    const { default: postgres } = await import("postgres");
+    const { drizzle } = await import("drizzle-orm/postgres-js");
 
     const isSupabase =
       env.databaseUrl.includes("supabase.co") ||
@@ -78,13 +77,13 @@ export function getSupabaseDb(): any {
  * Returns the best available database:
  *   1. Neon (preferred — faster, serverless-native, branching)
  *   2. Supabase PostgreSQL (fallback)
- *   3. Dev stub proxy (graceful no-op for local dev without any DB)
+ *   3. Dev stub proxy (graceful no-op for local dev without any DB configured)
  */
-export function getDb(): any {
-  const neon = getNeonDb();
+export async function getDb(): Promise<any> {
+  const neon = await getNeonDb();
   if (neon) return neon;
 
-  const supabase = getSupabaseDb();
+  const supabase = await getSupabaseDb();
   if (supabase) return supabase;
 
   // Graceful dev stub — returns empty arrays / success stubs

@@ -5,7 +5,7 @@ import { getDb, getNeonDb, getSupabaseDb } from "./connection";
 import { env } from "../lib/env";
 
 export async function findUserById(id: string): Promise<User | undefined> {
-  const rows = await getDb()
+  const rows = await (await getDb())
     .select()
     .from(schema.users)
     .where(eq(schema.users.id, id))
@@ -14,7 +14,7 @@ export async function findUserById(id: string): Promise<User | undefined> {
 }
 
 export async function findUserByEmail(email: string): Promise<User | undefined> {
-  const rows = await getDb()
+  const rows = await (await getDb())
     .select()
     .from(schema.users)
     .where(eq(schema.users.email, email))
@@ -43,7 +43,7 @@ export async function upsertUser(data: InsertUser): Promise<User | undefined> {
   // ─── Primary DB write ──────────────────────────────────────────────────────
   let result: User | undefined;
   try {
-    const rows = await getDb()
+    const rows = await (await getDb())
       .insert(schema.users)
       .values(values)
       .onConflictDoUpdate({
@@ -59,9 +59,9 @@ export async function upsertUser(data: InsertUser): Promise<User | undefined> {
   // ─── Mirror write to the secondary DB (fire-and-forget) ───────────────────
   // Ensures user record exists in both Neon AND Supabase Postgres regardless
   // of which one is the primary.
-  const primaryDb = getDb();
-  const neonDb = getNeonDb();
-  const supabaseDb = getSupabaseDb();
+  const primaryDb = await getDb();
+  const neonDb = await getNeonDb();
+  const supabaseDb = await getSupabaseDb();
   const secondaryDb = primaryDb === neonDb ? supabaseDb : neonDb;
 
   if (secondaryDb && secondaryDb !== primaryDb) {
