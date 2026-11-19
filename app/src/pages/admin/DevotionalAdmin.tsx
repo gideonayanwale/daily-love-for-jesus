@@ -580,7 +580,7 @@ function TelegramMessagesTab() {
     onError: (err: { message: string }) => toast.error(err.message),
   });
 
-  const messages = (data as { items?: Array<{ id: number; messageText?: string | null; processedAt?: string | null }> } | undefined)?.items ?? [];
+  const messages = (data as { items?: Array<{ id: number; text?: string | null; receivedAt?: string | null }> } | undefined)?.items ?? [];
 
   return (
     <div className="space-y-4 max-w-2xl">
@@ -625,7 +625,7 @@ function TelegramMessagesTab() {
         {messages.map((msg) => (
           <div key={msg.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
             <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-4">
-              {msg.messageText || '(no text)'}
+              {msg.text || '(no text)'}
             </p>
             <Button
               size="sm"
