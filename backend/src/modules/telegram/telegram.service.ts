@@ -79,7 +79,8 @@ export class TelegramService {
 
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
-      .from(schema.telegramMessages);
+      .from(schema.telegramMessages)
+      .where(processed !== undefined ? eq(schema.telegramMessages.processed, processed) : undefined);
 
     return {
       items,
