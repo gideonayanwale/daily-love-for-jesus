@@ -279,7 +279,8 @@ async function pollTelegramMessages(): Promise<void> {
     );
     type TelegramChatMessage = {
       message_id: number;
-      chat: { id: number; username?: string };
+      chat: { id: number; username?: string; title?: string };
+      from?: { id: number; first_name?: string };
       date: number;
       text?: string;
       caption?: string;
@@ -354,7 +355,7 @@ async function pollTelegramMessages(): Promise<void> {
           }
         }
       } catch (err) {
-        console.error("[scheduler] Error processing update:", err);
+        console.error("[scheduler] Failed to process a Telegram update.");
       }
     }
 
@@ -362,7 +363,7 @@ async function pollTelegramMessages(): Promise<void> {
       updateOffset = data.result[data.result.length - 1].update_id + 1;
     }
   } catch (err) {
-    console.error("[scheduler] pollTelegramMessages error:", err);
+    console.error("[scheduler] Telegram polling failed before completion.");
   }
 }
 
