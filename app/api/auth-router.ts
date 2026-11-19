@@ -50,8 +50,8 @@ export const authRouter = createRouter({
       if (!existing.length) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
       }
-      if (existing[0].role === "admin") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Only the platform owner can change another admin's role." });
+      if (!["user", "elevated_admin"].includes(existing[0].role)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This account's platform role cannot be changed through this operation." });
       }
       const updated = await db
         .update(schema.users)
