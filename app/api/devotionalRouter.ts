@@ -16,7 +16,7 @@ import {
 const stripHtml = (s: string): string => s.replace(/(<([^>]+)>)/gi, '').trim();
 
 // Fire-and-forget realtime broadcast after mutations
-async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+export async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return;
   try {
     const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
