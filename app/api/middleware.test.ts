@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { adminQuery, createRouter, publicQuery } from "./middleware";
 import type { TrpcContext } from "./context";
 import type { User } from "@db/schema";
