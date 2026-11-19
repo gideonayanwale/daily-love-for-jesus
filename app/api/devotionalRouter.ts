@@ -17,6 +17,7 @@ const stripHtml = (s: string): string => s.replace(/(<([^>]+)>)/gi, '').trim();
 
 // Fire-and-forget realtime broadcast after mutations
 async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return;
   try {
     await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
       method: "POST",
@@ -96,7 +97,6 @@ export const devotionalRouter = createRouter({
         .object({
           limit: z.number().min(1).max(100).default(20),
           offset: z.number().min(0).default(0),
-          
         })
         .optional()
     )
