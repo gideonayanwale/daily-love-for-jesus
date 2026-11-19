@@ -197,8 +197,7 @@ async function syncTable(
 export async function runFullSync(
   direction: "supabase→neon" | "neon→supabase" | "all" = "all"
 ): Promise<SyncResult[]> {
-  const supabaseDb = getSupabaseDb();
-  const neonDb = getNeonDb();
+  const [supabaseDb, neonDb] = await Promise.all([getSupabaseDb(), getNeonDb()]);
 
   if (!supabaseDb || !neonDb) {
     throw new Error("Both Neon and Supabase databases must be configured before running a full sync.");
@@ -245,7 +244,7 @@ export async function checkDbHealth(): Promise<DbHealthStatus> {
   };
 
   // Check Neon
-  const neonDb = getNeonDb();
+  const neonDb = await getNeonDb();
   if (neonDb) {
     const t = Date.now();
     try {
@@ -259,7 +258,7 @@ export async function checkDbHealth(): Promise<DbHealthStatus> {
   }
 
   // Check Supabase
-  const supabaseDb = getSupabaseDb();
+  const supabaseDb = await getSupabaseDb();
   if (supabaseDb) {
     const t = Date.now();
     try {
