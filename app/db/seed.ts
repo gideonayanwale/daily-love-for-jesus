@@ -24,8 +24,8 @@ async function seedBibleBooks() {
     order: b.order,
   }));
 
-  await db.insert(bibleBooks).values(booksData);
-  console.log(`Seeded ${booksData.length} Bible books`);
+  await db.insert(bibleBooks).values(booksData).onConflictDoNothing();
+  console.log(`Seeded ${booksData.length} Bible books (skipped duplicates)`);
 }
 
 async function seedBibleVerses() {
@@ -61,7 +61,7 @@ async function seedBibleVerses() {
         };
       });
 
-    await db.insert(bibleVerses).values(batch);
+    await db.insert(bibleVerses).values(batch).onConflictDoNothing();
     inserted += batch.length;
 
     if (inserted % 5000 === 0) {
@@ -96,7 +96,7 @@ async function seedHymns() {
       category: h.category,
     }));
 
-    await db.insert(hymns).values(batch);
+    await db.insert(hymns).values(batch).onConflictDoNothing();
     inserted += batch.length;
   }
 
