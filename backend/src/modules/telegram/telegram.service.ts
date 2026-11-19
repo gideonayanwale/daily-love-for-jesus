@@ -171,7 +171,7 @@ export class TelegramService {
           source: 'telegram',
           telegramMessageId,
           devotionalDate: new Date(),
-          isPublished: true,
+          isPublished: false,
         })
         .$returningId();
 
