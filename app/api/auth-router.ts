@@ -1,7 +1,7 @@
 import { z } from "zod";
 import * as cookie from "cookie";
 import { eq } from "drizzle-orm";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, strictAdminQuery } from "./middleware";
 import { upsertUser } from "./queries/users";
 import { getDb } from "./queries/connection";
 import * as schema from "@db/schema";
@@ -38,7 +38,7 @@ export const authRouter = createRouter({
     return { success: true };
   }),
 
-  promoteToElevatedAdmin: adminQuery
+  promoteToElevatedAdmin: strictAdminQuery
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const db = getDb();

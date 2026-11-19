@@ -66,9 +66,14 @@ export default function Login() {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
-  // If already authenticated, redirect
+  // If already authenticated, redirect away from login
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
   if (isAuthenticated) {
-    navigate("/dashboard");
     return null;
   }
 

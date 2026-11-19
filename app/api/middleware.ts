@@ -38,9 +38,6 @@ function requireRole(role: string) {
   });
 }
 
-export const authedQuery = t.procedure.use(requireAuth);
-export const adminQuery = authedQuery.use(requireRoles(["admin", "elevated_admin"]));
-
 function requireRoles(roles: string[]) {
   return t.middleware(async (opts) => {
     const { ctx, next } = opts;
@@ -56,8 +53,15 @@ function requireRoles(roles: string[]) {
   });
 }
 
+export const authedQuery = t.procedure.use(requireAuth);
+
+// Allows both admins and elevated_admins (most admin procedures)
+export const adminQuery = authedQuery.use(requireRoles(["admin", "elevated_admin"]));
+
+// Elevated-admin and above (alias kept for clarity in devotional/telegram routers)
 export const elevatedAdminQuery = authedQuery.use(
   requireRoles(["admin", "elevated_admin"])
 );
 
+// Super-admin only (e.g. role promotion)
 export const strictAdminQuery = authedQuery.use(requireRole('admin'));

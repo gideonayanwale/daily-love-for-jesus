@@ -25,7 +25,7 @@ export default function Dashboard() {
   const { data: devotional, isLoading: devLoading } = trpc.devotional.today.useQuery();
 
   const { data: favorites } = trpc.favorite.list.useQuery(
-    { userId: user!.id },
+    { userId: user?.id ?? '' },
     { enabled: !!user }
   );
 
