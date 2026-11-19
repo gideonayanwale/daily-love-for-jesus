@@ -92,16 +92,6 @@ export class TrpcService {
 
           user = rows[0];
           if (!user) {
-            const adminUserId =
-              this.configService?.get<string>('security.adminUserId') ||
-              process.env.ADMIN_USER_ID;
-            const adminEmail =
-              this.configService?.get<string>('security.adminEmail') ||
-              process.env.ADMIN_EMAIL;
-            const isAdmin =
-              (adminUserId && authUser.id === adminUserId) ||
-              (adminEmail && authUser.email?.toLowerCase() === adminEmail.toLowerCase());
-
             const inserted = await db
               .insert(schema.users)
               .values({
@@ -112,7 +102,7 @@ export class TrpcService {
                   authUser.user_metadata?.name ??
                   'User',
                 avatar: authUser.user_metadata?.avatar_url ?? null,
-                role: isAdmin ? 'admin' : 'user',
+                role: 'user',
               })
               .returning();
             user = inserted[0];
