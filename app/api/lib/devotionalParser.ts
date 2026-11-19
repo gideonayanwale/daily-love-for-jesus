@@ -119,7 +119,7 @@ export async function parseAndCreateDevotional(
         source: "telegram",
         telegramMessageId,
         devotionalDate: new Date(),
-        isPublished: true,
+        isPublished: false,
       })
       .$returningId();
 
