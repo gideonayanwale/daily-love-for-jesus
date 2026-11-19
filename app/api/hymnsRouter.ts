@@ -66,7 +66,7 @@ export const hymnsRouter = createRouter({
     const result = await db
       .select()
       .from(hymns)
-      .orderBy(sql`RAND()`)
+      .orderBy(sql`RANDOM()`)
       .limit(1);
     return result[0] ?? null;
   }),

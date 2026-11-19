@@ -26,10 +26,10 @@ export const appRouter = t.router({
     popularTranslations: t.procedure.query(() => [] as any[]),
     books: t.procedure.query(async () => [] as any[]),
     bookById: t.procedure
-      .input(z.object({ id: z.number().optional() }))
+      .input(z.object({ id: z.number() }))
       .query(async () => ({} as any)),
     chapters: t.procedure
-      .input(z.object({ bookNumber: z.number().optional() }))
+      .input(z.object({ bookNumber: z.number() }))
       .query(async () => [] as number[]),
     verses: t.procedure
       .input(
@@ -63,7 +63,7 @@ export const appRouter = t.router({
     search: t.procedure
       .input(
         z.object({
-          query: z.string().optional(),
+          query: z.string().min(1),
           translation: z.string().optional(),
         }),
       )
@@ -143,6 +143,28 @@ export const appRouter = t.router({
     groupDetails: t.procedure.input(z.any()).query(async () => ({} as any)),
     teacherOverview: t.procedure.input(z.any()).query(async () => ({} as any)),
     registerPushToken: t.procedure.input(z.any()).mutation(async () => ({ success: true })),
+  }),
+  teacherAssignment: t.router({
+    listGroups: t.procedure.query(async () => [] as any[]),
+    listEligibleUsers: t.procedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async () => [] as any[]),
+    assign: t.procedure
+      .input(z.object({ groupId: z.number(), userId: z.string() }))
+      .mutation(async () => ({ success: true })),
+    remove: t.procedure
+      .input(z.object({ groupId: z.number(), userId: z.string() }))
+      .mutation(async () => ({ success: true })),
+  }),
+  anonymousLog: t.router({
+    list: t.procedure
+      .input(
+        z.object({
+          limit: z.number().optional(),
+          offset: z.number().optional(),
+        })
+      )
+      .query(async () => ({ items: [] as any[], total: 0 })),
   }),
 });
 

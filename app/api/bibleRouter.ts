@@ -222,7 +222,7 @@ export const bibleRouter = createRouter({
         const result = await db
           .select()
           .from(bibleVerses)
-          .orderBy(sql`RAND()`)
+          .orderBy(sql`RANDOM()`)
           .limit(1);
 
         if (result.length > 0) {

@@ -12,7 +12,9 @@ export default function BibleChapter() {
   });
 
   const { data: chapters, isLoading } = trpc.bible.chapters.useQuery({
-    bookNumber: bNum,
+    bookNumber: book?.bookNumber ?? bNum,
+  }, {
+    enabled: book !== undefined,
   });
 
   return (

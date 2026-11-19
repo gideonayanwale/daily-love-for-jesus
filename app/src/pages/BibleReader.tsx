@@ -120,9 +120,13 @@ export default function BibleReader() {
     id: bNum,
   });
 
+  // The URL param holds the book PK (id). Once loaded, use the actual bookNumber
+  // field for chapter/verse queries which are keyed on the sequential book number.
+  const bookNum = book?.bookNumber ?? bNum;
+
   // Load chapters for book
   const { data: chaptersList } = trpc.bible.chapters.useQuery({
-    bookNumber: bNum,
+    bookNumber: bookNum,
   });
 
   // Load Verses from tRPC (which queries local DB or Bolls Life API)
@@ -132,7 +136,7 @@ export default function BibleReader() {
     error: queryError,
   } = trpc.bible.verses.useQuery(
     {
-      bookNumber: bNum,
+      bookNumber: bookNum,
       chapter: chNum,
       translation,
     },
@@ -175,7 +179,7 @@ export default function BibleReader() {
 
   // Sync Yoruba audio lookup (DaBible / Bibeli Mímọ́)
   useEffect(() => {
-    lookupYorubaAudio(bNum, chNum, book?.name || "Bibeli Mímọ́").then((info) => {
+    lookupYorubaAudio(bookNum, chNum, book?.name || "Bibeli Mímọ́").then((info) => {
       setYorubaAudio(info);
     });
     if (yorubaAudioRef.current) {
@@ -232,7 +236,7 @@ export default function BibleReader() {
             {
               contentId,
               contentType: "bible_chapter",
-              bookNumber: bNum,
+              bookNumber: bookNum,
               chapter: chNum,
               timeSpent,
               scrollDepth: 100,
@@ -358,11 +362,11 @@ export default function BibleReader() {
     if (isDownloadingYoruba) return;
     setIsDownloadingYoruba(true);
     toast.info("Downloading Yoruba audio straight to local storage...");
-    const res = await downloadYorubaAudioChapter(bNum, chNum);
+    const res = await downloadYorubaAudioChapter(bookNum, chNum);
     setIsDownloadingYoruba(false);
     if (res.success) {
       toast.success("✓ Yoruba audio saved to local storage!");
-      const refreshed = await lookupYorubaAudio(bNum, chNum, book?.name || "Bibeli Mímọ́");
+      const refreshed = await lookupYorubaAudio(bookNum, chNum, book?.name || "Bibeli Mímọ́");
       setYorubaAudio(refreshed);
       if (yorubaAudioRef.current && refreshed.localBlobUrl) {
         yorubaAudioRef.current.src = refreshed.localBlobUrl;
@@ -846,7 +850,7 @@ export default function BibleReader() {
           isOpen={compareVerseNumber !== null}
           onClose={() => setCompareVerseNumber(null)}
           bookName={book?.name ?? "Scripture"}
-          bookNumber={bNum}
+          bookNumber={bookNum}
           chapter={chNum}
           verse={compareVerseNumber}
         />
