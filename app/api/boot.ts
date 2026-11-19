@@ -153,7 +153,7 @@ app.post("/api/telegram/webhook", async (c) => {
 
     if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+        const broadcastResponse = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -168,6 +168,9 @@ app.post("/api/telegram/webhook", async (c) => {
             }],
           }),
         });
+        if (!broadcastResponse.ok) {
+          console.error("[telegram] Supabase Realtime rejected broadcast:", broadcastResponse.status, await broadcastResponse.text());
+        }
       } catch (broadcastError) {
         console.error("[telegram] Realtime broadcast failed:", broadcastError);
       }
