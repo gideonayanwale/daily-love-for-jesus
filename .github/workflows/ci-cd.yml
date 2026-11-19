@@ -47,7 +47,7 @@ jobs:
         run: npm --prefix app run lint
 
       - name: Run Test Suites
-        if: always() && steps.install-app.outcome == 'success'
+        if: always() && steps['install-app'].outcome == 'success'
         run: npm --prefix app run test -- --run
 
   # ─── Job 2: Monorepo Build Verification ────────────────────────────────────
