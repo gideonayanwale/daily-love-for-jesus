@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
+import ExplorePanel from './ExplorePanel';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
@@ -151,7 +152,7 @@ export default function AppLayout() {
             )}
           </nav>
 
-          {/* Right Header Actions: Theme Switcher & Profile */}
+          {/* Right Header Actions: Explore navigation, theme and profile */}
           <div className="flex items-center gap-2">
             {/* Theme Toggle Button */}
             <button
