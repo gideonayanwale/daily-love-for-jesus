@@ -211,7 +211,7 @@ export class TelegramService {
         body = bodyText.substring(0, 2000);
       }
 
-      const result = await db
+      const inserted = await db
         .insert(schema.devotionals)
         .values({
           title,
@@ -224,9 +224,19 @@ export class TelegramService {
           devotionalDate: new Date(),
           isPublished: false,
         })
-        .$returningId();
+        .onConflictDoNothing({ target: schema.devotionals.telegramMessageId })
+        .returning({ id: schema.devotionals.id });
 
-      const devotionalId = result[0]?.id;
+      let devotionalId = inserted[0]?.id;
+      if (!devotionalId) {
+        const existing = await db
+          .select({ id: schema.devotionals.id })
+          .from(schema.devotionals)
+          .where(eq(schema.devotionals.telegramMessageId, telegramMessageId))
+          .limit(1);
+        devotionalId = existing[0]?.id;
+      }
+      if (!devotionalId) return null;
 
       await db
         .update(schema.telegramMessages)
