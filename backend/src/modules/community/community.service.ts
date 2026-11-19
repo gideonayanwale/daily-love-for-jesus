@@ -1243,33 +1243,43 @@ export class CommunityService {
     if (requesterRole !== 'superadmin' && ['admin', 'superadmin'].includes(targetRows[0].role)) {
       throw new ForbiddenException('Only superadmin can change another platform administrator account.');
     }
-    const updated = await db
-      .update(schema.users)
-      .set({ role: targetRole, updatedAt: new Date() })
-      .where(eq(schema.users.id, targetUserId))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(schema.users)
+        .set({ role: targetRole, updatedAt: new Date() })
+        .where(eq(schema.users.id, targetUserId))
+        .returning();
 
-    if (!updated.length) {
-      throw new NotFoundException('Target user not found.');
-    }
+      if (!rows.length) {
+        throw new NotFoundException('Target user not found.');
+      }
 
-    await db.insert(schema.auditLogs).values({
-      actorId: requesterId,
-      action: 'elevate_user_role',
-      resourceType: 'user',
-      resourceId: targetUserId,
-      metadata: { targetRole, requesterRole },
-      occurredAt: new Date(),
+      await tx.insert(schema.auditLogs).values({
+        actorId: requesterId,
+        action: 'elevate_user_role',
+        resourceType: 'user',
+        resourceId: targetUserId,
+        metadata: { targetRole, requesterRole },
+        occurredAt: new Date(),
+      });
+      return rows;
     });
 
     const neonDb = this.dbService.getNeonDb();
     const supabaseDb = this.dbService.getSupabaseDb();
     const secondaryDb = db === neonDb ? supabaseDb : neonDb;
     if (secondaryDb && secondaryDb !== db) {
-      await secondaryDb
-        .update(schema.users)
-        .set({ role: targetRole, updatedAt: new Date() })
-        .where(eq(schema.users.id, targetUserId));
+      try {
+        await secondaryDb
+          .update(schema.users)
+          .set({ role: targetRole, updatedAt: new Date() })
+          .where(eq(schema.users.id, targetUserId));
+      } catch (error) {
+        this.logger.error(
+          `Role mirror failed for user ${targetUserId}; primary role change is audited but Realtime authorization may lag.`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
     }
 
     return {
