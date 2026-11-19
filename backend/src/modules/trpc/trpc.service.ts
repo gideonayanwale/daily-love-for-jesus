@@ -111,14 +111,6 @@ export class TrpcService {
       } catch (err: any) {
         this.logger.warn(`tRPC auth error: ${err.message}`);
       }
-    } else if (!this.supabaseAdmin) {
-      // Dev mode fallback
-      user = {
-        id: 'dev-user-00000000-0000-0000-0000-000000000000',
-        email: 'dev@dailyloveforjesus.org',
-        name: 'Developer Mode',
-        role: 'admin',
-      };
     }
 
     return { req, res, user };
