@@ -14,8 +14,6 @@ export interface AppConfig {
   security: {
     appId: string;
     appSecret: string;
-    adminUserId: string;
-    adminEmail: string;
   };
   integrations: {
     apiBibleKey: string;
@@ -51,8 +49,6 @@ export default (): AppConfig => ({
   security: {
     appId: process.env.APP_ID || 'daily-love-app',
     appSecret: process.env.APP_SECRET || '',
-    adminUserId: process.env.ADMIN_USER_ID || '',
-    adminEmail: process.env.ADMIN_EMAIL || '',
   },
   integrations: {
     apiBibleKey: process.env.API_BIBLE_KEY || '',
