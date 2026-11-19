@@ -31,10 +31,6 @@ export const env = {
   appSecret: get("APP_SECRET"),
   isProduction: process.env.NODE_ENV === "production",
 
-  // Admin Configuration
-  adminUserId: process.env.ADMIN_USER_ID ?? "",
-  adminEmail: process.env.ADMIN_EMAIL ?? "",
-
   // Telegram Bot Configuration
   telegramBotToken: get("TELEGRAM_BOT_TOKEN"),
   telegramWebhookSecret: get("TELEGRAM_WEBHOOK_SECRET"),
