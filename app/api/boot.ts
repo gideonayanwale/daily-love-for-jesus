@@ -338,7 +338,7 @@ async function pollTelegramMessages(): Promise<void> {
           const devotionalId = await parseAndCreateDevotional(db, inserted.id, text);
           if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
             try {
-              const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+              const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast?private=true`, {
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
