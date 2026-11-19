@@ -22,7 +22,7 @@ Daily Love For Jesus is a public-first Christian reading and fellowship platform
 1. Visitor opens the site; the application creates an anonymous, random session identifier where consent and local law permit.
 2. The public navigation is available immediately: Today, Bible, Devotionals, Hymns, Community overview, public calendar and public Telegram devotional feed (where configured).
 3. Public read endpoints return only published/public records.
-4. Anonymous events may record a pseudonymous session ID, page, timestamp, coarse device/user-agent data and referrer. Avoid retaining raw IP addresses by default; if abuse prevention requires IP processing, minimise, restrict access, document purpose and retention, and comply with privacy obligations.
+4. Anonymous events are rate-limited and record the page, timestamp, coarse user-agent data and a keyed HMAC visitor identifier derived from the IP address. The HMAC uses the server APP_SECRET and is truncated to 160 bits; if APP_SECRET is unavailable, no IP-derived identifier is persisted. Raw IP addresses are not stored. Visitor logs are restricted to strict administrators and should follow a defined retention policy.
 5. Visitor can continue without an account. No anonymous session is treated as a user identity or assigned a role.
 
 ### B. Sign-up
