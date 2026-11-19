@@ -3,7 +3,7 @@ import { createRouter, adminQuery, elevatedAdminQuery } from "./middleware";
 import { env } from "./lib/env";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   listTelegramMessages,
@@ -88,10 +88,7 @@ export const telegramRouter = createRouter({
       if (!storedMessage) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Telegram message could not be stored." });
       }
-      const duplicate = storedMessage.receivedAt.getTime() !== message.date * 1000 ||
-        storedMessage.messageId !== message.messageId ||
-        storedMessage.chatId !== message.chat.id;
-      if (duplicate || storedMessage.processed) {
+      if (storedMessage.processed) {
         return { status: "duplicate", id: storedMessage.id };
       }
 
