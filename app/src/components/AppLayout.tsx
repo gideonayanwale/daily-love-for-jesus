@@ -8,18 +8,14 @@ import {
   Users,
   Settings,
   WifiOff,
-  Wifi,
   Sun,
   Moon,
-  Sparkles,
-  User,
   Heart,
   ShieldCheck,
   LayoutDashboard,
 } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
-import ExplorePanel from './ExplorePanel';
 import ExplorePanel from './ExplorePanel';
 
 const navItems = [
