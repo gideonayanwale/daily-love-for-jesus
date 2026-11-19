@@ -14,8 +14,8 @@ For quick reference:
 | `DATABASE_URL` | **Yes** | **SECRET** (Server) | Supabase Dashboard &rarr; Settings &rarr; Database (Pooler Port 6543) |
 | `NEON_DATABASE_URL` | **Yes** | **SECRET** (Server) | Neon Console &rarr; Dashboard &rarr; Connection Details |
 | `APP_SECRET` | Optional | **SECRET** (Server) | Random 32-char hex string for sync admin auth |
-| `ADMIN_USER_ID` | Optional | Server | Supabase Auth &rarr; Users &rarr; UUID |
-| `ADMIN_EMAIL` | Optional | Server | Your Admin Email |
+| `ADMIN_USER_ID` | Deprecated | Server | Does not grant a role; retained only for deployment compatibility |
+| `ADMIN_EMAIL` | Deprecated | Server | Email matching never grants a role |
 | `TELEGRAM_BOT_TOKEN` | Optional | **SECRET** (Server) | Telegram @BotFather |
 | `TELEGRAM_CHANNEL_ID` | Optional | Server | Telegram Channel ID |
 | `API_BIBLE_KEY` | Optional | **SECRET** (Server) | scripture.api.bible |
