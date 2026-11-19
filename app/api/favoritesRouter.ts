@@ -30,14 +30,13 @@ export const favoritesRouter = createRouter({
       return db
         .select()
         .from(userFavorites)
-        .where(eq(userFavorites.userId, input.userId))
+        .where(eq(userFavorites.userId, ctx.user.id))
         .orderBy(desc(userFavorites.createdAt));
     }),
 
   add: authedQuery
     .input(
       z.object({
-        userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]),
         itemId: z.number().int().positive(),
         reference: z.string().max(500).optional(),
@@ -52,7 +51,7 @@ export const favoritesRouter = createRouter({
         .from(userFavorites)
         .where(
           and(
-            eq(userFavorites.userId, input.userId),
+            eq(userFavorites.userId, ctx.user.id),
             eq(userFavorites.type, input.type),
             eq(userFavorites.itemId, input.itemId)
           )
@@ -84,7 +83,7 @@ export const favoritesRouter = createRouter({
         itemId: z.number(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       await db
         .delete(userFavorites)
