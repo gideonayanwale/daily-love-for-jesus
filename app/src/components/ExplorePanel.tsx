@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
-  BookOpen, CalendarHeart, Check, ChevronLeft, ChevronRight, Compass,
-  Heart, LayoutDashboard, LogIn, Menu, Music, Settings, ShieldCheck,
+  BookOpen, CalendarHeart, Check, ChevronRight, Compass,
+  Heart, LayoutDashboard, LogIn, Menu, Music, Settings,
   Users, X,
 } from 'lucide-react';
 
