@@ -52,4 +52,4 @@ Templates available:
 ## 🛡️ Security Best Practices
 
 1. **Client-side isolation**: Only keys prefixed with `VITE_` or `EXPO_PUBLIC_` are bundled into frontend or mobile client builds. Never prefix `SUPABASE_SERVICE_ROLE_KEY`, `APP_SECRET`, or database connection strings with client prefixes.
-2. **Local Fallback Mode**: If Supabase or Neon credentials are not yet configured in development, the NestJS backend automatically defaults to a mock admin user (`Developer Mode`) and a resilient dev stub proxy, allowing you to develop and test UI features offline.
+2. **Fail-closed configuration**: The application does not create a mock administrator or silently use a database stub. Configure Supabase Auth and a real application database for authenticated workflows. Use explicit test fixtures and mocked dependencies in automated tests; never enable a production-like admin bypass.
