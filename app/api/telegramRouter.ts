@@ -12,7 +12,7 @@ import {
 import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 export const telegramRouter = createRouter({
-  // Webhook endpoint for Telegram bot (public — called by Telegram servers)
+  // Authenticated fallback procedure. Telegram's public webhook is handled by the secret-validated Hono route.
   webhook: elevatedAdminQuery
     .input(
       z.object({
