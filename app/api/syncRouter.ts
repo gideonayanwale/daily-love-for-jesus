@@ -45,20 +45,22 @@ syncRouter.get("/health", async (c) => {
     return c.json(
       {
         status: allHealthy ? "healthy" : "degraded",
-        databases: status,
         timestamp: new Date().toISOString(),
       },
       allHealthy ? 200 : 207
     );
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return c.json({ status: "unavailable" }, 503);
   }
 });
 
 // ── POST /api/sync/run — trigger a full bidirectional sync ────────────────────
 syncRouter.post("/run", adminAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const direction = body?.direction ?? "all"; // "all" | "supabase→neon" | "neon→supabase"
+  const direction = body?.direction ?? "all";
+  if (!["all", "supabase→neon", "neon→supabase"].includes(direction)) {
+    return c.json({ error: "Invalid sync direction" }, 400);
+  }
 
   console.log(`[sync-router] Starting sync (direction: ${direction})`);
   const start = Date.now();
