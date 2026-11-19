@@ -15,11 +15,10 @@ This comprehensive reference document lists all environment variables, API keys,
 | `SUPABASE_SERVICE_ROLE_KEY` | **Yes** | **SECRET** (Server) | Admin access for sync & bypass RLS | [Supabase Dashboard](#1-supabase-configuration) &rarr; Settings &rarr; API |
 | `DATABASE_URL` | **Yes** | **SECRET** (Server) | Supabase Postgres pooled connection | [Supabase Dashboard](#2-database-connection-strings) &rarr; Settings &rarr; Database |
 | `NEON_DATABASE_URL` | **Yes** | **SECRET** (Server) | Neon Serverless Postgres connection | [Neon Console](#3-neon-serverless-postgresql) &rarr; Dashboard &rarr; Connection Details |
-| `APP_SECRET` | Optional | **SECRET** (Server) | Secret token for sync admin API | Custom random 32-char string |
-| `ADMIN_USER_ID` | Deprecated | Server | Retained for backward-compatible deployment only; does not grant a role | Do not use for role provisioning |
-| `ADMIN_EMAIL` | Deprecated | Server | Retained for backward-compatible deployment only; does not grant a role | Do not use for role provisioning |
+| `APP_SECRET` | Required in production | **SECRET** (Server) | High-entropy server secret for signing and keyed pseudonyms | Generate with `openssl rand -hex 32` |
 | `TELEGRAM_BOT_TOKEN` | Optional | **SECRET** (Server) | Telegram bot token for devotional sync | [@BotFather on Telegram](#5-telegram-integration-optional) |
-| `TELEGRAM_CHANNEL_ID` | Optional | Server | Devotional Telegram channel ID | Channel info / Forward message |
+| `TELEGRAM_CHANNEL_ID` | Required for Telegram ingestion | Server | Exact Telegram channel ID (preferred) or @username | Channel info / Forward message |
+| `TELEGRAM_WEBHOOK_SECRET` | Required in production for webhook ingestion | **SECRET** (Server) | Telegram webhook secret token checked before parsing updates | Generate a random 32-character URL-safe secret |
 | `API_BIBLE_KEY` | Optional | **SECRET** (Server) | American Bible Society API Key | [scripture.api.bible](#6-bible-api-integration-optional) |
 
 ---
@@ -90,8 +89,10 @@ Used to ingest devotionals directly from church Telegram channels into the datab
 
 1. Open Telegram and message **@BotFather**.
 2. Run `/newbot`, follow prompts, and copy the HTTP API token &rarr; `TELEGRAM_BOT_TOKEN`.
-3. Add the bot as an administrator to your target Telegram Channel.
-4. Channel ID can be found by forwarding a message from the channel to `@userinfobot` or `@JsonDumpBot` &rarr; `TELEGRAM_CHANNEL_ID`.
+3. Add the bot as an administrator to your target Telegram Channel with permission to read channel posts.
+4. Set `TELEGRAM_CHANNEL_ID` to the channel's numeric ID (recommended; @username is supported).
+5. Generate and set `TELEGRAM_WEBHOOK_SECRET` as a high-entropy secret. Configure Telegram's `setWebhook` method with the deployed `/api/telegram/webhook` URL and the `secret_token` value matching that environment variable.
+6. The bot imports messages as unpublished drafts. An elevated administrator reviews and publishes them from Devotional Admin; only published devotionals appear in the public feed.
 
 ---
 
@@ -120,5 +121,4 @@ When deploying on Vercel:
    - `DATABASE_URL`
    - `NEON_DATABASE_URL`
    - `APP_SECRET`
-   - `ADMIN_USER_ID` / `ADMIN_EMAIL`
 4. Trigger a **Redeploy** (or push a commit to `main`).
