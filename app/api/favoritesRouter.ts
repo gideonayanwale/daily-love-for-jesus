@@ -1,18 +1,17 @@
 import { z } from "zod";
-import { createRouter, publicQuery } from "./middleware";
+import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { userFavorites } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export const favoritesRouter = createRouter({
-  list: publicQuery
+  list: authedQuery
     .input(
       z.object({
-        userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]).optional(),
       })
     )
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
 
       if (input.type) {
@@ -21,7 +20,7 @@ export const favoritesRouter = createRouter({
           .from(userFavorites)
           .where(
             and(
-              eq(userFavorites.userId, input.userId),
+              eq(userFavorites.userId, ctx.user.id),
               eq(userFavorites.type, input.type)
             )
           )
@@ -35,16 +34,16 @@ export const favoritesRouter = createRouter({
         .orderBy(desc(userFavorites.createdAt));
     }),
 
-  add: publicQuery
+  add: authedQuery
     .input(
       z.object({
         userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]),
-        itemId: z.number(),
-        reference: z.string().optional(),
+        itemId: z.number().int().positive(),
+        reference: z.string().max(500).optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
 
       // Check if already exists
@@ -67,7 +66,7 @@ export const favoritesRouter = createRouter({
       const result = await db
         .insert(userFavorites)
         .values({
-          userId: input.userId,
+          userId: ctx.user.id,
           type: input.type,
           itemId: input.itemId,
           reference: input.reference ?? null,
@@ -77,7 +76,7 @@ export const favoritesRouter = createRouter({
       return result[0] ?? null;
     }),
 
-  remove: publicQuery
+  remove: authedQuery
     .input(
       z.object({
         userId: z.string(),
