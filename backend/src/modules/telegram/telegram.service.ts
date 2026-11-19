@@ -56,9 +56,24 @@ export class TelegramService {
         processed: false,
         receivedAt: messageDate,
       })
-      .$returningId();
+      .onConflictDoNothing({
+        target: [schema.telegramMessages.messageId, schema.telegramMessages.chatId],
+      })
+      .returning({ id: schema.telegramMessages.id });
 
-    const storedId = inserted[0]?.id;
+    if (!inserted[0]) {
+      const duplicate = await db
+        .select({ id: schema.telegramMessages.id })
+        .from(schema.telegramMessages)
+        .where(and(
+          eq(schema.telegramMessages.messageId, messageId),
+          eq(schema.telegramMessages.chatId, chatId),
+        ))
+        .limit(1);
+      return { status: 'duplicate', id: duplicate[0]?.id ?? null };
+    }
+
+    const storedId = inserted[0].id;
     const devotionalId = await this.tryCreateDevotionalFromText(db, storedId, text);
     if (devotionalId) await this.broadcastDevotionalChanged(devotionalId, 'import');
 
