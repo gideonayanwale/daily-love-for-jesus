@@ -41,6 +41,9 @@ export const authRouter = createRouter({
   promoteToElevatedAdmin: strictAdminQuery
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You cannot change your own platform role." });
+      }
       const db = await getDb();
       const existing = await db
         .select({ role: schema.users.role })
