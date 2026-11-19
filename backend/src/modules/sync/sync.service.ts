@@ -56,12 +56,22 @@ export class SyncService {
           const sourceRows = await supabaseDb.select().from(t.table).limit(500);
           if (sourceRows.length > 0) {
             for (const row of sourceRows) {
+              const insertRow = t.name === 'users' ? { ...row, role: 'user' } : row;
+              const updateSet = t.name === 'users'
+                ? {
+                    email: row.email,
+                    name: row.name,
+                    avatar: row.avatar,
+                    lastSignInAt: row.lastSignInAt,
+                    updatedAt: row.updatedAt,
+                  }
+                : { ...row };
               await neonDb
                 .insert(t.table)
-                .values(row)
+                .values(insertRow)
                 .onConflictDoUpdate({
                   target: t.conflictCol,
-                  set: { ...row },
+                  set: updateSet,
                 });
               rowsSynced++;
             }
