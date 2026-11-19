@@ -163,7 +163,6 @@ export const devotionalRouter = createRouter({
       const devotional = await publishDevotional(input.id, input.isPublished);
       if (devotional) {
         broadcastDevotionalChanged(devotional.id, "publish").catch(() => void 0);
-        if (input.isPublished) sendDevotionalToTelegram(devotional).catch(() => void 0);
       }
       return devotional;
     }),
@@ -175,7 +174,13 @@ export const devotionalRouter = createRouter({
       if (!existing) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
       }
-      await sendDevotionalToTelegram(existing);
+      if (!existing.isPublished) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Publish the devotional before sending it to Telegram." });
+      }
+      const sent = await sendDevotionalToTelegram(existing);
+      if (!sent) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Telegram delivery is not configured. Set the bot token and channel ID." });
+      }
       return { success: true };
     }),
 });
