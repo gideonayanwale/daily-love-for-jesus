@@ -162,3 +162,14 @@ Do not implement uncontrolled bidirectional replication of independently writabl
 13. Account deletion removes/anonymises owned data and is safe to retry.
 14. First successful sign-in triggers onboarding once per account; the Explore panel can reopen it.
 15. Public navigation remains available after logout and when auth service is unavailable.
+
+## 8. Devotional publishing and Telegram ingestion
+
+- The public product has one Devotionals destination. Telegram is an import channel managed inside the devotional administration workflow; it is not a separate public content area.
+- The preferred ingestion path is the Telegram webhook. It must validate the configured webhook secret and configured channel ID/username before accepting a post. In non-serverless deployments, polling is a fallback only when webhook mode is not configured.
+- Every imported Telegram message is stored and parsed into an unpublished draft. Parsing success is not publication approval.
+- Only server-verified `admin` or `elevated_admin` users may review, edit, publish, unpublish, delete, or send devotional content to Telegram. The API derives permissions from the persisted application user role, never from client state or editable user metadata.
+- Public list, today, and detail reads return published devotionals only. Draft listing is a distinct elevated procedure.
+- Publishing updates the public devotional feed and emits a Realtime invalidation event. The event contains only an ID and action; it does not disclose devotional text or draft data.
+- Sending to Telegram is a separate explicit operation, requires the devotional to be published, and must surface missing configuration or Telegram API errors as failures.
+- The Supabase Realtime channel currently carries refresh signals only. The main application data store is Neon, so database-level RLS policies for application tables must be verified against the actual production database separately from API RBAC.
