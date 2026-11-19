@@ -1168,6 +1168,17 @@ export class CommunityService {
     }
 
     const db = this.dbService.getDb();
+    const targetRows = await db
+      .select({ role: schema.users.role })
+      .from(schema.users)
+      .where(eq(schema.users.id, targetUserId))
+      .limit(1);
+    if (!targetRows.length) {
+      throw new NotFoundException('Target user not found.');
+    }
+    if (requesterRole !== 'superadmin' && ['admin', 'superadmin'].includes(targetRows[0].role)) {
+      throw new ForbiddenException('Only superadmin can change another platform administrator account.');
+    }
     const updated = await db
       .update(schema.users)
       .set({ role: targetRole, updatedAt: new Date() })
