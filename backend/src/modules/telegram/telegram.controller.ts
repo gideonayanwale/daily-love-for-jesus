@@ -59,7 +59,7 @@ export class TelegramController {
   @Get('messages')
   @ApiBearerAuth()
   @UseGuards(SupabaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'elevated_admin')
   @ApiOperation({ summary: 'List received Telegram messages (Admin only)' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
