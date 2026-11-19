@@ -19,7 +19,7 @@ const stripHtml = (s: string): string => s.replace(/(<([^>]+)>)/gi, '').trim();
 async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return;
   try {
-    await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+    const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -34,6 +34,9 @@ async function broadcastDevotionalChanged(id: number, action: string): Promise<v
         }],
       }),
     });
+    if (!response.ok) {
+      console.error("[devotionalRouter] Supabase Realtime rejected broadcast:", response.status, await response.text());
+    }
   } catch (err) {
     console.error("[devotionalRouter] broadcast error:", err);
   }
