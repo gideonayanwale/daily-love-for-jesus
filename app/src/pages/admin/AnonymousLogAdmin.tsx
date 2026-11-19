@@ -25,9 +25,10 @@ export default function AnonymousLogAdmin() {
   const [offset, setOffset] = useState(0);
   const [rows, setRows] = useState<LogRow[]>([]);
 
+  type LogQueryResult = { items: LogRow[]; total: number } | undefined;
   const { data, isLoading, isFetching } = trpc.anonymousLog.list.useQuery(
     { limit: 50, offset },
-    { placeholderData: (prev: typeof data) => prev }
+    { placeholderData: (prev: LogQueryResult) => prev }
   );
 
   // Accumulate rows across pages
