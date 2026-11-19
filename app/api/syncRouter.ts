@@ -3,7 +3,7 @@
 // Exposes endpoints to trigger and monitor the Supabase ↔ Neon sync
 // ==============================================================================
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { runFullSync, checkDbHealth, type SyncResult } from "./lib/dbSync";
 import { env } from "./lib/env";
 import { findUserById } from "./queries/users";
@@ -11,7 +11,7 @@ import { findUserById } from "./queries/users";
 export const syncRouter = new Hono();
 
 // ── Auth guard: require Admin-Secret or valid Admin user for sync triggers ───
-const adminAuth = async (c: any, next: any) => {
+const adminAuth: MiddlewareHandler = async (c, next) => {
   const secret = c.req.header("x-admin-secret");
   if (secret && env.appSecret && secret === env.appSecret) {
     return next();
@@ -49,7 +49,7 @@ syncRouter.get("/health", async (c) => {
       },
       allHealthy ? 200 : 207
     );
-  } catch (err: any) {
+  } catch {
     return c.json({ status: "unavailable" }, 503);
   }
 });
@@ -78,8 +78,9 @@ syncRouter.post("/run", adminAuth, async (c) => {
       tables: results,
       errors: totalErrors.length > 0 ? totalErrors : undefined,
     });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Sync failed";
+    return c.json({ error: message }, 500);
   }
 });
 
