@@ -36,6 +36,14 @@ const requireAuth = t.middleware(async (opts) => {
 
 export const protectedProcedure = t.procedure.use(requireAuth);
 
+const requireAdminRole = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.user || !['admin', 'elevated_admin'].includes(ctx.user.role)) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Administrator access required' });
+  }
+  return next({ ctx: { ...ctx, user: ctx.user } });
+});
+const adminProcedure = protectedProcedure.use(requireAdminRole);
+
 export function buildAppRouter(
   authService: AuthService,
   bibleService: BibleService,
@@ -211,7 +219,7 @@ export function buildAppRouter(
         .query(async ({ input }) => {
           return devotionalsService.list(input?.limit ?? 20, input?.offset ?? 0);
         }),
-      create: publicProcedure
+      create: adminProcedure
         .input(
           z.object({
             title: z.string().min(1),
@@ -231,7 +239,7 @@ export function buildAppRouter(
     }),
 
     telegram: createRouter({
-      webhook: publicProcedure
+      webhook: adminProcedure
         .input(
           z.object({
             updateId: z.number(),
@@ -265,7 +273,7 @@ export function buildAppRouter(
         .mutation(async ({ input }) => {
           return telegramService.handleWebhookUpdate(input);
         }),
-      messages: publicProcedure
+      messages: adminProcedure
         .input(
           z
             .object({
@@ -282,7 +290,7 @@ export function buildAppRouter(
             input?.processed,
           );
         }),
-      processMessage: publicProcedure
+      processMessage: adminProcedure
         .input(z.object({ messageId: z.number() }))
         .mutation(async ({ input }) => {
           return telegramService.processMessage(input.messageId);
@@ -290,38 +298,29 @@ export function buildAppRouter(
     }),
 
     favorite: createRouter({
-      list: publicProcedure
-        .input(
-          z.object({
-            userId: z.string(),
-            type: z.enum(['verse', 'hymn', 'devotional']).optional(),
-          }),
-        )
-        .query(async ({ input }) => {
-          return favoritesService.list(input.userId, input.type);
+      list: protectedProcedure
+        .input(z.object({
+          type: z.enum(['verse', 'hymn', 'devotional']).optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+          return favoritesService.list(ctx.user.id, input.type);
         }),
-      add: publicProcedure
-        .input(
-          z.object({
-            userId: z.string(),
-            type: z.enum(['verse', 'hymn', 'devotional']),
-            itemId: z.number(),
-            reference: z.string().optional(),
-          }),
-        )
-        .mutation(async ({ input }) => {
-          return favoritesService.add(input.userId, input as any);
+      add: protectedProcedure
+        .input(z.object({
+          type: z.enum(['verse', 'hymn', 'devotional']),
+          itemId: z.number().int().positive(),
+          reference: z.string().max(500).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          return favoritesService.add(ctx.user.id, input as any);
         }),
-      remove: publicProcedure
-        .input(
-          z.object({
-            userId: z.string(),
-            type: z.enum(['verse', 'hymn', 'devotional']),
-            itemId: z.number(),
-          }),
-        )
-        .mutation(async ({ input }) => {
-          return favoritesService.remove(input.userId, input.type, input.itemId);
+      remove: protectedProcedure
+        .input(z.object({
+          type: z.enum(['verse', 'hymn', 'devotional']),
+          itemId: z.number().int().positive(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          return favoritesService.remove(ctx.user.id, input.type, input.itemId);
         }),
     }),
 
