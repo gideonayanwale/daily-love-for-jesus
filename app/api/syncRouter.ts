@@ -5,35 +5,32 @@
 
 import { Hono, type MiddlewareHandler } from "hono";
 import { runFullSync, checkDbHealth, type SyncResult } from "./lib/dbSync";
-import { env } from "./lib/env";
 import { findUserById } from "./queries/users";
 
 export const syncRouter = new Hono();
 
-// ── Auth guard: require Admin-Secret or valid Admin user for sync triggers ───
+// ── Auth guard: sync mutations require a verified platform-admin session ──
 const adminAuth: MiddlewareHandler = async (c, next) => {
-  const secret = c.req.header("x-admin-secret");
-  if (secret && env.appSecret && secret === env.appSecret) {
-    return next();
+  const authHeader = c.req.header("authorization") || "";
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    return c.json({ error: "A platform administrator session is required." }, 401);
   }
 
-  // Also accept Supabase Bearer token for authenticated users
-  const authHeader = c.req.header("authorization");
-  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-    try {
-      const token = authHeader.substring(7).trim();
-      const { supabaseAdmin } = await import("./lib/supabase");
-      const authUser = await supabaseAdmin.getUser(token);
-      if (authUser?.id) {
-        const profile = await findUserById(authUser.id);
-        if (profile?.role === "admin") return next();
-      }
-    } catch {
-      // Fall through to unauthorized
+  try {
+    const token = authHeader.substring(7).trim();
+    if (!token) return c.json({ error: "A platform administrator session is required." }, 401);
+    const { supabaseAdmin } = await import("./lib/supabase");
+    const authUser = await supabaseAdmin.getUser(token);
+    if (!authUser?.id) return c.json({ error: "Invalid or expired authentication token." }, 401);
+
+    const profile = await findUserById(authUser.id);
+    if (!profile || !["admin", "superadmin"].includes(profile.role)) {
+      return c.json({ error: "Platform administrator access is required." }, 403);
     }
+    return next();
+  } catch {
+    return c.json({ error: "Authentication verification failed." }, 401);
   }
-
-  return c.json({ error: "Unauthorized — x-admin-secret or admin bearer token required" }, 401);
 };
 
 // ── GET /api/sync/health — check both DB connections ──────────────────────────
