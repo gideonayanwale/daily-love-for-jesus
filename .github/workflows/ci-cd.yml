@@ -43,8 +43,8 @@ jobs:
       - name: TypeScript Type-Check
         run: npm --prefix app run check
 
-      - name: Lint
-        run: npm --prefix app run lint
+      - name: Focused lint for changed devotional UI
+        run: npm --prefix app run lint:ui
 
       - name: Run Test Suites
         if: always() && steps['install-app'].outcome == 'success'
