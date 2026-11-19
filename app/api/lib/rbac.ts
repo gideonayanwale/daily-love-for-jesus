@@ -91,7 +91,7 @@ export async function assertCommunityAdmin(userId: string, communityId: string) 
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
-  if (userRecord && ["admin", "elevated_admin"].includes(userRecord.role)) {
+  if (userRecord && ["admin", "elevated_admin", "superadmin"].includes(userRecord.role)) {
     return { role: "COMMUNITY_ADMIN" as CommunityRole, status: "active" };
   }
 
@@ -136,7 +136,7 @@ export async function assertCanManageGroup(requestingUserId: string, groupId: nu
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, requestingUserId),
   });
-  if (userRecord && ['admin', 'elevated_admin'].includes(userRecord.role)) {
+  if (userRecord && ['admin', 'elevated_admin', 'superadmin'].includes(userRecord.role)) {
     return;
   }
   const membership = await db.query.groupMembers.findFirst({
