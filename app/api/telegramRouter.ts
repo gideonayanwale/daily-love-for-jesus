@@ -41,14 +41,14 @@ export const telegramRouter = createRouter({
           .optional(),
         channelPost: z
           .object({
-            messageId: z.number(),
+            messageId: z.number().int().positive(),
             chat: z.object({
-              id: z.number(),
-              title: z.string().optional(),
+              id: z.number().int(),
+              title: z.string().max(255).optional(),
             }),
-            text: z.string().optional(),
-            caption: z.string().optional(),
-            date: z.number(),
+            text: z.string().max(10000).optional(),
+            caption: z.string().max(10000).optional(),
+            date: z.number().int().nonnegative(),
           })
           .optional(),
       })
@@ -130,7 +130,7 @@ export const telegramRouter = createRouter({
 
   // Admin-only: manually process a stored Telegram message into a devotional
   processMessage: adminQuery
-    .input(z.object({ messageId: z.number() }))
+    .input(z.object({ messageId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
 
