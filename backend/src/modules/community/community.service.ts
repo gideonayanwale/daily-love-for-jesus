@@ -1334,90 +1334,97 @@ export class CommunityService {
   ) {
     const db = this.dbService.getDb();
     const senderRole = await this.getUserRole(senderId);
+    const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(senderRole);
 
-    if (data.channelType === 'general') {
-      if (senderRole !== 'superadmin' && senderRole !== 'elevated_admin') {
-        throw new ForbiddenException(
-          'Only elevated administrators can broadcast in the general announcement channel.',
-        );
-      }
+    if (!['general', 'community', 'group', 'dm', 'leadership'].includes(data.channelType)) {
+      throw new BadRequestException('Unsupported chat channel type.');
+    }
+    if (!data.content?.trim() || data.content.length > 10000) {
+      throw new BadRequestException('Message content must be between 1 and 10,000 characters.');
+    }
+    if (data.mediaUrl && (!data.mediaUrl.startsWith('https://') || data.mediaUrl.length > 2048)) {
+      throw new BadRequestException('Only HTTPS media URLs are accepted.');
     }
 
-    if (data.channelType === 'leadership') {
-      if (
-        senderRole !== 'superadmin' &&
-        senderRole !== 'elevated_admin' &&
-        senderRole !== 'admin'
-      ) {
-        throw new ForbiddenException(
-          'Only leadership council members (elevated admins and community admins) can message in this channel.',
-        );
-      }
+    if (data.channelType === 'general' && !platformAdmin) {
+      throw new ForbiddenException('Only platform administrators can post to the general channel.');
+    }
+    if (data.channelType === 'leadership' && !platformAdmin) {
+      throw new ForbiddenException('Leadership channel access is restricted to platform administrators.');
     }
 
-    if (data.channelType === 'group' && data.groupId) {
-      const groupRows = await db
-        .select()
-        .from(schema.groups)
-        .where(eq(schema.groups.id, data.groupId))
-        .limit(1);
+    if (data.channelType === 'group') {
+      if (!data.groupId) throw new BadRequestException('groupId is required for group messages.');
+      const groupRows = await db.select().from(schema.groups).where(eq(schema.groups.id, data.groupId)).limit(1);
       const group = groupRows[0];
-      if (group?.onlyAdminsCanPost) {
-        const isGroupAdmin =
-          senderRole === 'superadmin' ||
-          senderRole === 'elevated_admin' ||
-          (await this.assertGroupRole(senderId, data.groupId, ['teacher', 'assistant_teacher'])
-            .then(() => true)
-            .catch(() => false));
-        if (!isGroupAdmin) {
-          throw new ForbiddenException(
-            'Only group administrators can send messages in this group (admin-only mode active).',
-          );
-        }
+      if (!group) throw new NotFoundException('Group not found.');
+      const membership = await db.select({ id: schema.groupMembers.id, role: schema.groupMembers.role })
+        .from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, data.groupId),
+          eq(schema.groupMembers.userId, senderId),
+          eq(schema.groupMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) {
+        throw new ForbiddenException('You must be an active group member to post here.');
+      }
+      if (group.onlyAdminsCanPost && !platformAdmin && !['teacher', 'assistant_teacher'].includes(membership[0]?.role ?? '')) {
+        throw new ForbiddenException('Only group administrators can post in this group.');
       }
     }
 
-    // Ephemeral 7-day auto-deletion for community group chats
+    if (data.channelType === 'community') {
+      if (!data.communityId) throw new BadRequestException('communityId is required for community messages.');
+      const membership = await db.select({ id: schema.communityMembers.id })
+        .from(schema.communityMembers)
+        .where(and(
+          eq(schema.communityMembers.communityId, data.communityId),
+          eq(schema.communityMembers.userId, senderId),
+          eq(schema.communityMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) {
+        throw new ForbiddenException('You must be an active community member to post here.');
+      }
+    }
+
+    if (data.channelType === 'dm') {
+      if (!data.receiverId || data.receiverId === senderId) {
+        throw new BadRequestException('A different receiverId is required for direct messages.');
+      }
+      const receiver = await db.select({ id: schema.users.id }).from(schema.users)
+        .where(eq(schema.users.id, data.receiverId)).limit(1);
+      if (!receiver.length) throw new NotFoundException('Message recipient not found.');
+    }
+
     const expiresAt =
       data.channelType === 'community' || data.channelType === 'group'
         ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
         : null;
 
-    const inserted = await db
-      .insert(schema.chatMessages)
-      .values({
-        channelType: data.channelType,
-        communityId: data.communityId || null,
-        groupId: data.groupId || null,
-        senderId,
-        receiverId: data.receiverId || null,
-        content: data.content,
-        mediaUrl: data.mediaUrl || null,
-        isEncrypted: Boolean(data.isEncrypted),
-        isAnnouncement: data.isAnnouncement || data.channelType === 'general',
-        expiresAt,
-      })
-      .returning();
+    const inserted = await db.insert(schema.chatMessages).values({
+      channelType: data.channelType,
+      communityId: data.communityId || null,
+      groupId: data.groupId || null,
+      senderId,
+      receiverId: data.receiverId || null,
+      content: data.content.trim(),
+      mediaUrl: data.mediaUrl || null,
+      isEncrypted: Boolean(data.isEncrypted),
+      isAnnouncement: data.isAnnouncement || data.channelType === 'general',
+      expiresAt,
+    }).returning();
 
-    const senderRows = await db
-      .select({
-        id: schema.users.id,
-        name: schema.users.name,
-        avatar: schema.users.avatar,
-        role: schema.users.role,
-      })
-      .from(schema.users)
-      .where(eq(schema.users.id, senderId))
-      .limit(1);
+    const senderRows = await db.select({
+      id: schema.users.id,
+      name: schema.users.name,
+      avatar: schema.users.avatar,
+      role: schema.users.role,
+    }).from(schema.users).where(eq(schema.users.id, senderId)).limit(1);
 
-    return {
-      success: true,
-      message: inserted[0],
-      sender: senderRows[0] || null,
-    };
+    return { success: true, message: inserted[0], sender: senderRows[0] || null };
   }
 
-  async listChatMessages(
+    async listChatMessages(
     userId: string,
     channelType: 'general' | 'community' | 'group' | 'dm' | 'leadership',
     options: {
@@ -1429,17 +1436,41 @@ export class CommunityService {
   ) {
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
+    const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(userRole);
 
-    if (channelType === 'leadership') {
-      if (userRole !== 'superadmin' && userRole !== 'elevated_admin' && userRole !== 'admin') {
-        throw new ForbiddenException(
-          'Access denied: leadership channel is exclusive to elevated admins and community admins.',
-        );
+    if (!['general', 'community', 'group', 'dm', 'leadership'].includes(channelType)) {
+      throw new BadRequestException('Unsupported chat channel type.');
+    }
+    if (channelType === 'leadership' && !platformAdmin) {
+      throw new ForbiddenException('Leadership channel access is restricted to platform administrators.');
+    }
+    if (channelType === 'community') {
+      if (!options.communityId) throw new BadRequestException('communityId is required.');
+      const membership = await db.select({ id: schema.communityMembers.id }).from(schema.communityMembers)
+        .where(and(
+          eq(schema.communityMembers.communityId, options.communityId),
+          eq(schema.communityMembers.userId, userId),
+          eq(schema.communityMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) throw new ForbiddenException('You are not a member of this community.');
+    }
+    if (channelType === 'group') {
+      if (!options.groupId) throw new BadRequestException('groupId is required.');
+      const membership = await db.select({ id: schema.groupMembers.id }).from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, options.groupId),
+          eq(schema.groupMembers.userId, userId),
+          eq(schema.groupMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) throw new ForbiddenException('You are not a member of this group.');
+    }
+    if (channelType === 'dm') {
+      if (!options.receiverId || options.receiverId === userId) {
+        throw new BadRequestException('A different receiverId is required.');
       }
     }
 
-    const limit = options.limit || 50;
-
+    const limit = Math.min(Math.max(Number(options.limit) || 50, 1), 100);
     let condition = and(
       eq(schema.chatMessages.channelType, channelType),
       eq(schema.chatMessages.isDeleted, false),
@@ -1451,122 +1482,109 @@ export class CommunityService {
       ),
     );
 
-    if (channelType === 'general' || channelType === 'leadership') {
-      // General or leadership channel condition
-    } else if (channelType === 'community' && options.communityId) {
-      condition = and(condition, eq(schema.chatMessages.communityId, options.communityId));
-    } else if (channelType === 'group' && options.groupId) {
-      condition = and(condition, eq(schema.chatMessages.groupId, options.groupId));
-    } else if (channelType === 'dm' && options.receiverId) {
+    if (channelType === 'community') {
+      condition = and(condition, eq(schema.chatMessages.communityId, options.communityId!));
+    } else if (channelType === 'group') {
+      condition = and(condition, eq(schema.chatMessages.groupId, options.groupId!));
+    } else if (channelType === 'dm') {
       condition = and(
         eq(schema.chatMessages.channelType, 'dm'),
         eq(schema.chatMessages.isDeleted, false),
         or(
-          and(
-            eq(schema.chatMessages.senderId, userId),
-            eq(schema.chatMessages.receiverId, options.receiverId),
-          ),
-          and(
-            eq(schema.chatMessages.senderId, options.receiverId),
-            eq(schema.chatMessages.receiverId, userId),
-          ),
+          and(eq(schema.chatMessages.senderId, userId), eq(schema.chatMessages.receiverId, options.receiverId!)),
+          and(eq(schema.chatMessages.senderId, options.receiverId!), eq(schema.chatMessages.receiverId, userId)),
         ),
       );
     }
 
-    return db
-      .select({
-        id: schema.chatMessages.id,
-        channelType: schema.chatMessages.channelType,
-        communityId: schema.chatMessages.communityId,
-        groupId: schema.chatMessages.groupId,
-        senderId: schema.chatMessages.senderId,
-        receiverId: schema.chatMessages.receiverId,
-        content: schema.chatMessages.content,
-        mediaUrl: schema.chatMessages.mediaUrl,
-        isEncrypted: schema.chatMessages.isEncrypted,
-        isPinned: schema.chatMessages.isPinned,
-        isKept: schema.chatMessages.isKept,
-        isAnnouncement: schema.chatMessages.isAnnouncement,
-        expiresAt: schema.chatMessages.expiresAt,
-        createdAt: schema.chatMessages.createdAt,
-        senderName: schema.users.name,
-        senderAvatar: schema.users.avatar,
-        senderRole: schema.users.role,
-      })
-      .from(schema.chatMessages)
+    return db.select({
+      id: schema.chatMessages.id,
+      channelType: schema.chatMessages.channelType,
+      communityId: schema.chatMessages.communityId,
+      groupId: schema.chatMessages.groupId,
+      senderId: schema.chatMessages.senderId,
+      receiverId: schema.chatMessages.receiverId,
+      content: schema.chatMessages.content,
+      mediaUrl: schema.chatMessages.mediaUrl,
+      isEncrypted: schema.chatMessages.isEncrypted,
+      isPinned: schema.chatMessages.isPinned,
+      isKept: schema.chatMessages.isKept,
+      isAnnouncement: schema.chatMessages.isAnnouncement,
+      expiresAt: schema.chatMessages.expiresAt,
+      createdAt: schema.chatMessages.createdAt,
+      senderName: schema.users.name,
+      senderAvatar: schema.users.avatar,
+      senderRole: schema.users.role,
+    }).from(schema.chatMessages)
       .innerJoin(schema.users, eq(schema.chatMessages.senderId, schema.users.id))
       .where(condition)
       .orderBy(asc(schema.chatMessages.createdAt))
       .limit(limit);
   }
 
-  async moderateMessage(
+    async moderateMessage(
     userId: string,
     messageId: number,
     action: 'pin' | 'unpin' | 'delete' | 'keep' | 'unkeep',
   ) {
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
+    const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(userRole);
 
-    const msgRows = await db
-      .select()
-      .from(schema.chatMessages)
-      .where(eq(schema.chatMessages.id, messageId))
-      .limit(1);
-
+    const msgRows = await db.select().from(schema.chatMessages)
+      .where(eq(schema.chatMessages.id, messageId)).limit(1);
     const msg = msgRows[0];
     if (!msg) throw new NotFoundException('Message not found.');
 
-    const isPlatformAdmin = userRole === 'superadmin' || userRole === 'elevated_admin';
     const isSender = msg.senderId === userId;
+    let scopedModerator = false;
+    if (msg.groupId) {
+      const member = await db.select({ role: schema.groupMembers.role }).from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, msg.groupId),
+          eq(schema.groupMembers.userId, userId),
+          eq(schema.groupMembers.status, 'active'),
+        )).limit(1);
+      scopedModerator = ['teacher', 'assistant_teacher'].includes(member[0]?.role ?? '');
+    } else if (msg.communityId) {
+      const member = await db.select({ role: schema.communityMembers.role }).from(schema.communityMembers)
+        .where(and(
+          eq(schema.communityMembers.communityId, msg.communityId),
+          eq(schema.communityMembers.userId, userId),
+          eq(schema.communityMembers.status, 'active'),
+        )).limit(1);
+      scopedModerator = ['COMMUNITY_OWNER', 'COMMUNITY_ADMIN'].includes(member[0]?.role ?? '');
+    }
 
-    if (!isPlatformAdmin && !isSender && action === 'delete') {
+    if (action === 'delete' && !platformAdmin && !isSender && !scopedModerator) {
       throw new ForbiddenException('Not authorized to delete this message.');
     }
-    if (!isPlatformAdmin && (action === 'pin' || action === 'unpin')) {
-      throw new ForbiddenException('Only administrators can pin/unpin messages.');
+    if ((action === 'pin' || action === 'unpin') && !platformAdmin && !scopedModerator) {
+      throw new ForbiddenException('Only platform or group/community moderators can pin messages.');
+    }
+    if ((action === 'keep' || action === 'unkeep') && !platformAdmin && !isSender && !scopedModerator) {
+      throw new ForbiddenException('Not authorized to change message retention.');
     }
 
     if (action === 'delete') {
-      await db
-        .update(schema.chatMessages)
-        .set({ isDeleted: true, updatedAt: new Date() })
+      await db.update(schema.chatMessages).set({ isDeleted: true, updatedAt: new Date() })
         .where(eq(schema.chatMessages.id, messageId));
       return { success: true, message: 'Message deleted.' };
     }
-
     if (action === 'keep' || action === 'unkeep') {
       const isKept = action === 'keep';
-      await db
-        .update(schema.chatMessages)
-        .set({
-          isKept,
-          updatedAt: new Date(),
-        })
+      await db.update(schema.chatMessages).set({ isKept, updatedAt: new Date() })
         .where(eq(schema.chatMessages.id, messageId));
-      return {
-        success: true,
-        message: isKept
-          ? 'Message saved permanently (auto-deletion exempted).'
-          : 'Message unkept.',
-        isKept,
-      };
+      return { success: true, message: isKept ? 'Message saved permanently (auto-deletion exempted).' : 'Message unkept.', isKept };
     }
 
     const pinned = action === 'pin';
-    await db
-      .update(schema.chatMessages)
-      .set({
-        isPinned: pinned,
-        updatedAt: new Date(),
-      })
+    await db.update(schema.chatMessages).set({ isPinned: pinned, updatedAt: new Date() })
       .where(eq(schema.chatMessages.id, messageId));
-
     return { success: true, message: pinned ? 'Message pinned (auto-deletion exempted).' : 'Message unpinned.' };
   }
 
-  async toggleGroupAdminOnlyPosting(
+    async toggleGroupAdminOnlyPosting(
     userId: string,
     groupId: number,
     onlyAdminsCanPost: boolean,
@@ -1589,24 +1607,21 @@ export class CommunityService {
   }
 
   // ─── 7-Day Auto-Deletion Sweeper ───────────────────────────────────────────
-  async cleanupExpiredChatMessages() {
+  async cleanupExpiredChatMessages(requesterId: string) {
+    await this.assertPlatformRole(requesterId, ['admin', 'superadmin']);
     const db = this.dbService.getDb();
-    const purged = await db
-      .delete(schema.chatMessages)
-      .where(
-        and(
-          sql`${schema.chatMessages.expiresAt} IS NOT NULL`,
-          sql`${schema.chatMessages.expiresAt} <= NOW()`,
-          eq(schema.chatMessages.isPinned, false),
-          eq(schema.chatMessages.isKept, false),
-        ),
-      )
+    const purged = await db.delete(schema.chatMessages)
+      .where(and(
+        sql`${schema.chatMessages.expiresAt} IS NOT NULL`,
+        sql`${schema.chatMessages.expiresAt} <= NOW()`,
+        eq(schema.chatMessages.isPinned, false),
+        eq(schema.chatMessages.isKept, false),
+      ))
       .returning({ id: schema.chatMessages.id });
-
     return { success: true, purgedCount: purged.length };
   }
 
-  // ─── Superadmin Cloudinary Backup Sync ─────────────────────────────────────
+    // ─── Superadmin Cloudinary Backup Sync ─────────────────────────────────────
   private parseCloudinaryUrl(): { cloudName: string; apiKey: string; apiSecret: string } | null {
     const rawUrl =
       this.configService.get<string>('integrations.cloudinaryUrl') ||
