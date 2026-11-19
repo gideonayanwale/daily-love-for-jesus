@@ -13,7 +13,7 @@ import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 export const telegramRouter = createRouter({
   // Webhook endpoint for Telegram bot (public — called by Telegram servers)
-  webhook: publicQuery
+  webhook: elevatedAdminQuery
     .input(
       z.object({
         updateId: z.number(),
@@ -249,7 +249,7 @@ async function tryCreateDevotionalFromMessage(
         source: "telegram",
         telegramMessageId: telegramMessageId,
         devotionalDate: new Date(),
-        isPublished: true,
+        isPublished: false,
       })
       .$returningId();
 
