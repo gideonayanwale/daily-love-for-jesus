@@ -189,7 +189,7 @@ export const telegramRouter = createRouter({
 
 // Helper function to parse devotional from Telegram message text
 async function tryCreateDevotionalFromMessage(
-  db: any,
+  db: Parameters<typeof parseAndCreateDevotional>[0],
   telegramMessageId: number,
   text: string
 ): Promise<number | null> {
@@ -197,7 +197,7 @@ async function tryCreateDevotionalFromMessage(
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length < 2) return null;
 
-    let title = lines[0].substring(0, 200);
+    const title = lines[0].substring(0, 200);
     let scripture = "";
     let scriptureText = "";
     let body = "";
