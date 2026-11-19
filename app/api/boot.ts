@@ -238,6 +238,15 @@ async function pollTelegramMessages(): Promise<void> {
       const message = update.message ?? update.channel_post;
       if (!message) continue;
 
+      const configuredChannel = env.telegramChannelId.trim();
+      const incomingId = String(message.chat?.id ?? "");
+      const incomingUsername = message.chat?.username ? `@${message.chat.username}` : "";
+      if (
+        !configuredChannel ||
+        (configuredChannel !== incomingId &&
+          configuredChannel.toLowerCase() !== incomingUsername.toLowerCase())
+      ) continue;
+
       const text = message.text ?? message.caption ?? "";
       if (!text.trim()) continue;
 
@@ -269,7 +278,7 @@ async function pollTelegramMessages(): Promise<void> {
   }
 }
 
-if (env.telegramBotToken && !env.telegramWebhookSecret && !isServerless) {
+if (env.telegramBotToken && env.telegramChannelId && !env.telegramWebhookSecret && !isServerless) {
   // Long-polling is a fallback only. When a webhook secret is configured,
   // Telegram push delivery is the single ingestion path.
   pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
