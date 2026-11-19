@@ -107,6 +107,9 @@ export const telegramRouter = createRouter({
         result[0].id,
         text
       );
+      if (devotionalId !== null) {
+        await broadcastDevotionalChanged(devotionalId, "import");
+      }
 
       return {
         status: "processed",
