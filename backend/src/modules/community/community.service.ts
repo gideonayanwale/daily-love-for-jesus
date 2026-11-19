@@ -121,6 +121,9 @@ export class CommunityService {
 
   // ─── Helpers: Role checks ──────────────────────────────────────────────────
   async assertGroupRole(userId: string, groupId: number, allowedRoles: string[] = ['teacher', 'assistant_teacher']) {
+    if (!Number.isSafeInteger(groupId) || groupId < 1) {
+      throw new BadRequestException('A valid group ID is required.');
+    }
     const db = this.dbService.getDb();
 
     // Check if system admin
@@ -644,6 +647,18 @@ export class CommunityService {
       sessionDate?: string;
     },
   ) {
+    if (!data || !Number.isSafeInteger(data.groupId) || data.groupId < 1) {
+      throw new BadRequestException('A valid group ID is required.');
+    }
+    if (data.title !== undefined && (typeof data.title !== 'string' || data.title.length > 255)) {
+      throw new BadRequestException('Session title cannot exceed 255 characters.');
+    }
+    if (data.sessionType !== undefined && !['sunday_school', 'bible_study', 'prayer_meeting', 'event'].includes(data.sessionType)) {
+      throw new BadRequestException('Invalid attendance session type.');
+    }
+    if (data.sessionDate !== undefined && Number.isNaN(new Date(data.sessionDate).getTime())) {
+      throw new BadRequestException('Session date is invalid.');
+    }
     await this.assertGroupRole(userId, data.groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -674,8 +689,20 @@ export class CommunityService {
       notes?: string;
     }>,
   ) {
-    if (!Array.isArray(records) || records.length > 500) {
-      throw new BadRequestException('A maximum of 500 attendance records can be submitted at once.');
+    if (!Number.isSafeInteger(sessionId) || sessionId < 1) {
+      throw new BadRequestException('A valid attendance session ID is required.');
+    }
+    if (!Array.isArray(records) || records.length < 1 || records.length > 500) {
+      throw new BadRequestException('Between 1 and 500 attendance records must be submitted.');
+    }
+    if (records.some((record) =>
+      !record ||
+      (record.userId !== undefined && typeof record.userId !== 'string') ||
+      (record.guestName !== undefined && (typeof record.guestName !== 'string' || record.guestName.length > 255)) ||
+      (record.guestPhone !== undefined && (typeof record.guestPhone !== 'string' || record.guestPhone.length > 25)) ||
+      (record.notes !== undefined && (typeof record.notes !== 'string' || record.notes.length > 1000))
+    )) {
+      throw new BadRequestException('Attendance record fields are invalid.');
     }
     const allowedStatuses = ['present', 'absent', 'excused', 'late'];
     if (records.some((record) => !allowedStatuses.includes(record.status))) {
@@ -1759,6 +1786,9 @@ export class CommunityService {
   }
 
   async backupCommunityChatToCloudinary(requesterId: string, communityId: string) {
+    if (typeof communityId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(communityId)) {
+      throw new BadRequestException('Community ID must be a valid UUID.');
+    }
     const requesterRole = await this.getUserRole(requesterId);
     if (requesterRole !== 'superadmin') {
       throw new ForbiddenException('Only superadmin can perform Cloudinary backup sync.');
