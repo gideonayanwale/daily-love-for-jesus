@@ -40,7 +40,7 @@ export async function assertGroupRole(
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
-  if (userRecord && ["admin", "elevated_admin"].includes(userRecord.role)) {
+  if (userRecord && ["admin", "elevated_admin", "superadmin"].includes(userRecord.role)) {
     return { role: "teacher" as GroupRole, status: "active" };
   }
 
@@ -122,14 +122,14 @@ export async function assertCanAssignTeacher(requestingUserId: string): Promise<
   const userRecord = await db.query.users.findFirst({
     where: eq(users.id, requestingUserId),
   });
-  if (!userRecord || !['admin', 'elevated_admin'].includes(userRecord.role)) {
+  if (!userRecord || !['admin', 'elevated_admin', 'superadmin'].includes(userRecord.role)) {
     throw new AuthorizationError('Only admins or elevated admins can assign Sunday School teachers', 403);
   }
 }
 
 /**
  * Ensures the requesting user can manage a group:
- * either globally as admin/elevated_admin, or as a teacher within the group.
+ * either globally as admin/elevated_admin/superadmin, or as a teacher within the group.
  */
 export async function assertCanManageGroup(requestingUserId: string, groupId: number): Promise<void> {
   const db = await getDb();
