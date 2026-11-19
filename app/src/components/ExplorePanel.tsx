@@ -114,7 +114,7 @@ export default function ExplorePanel({ userId, userName, userRole }: Props) {
                 { label: 'Community', path: '/community', icon: Users, detail: 'Discover fellowship features' },
                 ...(userId ? [{ label: 'My dashboard', path: '/dashboard', icon: LayoutDashboard, detail: 'Your personal activity and progress' }] : []),
                 ...(userId ? [{ label: 'Settings', path: '/settings', icon: Settings, detail: 'Manage your account and preferences' }] : []),
-                ...(['admin', 'elevated_admin'].includes(userRole ?? '') ? [{ label: 'Devotional admin', path: '/admin/devotionals', icon: ShieldCheck, detail: 'Review imports and publish devotionals' }] : []),
+                ...(['admin', 'elevated_admin', 'superadmin'].includes(userRole ?? '') ? [{ label: 'Devotional admin', path: '/admin/devotionals', icon: ShieldCheck, detail: 'Review imports and publish devotionals' }] : []),
               ].map((item) => {
                 const ItemIcon = item.icon;
                 const active = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
