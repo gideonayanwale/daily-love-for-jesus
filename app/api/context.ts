@@ -8,6 +8,7 @@ export type TrpcContext = {
   req: Request;
   resHeaders: Headers;
   user?: User;
+  authError?: boolean;
 };
 
 export async function authenticateSupabaseRequest(headers: Headers): Promise<User | undefined> {
@@ -60,10 +61,18 @@ export async function createContext(
   opts: FetchCreateContextFnOptions,
 ): Promise<TrpcContext> {
   const ctx: TrpcContext = { req: opts.req, resHeaders: opts.resHeaders };
+  const authHeader = opts.req.headers.get("authorization") ?? "";
+  const cookies = cookie.parse(opts.req.headers.get("cookie") || "");
+  const suppliedCredential =
+    (authHeader.toLowerCase().startsWith("bearer ") && authHeader.substring(7).trim().length > 0) ||
+    Boolean(cookies["sb-access-token"] || cookies["daily_love_token"]);
+
   try {
     ctx.user = await authenticateSupabaseRequest(opts.req.headers);
+    ctx.authError = suppliedCredential && !ctx.user;
   } catch {
-    // Authentication is optional on context creation
+    // Anonymous requests remain public; invalid supplied credentials do not.
+    ctx.authError = suppliedCredential;
   }
   return ctx;
 }
