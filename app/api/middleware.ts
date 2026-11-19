@@ -73,5 +73,5 @@ export const elevatedAdminQuery = authedQuery.use(
   requireRoles(["admin", "elevated_admin"])
 );
 
-// Super-admin only (e.g. role promotion)
-export const strictAdminQuery = authedQuery.use(requireRole('admin'));
+// Platform-owner tier: global admin or superadmin (e.g. visitor logs and role elevation).
+export const strictAdminQuery = authedQuery.use(requireRoles(["admin", "superadmin"]));
