@@ -9,8 +9,8 @@ function escHtml(s: string): string {
 
 // Formats a devotional as an HTML Telegram message.
 // Only sections with content are included.
-export async function sendDevotionalToTelegram(devotional: Devotional): Promise<void> {
-  if (!env.telegramBotToken?.trim() || !env.telegramChannelId?.trim()) return;
+export async function sendDevotionalToTelegram(devotional: Devotional): Promise<boolean> {
+  if (!env.telegramBotToken?.trim() || !env.telegramChannelId?.trim()) return false;
 
   const lines: string[] = [];
 
@@ -87,11 +87,13 @@ export async function sendDevotionalToTelegram(devotional: Devotional): Promise<
         }),
       }
     );
-    if (!res.ok) {
-      const body = await res.text();
-      console.error('[telegramNotify] sendMessage failed:', res.status, body);
+    const result = await res.json().catch(() => null) as { ok?: boolean; description?: string } | null;
+    if (!res.ok || result?.ok === false) {
+      throw new Error(result?.description || `Telegram sendMessage failed with status ${res.status}`);
     }
+    return true;
   } catch (err) {
     console.error('[telegramNotify] fetch error:', err);
+    throw err;
   }
 }
