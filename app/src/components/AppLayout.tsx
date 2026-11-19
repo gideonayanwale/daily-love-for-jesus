@@ -15,6 +15,7 @@ import {
   User,
   Heart,
   ShieldCheck,
+  LayoutDashboard,
 } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
@@ -100,6 +101,19 @@ export default function AppLayout() {
 
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1">
+            {user && (
+              <button
+                onClick={() => navigate('/dashboard')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  location.pathname === '/dashboard'
+                    ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-semibold'
+                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-900'
+                }`}
+              >
+                <LayoutDashboard className={`w-4 h-4 ${location.pathname === '/dashboard' ? 'stroke-[2.5px]' : 'stroke-2'}`} />
+                <span>Dashboard</span>
+              </button>
+            )}
             {navItems.map((item) => {
               const isActive =
                 item.path === '/'
@@ -155,7 +169,7 @@ export default function AppLayout() {
             {/* Profile or Login */}
             {user ? (
               <button
-                onClick={() => navigate('/settings')}
+                onClick={() => navigate('/dashboard')}
                 className="flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-xs font-semibold"
               >
                 <div className="w-6 h-6 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center font-bold text-[11px]">
@@ -185,6 +199,23 @@ export default function AppLayout() {
       {/* Mobile Bottom Navigation Bar (md:hidden) */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0c0c0f]/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 z-40 safe-area-bottom">
         <div className="flex items-center justify-around py-2">
+          {user && (
+            <button
+              onClick={() => navigate('/dashboard')}
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all duration-150 ${
+                location.pathname === '/dashboard'
+                  ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
+              }`}
+            >
+              <LayoutDashboard
+                className={`w-5 h-5 transition-transform ${
+                  location.pathname === '/dashboard' ? 'scale-110 stroke-[2.5px]' : 'stroke-2'
+                }`}
+              />
+              <span className="text-[10px] tracking-tight">Dashboard</span>
+            </button>
+          )}
           {navItems.map((item) => {
             const isActive =
               item.path === '/'

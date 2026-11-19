@@ -39,7 +39,7 @@ function requireRole(role: string) {
 }
 
 export const authedQuery = t.procedure.use(requireAuth);
-export const adminQuery = authedQuery.use(requireRole("admin"));
+export const adminQuery = authedQuery.use(requireRoles(["admin", "elevated_admin"]));
 
 function requireRoles(roles: string[]) {
   return t.middleware(async (opts) => {

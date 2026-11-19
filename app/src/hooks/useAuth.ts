@@ -92,7 +92,7 @@ export function useAuth(options?: UseAuthOptions) {
         email: session.user.email ?? null,
         name: session.user.user_metadata?.full_name ?? session.user.user_metadata?.name ?? null,
         avatar: session.user.user_metadata?.avatar_url ?? null,
-        role: session.user.role ?? "user",
+        role: "user" as const,
         createdAt: new Date(),
         updatedAt: new Date(),
         lastSignInAt: new Date(),

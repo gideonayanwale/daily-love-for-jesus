@@ -68,7 +68,7 @@ export default function Login() {
 
   // If already authenticated, redirect
   if (isAuthenticated) {
-    navigate("/");
+    navigate("/dashboard");
     return null;
   }
 
@@ -140,9 +140,11 @@ export default function Login() {
         const res = await signUp(email.trim(), password, sanitisedName);
         if (res.error) {
           toast.error(res.error.message);
-        } else {
+        } else if (res.data.session) {
           toast.success("Account created successfully! Welcome to Daily Love For Jesus.");
-          navigate("/");
+          navigate("/dashboard");
+        } else {
+          toast.info("Check your email to confirm your account before signing in.");
         }
       } else {
         const res = await signIn(email.trim(), password);
@@ -159,7 +161,7 @@ export default function Login() {
         } else {
           setFailedAttempts(0);
           toast.success("Welcome back!");
-          navigate("/");
+          navigate("/dashboard");
         }
       }
     } catch (err: unknown) {

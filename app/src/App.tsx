@@ -2,6 +2,8 @@ import { Routes, Route } from 'react-router'
 import { lazy, Suspense } from 'react'
 import AppLayout from './components/AppLayout'
 import AdminRoute from './components/AdminRoute'
+import PrivateRoute from './components/PrivateRoute'
+const Dashboard = lazy(() => import('./pages/Dashboard'))
 
 const Home = lazy(() => import('./pages/Home'))
 const Bible = lazy(() => import('./pages/Bible'))
@@ -22,6 +24,16 @@ function App() {
     <Routes>
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Suspense fallback={<Loading />}><Home /></Suspense>} />
+        <Route
+          path="dashboard"
+          element={
+            <PrivateRoute>
+              <Suspense fallback={<Loading />}>
+                <Dashboard />
+              </Suspense>
+            </PrivateRoute>
+          }
+        />
         <Route path="bible" element={<Suspense fallback={<Loading />}><Bible /></Suspense>} />
         <Route path="bible/:bookNumber" element={<Suspense fallback={<Loading />}><BibleChapter /></Suspense>} />
         <Route path="bible/:bookNumber/:chapter" element={<Suspense fallback={<Loading />}><BibleReader /></Suspense>} />
