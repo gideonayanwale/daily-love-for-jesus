@@ -1286,7 +1286,7 @@ export class CommunityService {
     const db = this.dbService.getDb();
     const requesterRole = await this.getUserRole(requesterId);
     const membership = await db
-      .select({ id: schema.communityMembers.id })
+      .select({ id: schema.communityMembers.id, role: schema.communityMembers.role })
       .from(schema.communityMembers)
       .where(and(
         eq(schema.communityMembers.communityId, communityId),
@@ -1294,8 +1294,8 @@ export class CommunityService {
         eq(schema.communityMembers.status, 'active'),
       ))
       .limit(1);
-    if (!membership.length && !['admin', 'elevated_admin', 'superadmin'].includes(requesterRole)) {
-      throw new ForbiddenException('You are not a member of this community.');
+    if (!['admin', 'elevated_admin', 'superadmin'].includes(requesterRole) && !['COMMUNITY_OWNER', 'COMMUNITY_ADMIN'].includes(membership[0]?.role ?? '')) {
+      throw new ForbiddenException('Community leader access is required to view the member directory.');
     }
     return db
       .select({
