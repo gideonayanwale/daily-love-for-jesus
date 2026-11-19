@@ -6,6 +6,40 @@ import { createRouter, adminQuery } from "./middleware";
 import { env } from "./lib/env";
 import { logMediaUpload } from "./queries/media";
 
+async function readLimitedBody(response: Response, maxBytes: number): Promise<Uint8Array> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength > maxBytes) throw new Error("Media file exceeds the 15 MB limit.");
+    return new Uint8Array(buffer);
+  }
+
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > maxBytes) {
+        await reader.cancel();
+        throw new Error("Media file exceeds the 15 MB limit.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const output = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    output.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return output;
+}
+
 export const mediaRouter = createRouter({
   /**
    * Generate a signed Cloudinary upload URL.
@@ -83,8 +117,7 @@ export const mediaRouter = createRouter({
         const declaredLength = Number(fileResponse.headers.get("content-length") ?? 0);
         const maxBytes = 15 * 1024 * 1024;
         if (declaredLength > maxBytes) throw new Error("Media file exceeds the 15 MB limit.");
-        const fileBuffer = await fileResponse.arrayBuffer();
-        if (fileBuffer.byteLength > maxBytes) throw new Error("Media file exceeds the 15 MB limit.");
+        const fileBuffer = await readLimitedBody(fileResponse, maxBytes);
 
         const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "").slice(0, 180) || "upload";
         const storagePath = "media/" + Date.now() + "_" + safeFileName;
