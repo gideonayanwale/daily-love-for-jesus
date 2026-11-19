@@ -70,10 +70,10 @@ export function buildAppRouter(
         }),
       logout: protectedProcedure.mutation(async ({ ctx }) => {
         if (ctx.res && ctx.res.setHeader) {
-          ctx.res.setHeader(
-            'Set-Cookie',
-            cookie.serialize('sb-access-token', '', { path: '/', maxAge: 0 }),
-          );
+          ctx.res.setHeader('Set-Cookie', [
+            cookie.serialize('sb-access-token', '', { path: '/', maxAge: 0, httpOnly: true, sameSite: 'lax', secure: true }),
+            cookie.serialize('daily_love_token', '', { path: '/', maxAge: 0, httpOnly: true, sameSite: 'lax', secure: true }),
+          ]);
         }
         return { success: true };
       }),
