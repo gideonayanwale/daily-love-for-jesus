@@ -3,10 +3,10 @@ import { useLocation, useNavigate } from 'react-router';
 import {
   BookOpen, CalendarHeart, Check, ChevronRight, Compass,
   Heart, LayoutDashboard, LogIn, Menu, Music, Settings,
-  Users, X,
+  Users, X, ShieldCheck,
 } from 'lucide-react';
 
-type Props = { userId?: string; userName?: string | null };
+type Props = { userId?: string; userName?: string | null; userRole?: string | null };
 
 const steps = [
   {
@@ -39,7 +39,7 @@ const steps = [
   },
 ];
 
-export default function ExplorePanel({ userId, userName }: Props) {
+export default function ExplorePanel({ userId, userName, userRole }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -110,6 +110,7 @@ export default function ExplorePanel({ userId, userName }: Props) {
                 { label: 'Community', path: '/community', icon: Users, detail: 'Discover fellowship features' },
                 ...(userId ? [{ label: 'My dashboard', path: '/dashboard', icon: LayoutDashboard, detail: 'Your personal activity and progress' }] : []),
                 ...(userId ? [{ label: 'Settings', path: '/settings', icon: Settings, detail: 'Manage your account and preferences' }] : []),
+                ...(['admin', 'elevated_admin'].includes(userRole ?? '') ? [{ label: 'Devotional admin', path: '/admin/devotionals', icon: ShieldCheck, detail: 'Review imports and publish devotionals' }] : []),
               ].map((item) => {
                 const ItemIcon = item.icon;
                 const active = item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path);
