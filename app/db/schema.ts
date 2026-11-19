@@ -155,6 +155,7 @@ export const telegramMessages = pgTable(
   },
   (table) => [
     index("idx_telegram_msg").on(table.messageId, table.chatId),
+    uniqueIndex("uq_telegram_message_chat").on(table.messageId, table.chatId),
     index("idx_telegram_processed").on(table.processed),
   ]
 );
