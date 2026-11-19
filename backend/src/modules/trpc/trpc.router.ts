@@ -44,7 +44,7 @@ const requireAuth = t.middleware(async (opts) => {
 export const protectedProcedure = t.procedure.use(requireAuth);
 
 const requireAdminRole = t.middleware(async ({ ctx, next }) => {
-  if (!ctx.user || !['admin', 'elevated_admin'].includes(ctx.user.role)) {
+  if (!ctx.user || !['admin', 'elevated_admin', 'superadmin'].includes(ctx.user.role)) {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Administrator access required' });
   }
   return next({ ctx: { ...ctx, user: ctx.user } });
