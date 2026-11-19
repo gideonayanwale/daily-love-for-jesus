@@ -16,11 +16,14 @@ export const mediaRouter = createRouter({
       z.object({
         fileName: z.string().max(500),
         mimeType: z.string().max(100),
-        folder: z.string().max(100).default("devotionals"),
+        folder: z.string().min(1).max(100).regex(/^[a-zA-Z0-9/_-]+$/).refine((value) => !value.includes(".."), "Invalid folder path").default("devotionals"),
       })
     )
     .mutation(async ({ input }) => {
       const { folder } = input;
+      if (!env.cloudinaryCloudName || !env.cloudinaryApiKey || !env.cloudinaryApiSecret) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Cloudinary uploads are not configured." });
+      }
       const timestamp = Math.floor(Date.now() / 1000);
       const publicId = nanoid(12);
 
@@ -49,25 +52,42 @@ export const mediaRouter = createRouter({
   archiveToSupabase: adminQuery
     .input(
       z.object({
-        cloudinaryUrl: z.string().url(),
+        cloudinaryUrl: z.string().url().refine((value) => {
+          try {
+            const url = new URL(value);
+            return url.protocol === "https:" && url.hostname === "res.cloudinary.com" && !url.username && !url.password;
+          } catch {
+            return false;
+          }
+        }, "Only secure Cloudinary asset URLs are accepted"),
         fileName: z.string().max(500),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const { cloudinaryUrl, fileName } = input;
+      if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Supabase Storage is not configured." });
+      }
 
       try {
-        // Fetch the file from Cloudinary
+        // Fetch only verified Cloudinary URLs; reject oversized or unexpected media.
         const fileResponse = await fetch(cloudinaryUrl);
         if (!fileResponse.ok) {
           throw new Error(`Failed to fetch Cloudinary file: ${fileResponse.statusText}`);
         }
 
-        const mimeType = fileResponse.headers.get("content-type") ?? "application/octet-stream";
+        const mimeType = (fileResponse.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+        if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
+          throw new Error("Only image and video uploads are supported.");
+        }
+        const declaredLength = Number(fileResponse.headers.get("content-length") ?? 0);
+        const maxBytes = 15 * 1024 * 1024;
+        if (declaredLength > maxBytes) throw new Error("Media file exceeds the 15 MB limit.");
         const fileBuffer = await fileResponse.arrayBuffer();
+        if (fileBuffer.byteLength > maxBytes) throw new Error("Media file exceeds the 15 MB limit.");
 
-        // Determine storage bucket path
-        const storagePath = `media/${Date.now()}_${fileName}`;
+        const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "").slice(0, 180) || "upload";
+        const storagePath = "media/" + Date.now() + "_" + safeFileName;
 
         // Upload to Supabase Storage via REST API
         const uploadResponse = await fetch(
