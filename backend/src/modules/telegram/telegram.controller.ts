@@ -33,7 +33,7 @@ export class TelegramController {
     @Body() update: any,
     @Headers('x-telegram-bot-api-secret-token') secretToken?: string,
   ) {
-    const expected = this.configService.get<string>('integrations.telegramBotSecret') || process.env.TELEGRAM_BOT_SECRET || '';
+    const expected = this.configService.get<string>('integrations.telegramWebhookSecret') || process.env.TELEGRAM_WEBHOOK_SECRET || '';
     if (!expected) {
       throw new UnauthorizedException(
         'Telegram webhook is not configured. Set TELEGRAM_BOT_SECRET to enable webhook ingestion.',
