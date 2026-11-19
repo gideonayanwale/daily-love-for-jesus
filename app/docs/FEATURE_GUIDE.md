@@ -4,6 +4,10 @@ This guide is written for the app operator — the person responsible for runnin
 
 ---
 
+**Telegram devotional workflow:** Telegram is an import source inside the devotional administration area, not a separate public destination. The bot webhook validates its secret and configured channel, then stores each accepted message and attempts to parse it into an unpublished draft. Admins and elevated admins review the draft in Manage Devotions, edit it if needed, and publish it. Public devotional list/detail procedures only return published records. Telegram delivery is a separate explicit action available only after publication; missing bot configuration or Telegram API errors are surfaced as failures. Realtime events carry only an invalidation signal (record ID and action), never devotional draft content.
+
+**Realtime and authorization:** Mutations are authorized on the server using the persisted users.role; client-side role labels are only presentation. The Realtime topic is used to refresh public and admin queries. Since the broadcast payload contains no devotional text, public subscribers can safely receive refresh signals while the API continues to filter drafts.
+
 ## 1. Environment Setup
 
 All configuration lives in a file called `.env` at the root of the `app/` folder. Copy `.env.example` to `.env` and fill in each value. The table below explains every variable.
@@ -85,7 +89,7 @@ The app has three levels of access.
 
 **Promoting a user to elevated_admin:** An `admin` can call the `auth.promoteToElevatedAdmin` mutation from the API, passing the target user's ID. No UI screen exists for this yet — it must be done via a tool like Postman or a custom script while authenticated as admin.
 
-**How roles are assigned at sign-up:** New accounts always start as `user`. The first account whose UUID or email matches `ADMIN_USER_ID` / `ADMIN_EMAIL` in `.env` is automatically granted `admin` on first login.
+**How roles are assigned at sign-up:** Every new account starts as `user`. Sign-in never grants or changes roles. The first `admin` must be provisioned by a trusted operator against the verified Supabase UUID in the application users table. After bootstrap, an `admin` can promote users to `elevated_admin` through the protected `auth.promoteToElevatedAdmin` procedure.
 
 ---
 
