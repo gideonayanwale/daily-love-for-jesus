@@ -70,20 +70,25 @@ jobs:
       - name: Install App Dependencies
         run: npm --prefix app install --legacy-peer-deps
 
+      - name: Install Backend Dependencies
+        run: npm --prefix backend install --legacy-peer-deps
+
       - name: Build Frontend SPA & Backend API
         env:
           NODE_ENV: production
           APP_SECRET: ${{secrets.APP_SECRET || 'ci-build-placeholder-not-used-at-runtime'}}
           VITE_SUPABASE_URL: ${{secrets.VITE_SUPABASE_URL || 'https://mock.supabase.co'}}
           VITE_SUPABASE_ANON_KEY: ${{secrets.VITE_SUPABASE_ANON_KEY || 'mock-anon-key'}}
-        run: npm --prefix app run build
+        run: |
+          npm --prefix app run build
+          npm --prefix backend run build
 
       - name: Verify Build Artifacts
         run: |
           test -d app/dist/public || { echo "Frontend output missing at app/dist/public"; exit 1; }
           test -f app/dist/public/index.html || { echo "Frontend index.html missing"; exit 1; }
-          test -f app/dist/index.js || { echo "Backend bundle missing at app/dist/index.js"; exit 1; }
-          echo "All production bundles compiled successfully."
+          test -f backend/dist/main.js || { echo "NestJS backend output missing at backend/dist/main.js"; exit 1; }
+          echo "Frontend SPA and NestJS backend compiled successfully."
 
   # ─── Job 3: Multi-Stage Container Build ─────────────────────────────────────
   docker-build:
