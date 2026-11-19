@@ -34,7 +34,10 @@ jobs:
         with:
           node-version: '24'
           cache: 'npm'
-          cache-dependency-path: app/package-lock.json
+          cache-dependency-path: |
+            app/package-lock.json
+            backend/package-lock.json
+            mobile/package-lock.json
 
       - name: Install App Dependencies
         id: install-app
@@ -45,6 +48,14 @@ jobs:
 
       - name: Focused lint for changed devotional UI
         run: npm --prefix app run lint:ui
+
+      - name: Install Mobile Dependencies
+        id: install-mobile
+        run: npm --prefix mobile install --legacy-peer-deps
+
+      - name: Mobile TypeScript Type-Check
+        if: steps['install-mobile'].outcome == 'success'
+        run: npm --prefix mobile run typecheck
 
       - name: Run Test Suites
         if: always() && steps['install-app'].outcome == 'success'
