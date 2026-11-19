@@ -328,11 +328,22 @@ export class CommunityService {
 
   // ─── Batch Offline Reading Log Ingestion ───────────────────────────────────
   async syncTracking(userId: string, logs: ReadingLogItemDto[]) {
+    if (!Array.isArray(logs) || logs.length > 100) {
+      throw new BadRequestException('A maximum of 100 reading logs can be synced per request.');
+    }
     const db = this.dbService.getDb();
     const syncedIds: string[] = [];
     const skippedDuplicateIds: string[] = [];
 
     for (const log of logs) {
+      if (!log || typeof log.clientLogId !== 'string' || log.clientLogId.length > 128 ||
+          typeof log.contentId !== 'string' || log.contentId.length > 200) {
+        throw new BadRequestException('Reading log identifiers are invalid.');
+      }
+      const completedAt = new Date(log.completedAt);
+      if (Number.isNaN(completedAt.getTime()) || completedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+        throw new BadRequestException('Reading log completion time is invalid.');
+      }
       if (log.groupId !== undefined && log.groupId !== null) {
         const membership = await db
           .select({ id: schema.groupMembers.id })
@@ -369,9 +380,9 @@ export class CommunityService {
         contentType: log.contentType ?? 'bible_chapter',
         bookNumber: log.bookNumber ?? null,
         chapter: log.chapter ?? null,
-        timeSpent: log.timeSpent ?? 0,
-        scrollDepth: log.scrollDepth ?? 100,
-        completedAt: new Date(log.completedAt),
+        timeSpent: Math.min(Math.max(Number(log.timeSpent) || 0, 0), 86400),
+        scrollDepth: Math.min(Math.max(Number(log.scrollDepth) || 0, 0), 100),
+        completedAt,
         clientLogId: log.clientLogId,
         syncedAt: new Date(),
       });
@@ -543,6 +554,9 @@ export class CommunityService {
       announcementType?: 'general' | 'assignment' | 'event' | 'reminder';
     },
   ) {
+    if (!data.title?.trim() || data.title.length > 255 || !data.body?.trim() || data.body.length > 10000) {
+      throw new BadRequestException('Announcement title/body is invalid or too long.');
+    }
     await this.assertGroupRole(userId, data.groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -635,6 +649,13 @@ export class CommunityService {
       notes?: string;
     }>,
   ) {
+    if (!Array.isArray(records) || records.length > 500) {
+      throw new BadRequestException('A maximum of 500 attendance records can be submitted at once.');
+    }
+    const allowedStatuses = ['present', 'absent', 'excused', 'late'];
+    if (records.some((record) => !allowedStatuses.includes(record.status))) {
+      throw new BadRequestException('Invalid attendance status.');
+    }
     const db = this.dbService.getDb();
     const sessions = await db
       .select()
@@ -829,6 +850,8 @@ export class CommunityService {
       message?: string;
     },
   ) {
+    if (!['reminder_sent', 'note_added'].includes(data.actionType)) throw new BadRequestException('Invalid follow-up action.');
+    if (data.message && data.message.length > 500) throw new BadRequestException('Follow-up message cannot exceed 500 characters.');
     await this.assertGroupRole(userId, data.groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -1121,6 +1144,9 @@ export class CommunityService {
     targetUserId: string,
     targetRole: 'elevated_admin' | 'admin' | 'user',
   ) {
+    if (!['user', 'elevated_admin', 'admin'].includes(targetRole)) {
+      throw new BadRequestException('Invalid target role.');
+    }
     const requesterRole = await this.getUserRole(requesterId);
     if (requesterRole !== 'admin' && requesterRole !== 'superadmin') {
       throw new ForbiddenException('Only a platform admin can assign administrative roles.');
@@ -1527,6 +1553,9 @@ export class CommunityService {
     messageId: number,
     action: 'pin' | 'unpin' | 'delete' | 'keep' | 'unkeep',
   ) {
+    if (!['pin', 'unpin', 'delete', 'keep', 'unkeep'].includes(action)) {
+      throw new BadRequestException('Invalid moderation action.');
+    }
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
     const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(userRole);
@@ -1589,6 +1618,7 @@ export class CommunityService {
     groupId: number,
     onlyAdminsCanPost: boolean,
   ) {
+    if (typeof onlyAdminsCanPost !== 'boolean') throw new BadRequestException('onlyAdminsCanPost must be boolean.');
     await this.assertGroupRole(userId, groupId, ['teacher']);
     const db = this.dbService.getDb();
     await db
