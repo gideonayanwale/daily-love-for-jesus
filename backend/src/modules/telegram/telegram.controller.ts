@@ -36,7 +36,7 @@ export class TelegramController {
     const expected = this.configService.get<string>('integrations.telegramWebhookSecret') || process.env.TELEGRAM_WEBHOOK_SECRET || '';
     if (!expected) {
       throw new UnauthorizedException(
-        'Telegram webhook is not configured. Set TELEGRAM_BOT_SECRET to enable webhook ingestion.',
+        'Telegram webhook is not configured. Set TELEGRAM_WEBHOOK_SECRET to enable webhook ingestion.',
       );
     }
     if (!secretToken || !this.timingSafeEqual(secretToken, expected)) {
@@ -96,7 +96,7 @@ export class TelegramController {
   @Post('messages/:id/process')
   @ApiBearerAuth()
   @UseGuards(SupabaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'elevated_admin')
   @ApiOperation({ summary: 'Manually trigger devotional extraction for a message' })
   async processMessage(@Param('id', ParseIntPipe) id: number) {
     return this.telegramService.processMessage(id);
