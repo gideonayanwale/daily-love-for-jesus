@@ -106,39 +106,16 @@ export class SupabaseAuthGuard implements CanActivate {
 
       const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
       if (error || !authUser) {
-        if (isPublic) return true;
         throw new UnauthorizedException('Invalid or expired authentication token');
       }
 
       // Upsert/find user in database
       const db = this.dbService?.getDb();
-      const adminUserId =
-        this.configService?.get<string>('security.adminUserId') ||
-        process.env.ADMIN_USER_ID;
-      const adminEmail =
-        this.configService?.get<string>('security.adminEmail') ||
-        process.env.ADMIN_EMAIL;
-
-      const isAdmin =
-        (adminUserId && authUser.id === adminUserId) ||
-        (adminEmail && authUser.email?.toLowerCase() === adminEmail.toLowerCase());
-
-      const userRole = isAdmin ? 'admin' : 'user';
-
       if (!db) {
-        request.user = {
-          id: authUser.id,
-          email: authUser.email ?? null,
-          name:
-            authUser.user_metadata?.full_name ??
-            authUser.user_metadata?.name ??
-            authUser.email?.split('@')[0] ??
-            'Believer',
-          avatar: authUser.user_metadata?.avatar_url ?? null,
-          role: userRole,
-        };
-        return true;
+        throw new UnauthorizedException('Application profile database is unavailable.');
       }
+
+      const userRole = 'user';
 
       const existingUsers = await db
         .select()
@@ -172,7 +149,6 @@ export class SupabaseAuthGuard implements CanActivate {
             set: {
               lastSignInAt: new Date(),
               updatedAt: new Date(),
-              role: userRole,
             },
           })
           .returning();
@@ -182,7 +158,6 @@ export class SupabaseAuthGuard implements CanActivate {
       request.user = appUser;
       return true;
     } catch (err: any) {
-      if (isPublic) return true;
       if (err instanceof UnauthorizedException) throw err;
       this.logger.error(`SupabaseAuthGuard error: ${err.message}`);
       throw new UnauthorizedException('Authentication verification failed');
