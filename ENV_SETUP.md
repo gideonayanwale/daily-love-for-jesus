@@ -37,8 +37,6 @@ Templates available:
 | `NEON_DATABASE_URL` | Backend ONLY | Recommended | [Neon Console](https://console.neon.tech) &rarr; Dashboard &rarr; Connection Details. High-speed serverless PostgreSQL used for Drizzle ORM operations. |
 | `APP_ID` | Backend | Optional (Default: `daily-love-app`) | Application identifier for internal token generation. |
 | `APP_SECRET` | Backend | Recommended | Strong random secret string used to sign session cookies and verify `x-admin-secret` API headers. Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
-| `ADMIN_USER_ID` | Backend | Optional | Supabase User UUID (from Supabase Auth table) to automatically grant the `admin` role upon sign-in. |
-| `ADMIN_EMAIL` | Backend | Optional | Email address (e.g. `pastor@dailyloveforjesus.org`) automatically granted the `admin` role upon sign-in. |
 | `API_BIBLE_KEY` | Backend | Optional | [American Bible Society API.Bible](https://scripture.api.bible/signup). Default Bible engine uses Bolls Life API (completely free, 50+ translations, 0 keys needed). |
 | `TELEGRAM_BOT_TOKEN` | Backend | Optional | Generated via [@BotFather](https://t.me/BotFather) on Telegram for automated channel message ingestion. |
 | `TELEGRAM_CHANNEL_ID` | Backend | Optional | The Telegram channel ID (e.g. `@dailyloveforjesus` or `-100xxxxxx`) from which devotionals are ingested. |
