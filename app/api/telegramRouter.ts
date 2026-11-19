@@ -240,7 +240,7 @@ async function tryCreateDevotionalFromMessage(
       body = bodyText.substring(0, 2000);
     }
 
-    const result = await db
+    const inserted = await db
       .insert(devotionals)
       .values({
         title,
@@ -250,18 +250,30 @@ async function tryCreateDevotionalFromMessage(
         reflection: null,
         prayer: prayer || null,
         source: "telegram",
-        telegramMessageId: telegramMessageId,
+        telegramMessageId,
         devotionalDate: new Date(),
         isPublished: false,
       })
-      .$returningId();
+      .onConflictDoNothing({ target: devotionals.telegramMessageId })
+      .returning({ id: devotionals.id });
+
+    let devotionalId = inserted[0]?.id;
+    if (!devotionalId) {
+      const existing = await db
+        .select({ id: devotionals.id })
+        .from(devotionals)
+        .where(eq(devotionals.telegramMessageId, telegramMessageId))
+        .limit(1);
+      devotionalId = existing[0]?.id;
+    }
+    if (!devotionalId) return null;
 
     await db
       .update(telegramMessages)
-      .set({ processed: true, devotionalId: result[0].id })
+      .set({ processed: true, devotionalId })
       .where(eq(telegramMessages.id, telegramMessageId));
 
-    return result[0].id;
+    return devotionalId;
   } catch (error) {
     console.error("Failed to create devotional from message:", error);
     return null;
