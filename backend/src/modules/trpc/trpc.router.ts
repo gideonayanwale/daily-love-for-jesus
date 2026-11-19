@@ -14,6 +14,7 @@ export interface TrpcContext {
   req: any;
   res: any;
   user?: any;
+  authError?: boolean;
 }
 
 const t = initTRPC.context<TrpcContext>().create({
@@ -21,7 +22,13 @@ const t = initTRPC.context<TrpcContext>().create({
 });
 
 export const createRouter = t.router;
-export const publicProcedure = t.procedure;
+const rejectInvalidCredential = t.middleware(async ({ ctx, next }) => {
+  if (ctx.authError) {
+    throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Invalid or expired authentication token' });
+  }
+  return next();
+});
+export const publicProcedure = t.procedure.use(rejectInvalidCredential);
 
 const requireAuth = t.middleware(async (opts) => {
   const { ctx, next } = opts;
