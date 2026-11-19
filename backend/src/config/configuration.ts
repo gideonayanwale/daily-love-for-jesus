@@ -19,6 +19,7 @@ export interface AppConfig {
     apiBibleKey: string;
     telegramBotToken: string;
     telegramChannelId: string;
+    telegramWebhookSecret: string;
     geminiApiKey: string;
     openrouterApiKey: string;
     cloudinaryCloudName: string;
@@ -54,6 +55,7 @@ export default (): AppConfig => ({
     apiBibleKey: process.env.API_BIBLE_KEY || '',
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
     telegramChannelId: process.env.TELEGRAM_CHANNEL_ID || '',
+    telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
