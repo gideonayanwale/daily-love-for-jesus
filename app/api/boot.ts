@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { bodyLimit } from "hono/body-limit";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -33,9 +34,30 @@ async function pseudonymizeVisitorIp(ip: string | null): Promise<string | null> 
 }
 setInterval(() => anonLogCache.clear(), 10 * 60 * 1000).unref();
 
+const telegramMessageSchema = z.object({
+  message_id: z.number().int().positive(),
+  chat: z.object({
+    id: z.number().int(),
+    username: z.string().max(64).optional(),
+    title: z.string().max(500).optional(),
+  }),
+  from: z.object({
+    id: z.number().int().positive(),
+    first_name: z.string().max(255).optional(),
+  }).passthrough().optional(),
+  date: z.number().int().nonnegative().optional(),
+  text: z.string().max(10000).optional(),
+  caption: z.string().max(10000).optional(),
+}).passthrough();
+
+const telegramUpdateSchema = z.object({
+  message: telegramMessageSchema.optional(),
+  channel_post: telegramMessageSchema.optional(),
+}).passthrough();
+
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+app.use(bodyLimit({ maxSize: 5 * 1024 * 1024 }));
 
 app.use('*', async (c, next) => {
   // Only track anonymous GET requests
@@ -104,7 +126,12 @@ app.post("/api/telegram/webhook", async (c) => {
   }
 
   try {
-    const update = await c.req.json();
+    const rawUpdate = await c.req.json();
+    const parsedUpdate = telegramUpdateSchema.safeParse(rawUpdate);
+    if (!parsedUpdate.success) {
+      return c.json({ error: "Invalid Telegram update payload" }, 400);
+    }
+    const update = parsedUpdate.data;
 
     // Handle both messages and channel posts
     const message = update.message ?? update.channel_post;
