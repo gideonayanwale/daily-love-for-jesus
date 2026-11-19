@@ -79,20 +79,7 @@ jobs:
           for package in app backend; do
             report="$(mktemp)"
             npm --prefix "$package" audit --json > "$report" || true
-            node - "$report" "$package" <<'NODE'
-            const fs = require('node:fs');
-            const [file, packageName] = process.argv.slice(2);
-            try {
-              const report = JSON.parse(fs.readFileSync(file, 'utf8'));
-              const totals = report.metadata?.vulnerabilities ?? {};
-              console.log(`[${packageName}] vulnerability totals:`, totals);
-              for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
-                console.log(`[${packageName}] ${name}: ${item.severity}; direct=${item.isDirect}; fix=${JSON.stringify(item.fixAvailable)}`);
-              }
-            } catch {
-              console.log(`[${packageName}] npm audit did not return parseable JSON.`);
-            }
-            NODE
+            node -e 'const fs=require("node:fs"); const [file, packageName]=process.argv.slice(1); try { const report=JSON.parse(fs.readFileSync(file,"utf8")); const totals=report.metadata?.vulnerabilities ?? {}; console.log(`[${packageName}] vulnerability totals:`, totals); for (const [name,item] of Object.entries(report.vulnerabilities ?? {})) console.log(`[${packageName}] ${name}: ${item.severity}; direct=${item.isDirect}; fix=${JSON.stringify(item.fixAvailable)}`); } catch { console.log(`[${packageName}] npm audit did not return parseable JSON.`); }' "$report" "$package"
             rm -f "$report"
           done
       - name: Build Frontend SPA & Backend API
