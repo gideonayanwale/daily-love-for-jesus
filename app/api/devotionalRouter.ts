@@ -22,12 +22,15 @@ async function broadcastDevotionalChanged(id: number, action: string): Promise<v
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
         Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
       },
       body: JSON.stringify({
-        topic: "devotionals",
-        event: "devotional_changed",
-        payload: { id, action },
+        messages: [{
+          topic: "devotionals",
+          event: "devotional_changed",
+          payload: { id, action },
+        }],
       }),
     });
   } catch (err) {
