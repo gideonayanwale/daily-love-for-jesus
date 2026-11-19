@@ -19,12 +19,12 @@ export const telegramRouter = createRouter({
   webhook: elevatedAdminQuery
     .input(
       z.object({
-        updateId: z.number(),
+        updateId: z.number().int().nonnegative(),
         message: z
           .object({
-            messageId: z.number(),
+            messageId: z.number().int().positive(),
             chat: z.object({
-              id: z.number(),
+              id: z.number().int(),
               title: z.string().optional(),
             }),
             from: z
@@ -34,9 +34,9 @@ export const telegramRouter = createRouter({
                 username: z.string().optional(),
               })
               .optional(),
-            text: z.string().optional(),
-            caption: z.string().optional(),
-            date: z.number(),
+            text: z.string().max(10000).optional(),
+            caption: z.string().max(10000).optional(),
+            date: z.number().int().nonnegative(),
           })
           .optional(),
         channelPost: z
@@ -104,7 +104,7 @@ export const telegramRouter = createRouter({
 
       return {
         status: "processed",
-        messageId: result[0].id,
+        messageId: storedMessage.id,
         devotionalId,
       };
     }),
