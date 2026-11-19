@@ -166,6 +166,9 @@ export class CommunityService {
 
   // ─── Invite Code Generation ────────────────────────────────────────────────
   async generateInvite(userId: string, groupId: number, regenerate: boolean = false) {
+    if (!Number.isSafeInteger(groupId) || groupId < 1 || typeof regenerate !== 'boolean') {
+      throw new BadRequestException('Group ID and regenerate flag are invalid.');
+    }
     await this.assertGroupRole(userId, groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -235,6 +238,16 @@ export class CommunityService {
 
   // ─── Join Group with 6-Digit Code ──────────────────────────────────────────
   async joinGroup(userId: string, inviteCode: string, whatsappNumber?: string) {
+    if (typeof inviteCode !== 'string' || !/^[A-Z0-9]{4,10}$/i.test(inviteCode.trim())) {
+      throw new BadRequestException('A valid group invite code is required.');
+    }
+    if (whatsappNumber !== undefined && (
+      typeof whatsappNumber !== 'string' ||
+      whatsappNumber.length > 25 ||
+      !/^[+0-9()\-\s]*$/.test(whatsappNumber)
+    )) {
+      throw new BadRequestException('WhatsApp number format is invalid.');
+    }
     const db = this.dbService.getDb();
     const cleanCode = inviteCode.trim().toUpperCase();
 
@@ -1236,6 +1249,18 @@ export class CommunityService {
       category?: string;
     },
   ) {
+    if (!data || typeof data.name !== 'string' || data.name.trim().length < 3 || data.name.trim().length > 120) {
+      throw new BadRequestException('Community name must be between 3 and 120 characters.');
+    }
+    if (data.description !== undefined && (typeof data.description !== 'string' || data.description.length > 2000)) {
+      throw new BadRequestException('Community description cannot exceed 2,000 characters.');
+    }
+    if (data.location !== undefined && (typeof data.location !== 'string' || data.location.length > 255)) {
+      throw new BadRequestException('Community location cannot exceed 255 characters.');
+    }
+    if (data.category !== undefined && (typeof data.category !== 'string' || data.category.length > 100)) {
+      throw new BadRequestException('Community category cannot exceed 100 characters.');
+    }
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
     const slug =
@@ -1304,6 +1329,12 @@ export class CommunityService {
   }
 
   async approveCommunity(requesterId: string, communityId: string, approve: boolean) {
+    if (typeof communityId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(communityId)) {
+      throw new BadRequestException('Community ID must be a valid UUID.');
+    }
+    if (typeof approve !== 'boolean') {
+      throw new BadRequestException('Approval decision must be a boolean.');
+    }
     const requesterRole = await this.getUserRole(requesterId);
     if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
       throw new ForbiddenException('Only superadmin and elevated_admin can approve communities.');
@@ -1332,6 +1363,9 @@ export class CommunityService {
   }
 
   async getCommunityMembers(requesterId: string, communityId: string) {
+    if (typeof communityId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(communityId)) {
+      throw new BadRequestException('Community ID must be a valid UUID.');
+    }
     const db = this.dbService.getDb();
     const requesterRole = await this.getUserRole(requesterId);
     const membership = await db
