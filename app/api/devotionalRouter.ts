@@ -163,7 +163,7 @@ export const devotionalRouter = createRouter({
       const devotional = await publishDevotional(input.id, input.isPublished);
       if (devotional) {
         broadcastDevotionalChanged(devotional.id, "publish").catch(() => void 0);
-        sendDevotionalToTelegram(devotional).catch(() => void 0);
+        if (input.isPublished) sendDevotionalToTelegram(devotional).catch(() => void 0);
       }
       return devotional;
     }),
