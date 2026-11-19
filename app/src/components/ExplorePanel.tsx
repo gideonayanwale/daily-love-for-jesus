@@ -50,7 +50,10 @@ export default function ExplorePanel({ userId, userName }: Props) {
     if (!userId) return;
     try {
       const key = `dlfj:onboarding:v1:${userId}`;
-      if (window.localStorage.getItem(key) !== 'complete') setTourOpen(true);
+      if (window.localStorage.getItem(key) !== 'complete') {
+        const timer = window.setTimeout(() => setTourOpen(true), 0);
+        return () => window.clearTimeout(timer);
+      }
     } catch {
       // Onboarding remains manually available if browser storage is disabled.
     }
