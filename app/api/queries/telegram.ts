@@ -67,6 +67,21 @@ export async function insertTelegramMessage(
     .limit(1);
   if (existing[0]) return existing[0];
 
-  const result = await db.insert(telegramMessages).values(data).$returningId();
-  return getTelegramMessageById(result[0].id);
+  const inserted = await db
+    .insert(telegramMessages)
+    .values(data)
+    .onConflictDoNothing({ target: [telegramMessages.messageId, telegramMessages.chatId] })
+    .returning({ id: telegramMessages.id });
+  if (!inserted[0]) {
+    const duplicate = await db
+      .select()
+      .from(telegramMessages)
+      .where(and(
+        eq(telegramMessages.messageId, data.messageId),
+        eq(telegramMessages.chatId, data.chatId),
+      ))
+      .limit(1);
+    return duplicate[0];
+  }
+  return getTelegramMessageById(inserted[0].id);
 }
