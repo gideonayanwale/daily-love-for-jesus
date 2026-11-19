@@ -73,6 +73,28 @@ jobs:
       - name: Install Backend Dependencies
         run: npm --prefix backend install --legacy-peer-deps
 
+      - name: Report dependency vulnerability audit
+        continue-on-error: true
+        run: |
+          for package in app backend; do
+            report="$(mktemp)"
+            npm --prefix "$package" audit --json > "$report" || true
+            node - "$report" "$package" <<'NODE'
+            const fs = require('node:fs');
+            const [file, packageName] = process.argv.slice(2);
+            try {
+              const report = JSON.parse(fs.readFileSync(file, 'utf8'));
+              const totals = report.metadata?.vulnerabilities ?? {};
+              console.log(`[${packageName}] vulnerability totals:`, totals);
+              for (const [name, item] of Object.entries(report.vulnerabilities ?? {})) {
+                console.log(`[${packageName}] ${name}: ${item.severity}; direct=${item.isDirect}; fix=${JSON.stringify(item.fixAvailable)}`);
+              }
+            } catch {
+              console.log(`[${packageName}] npm audit did not return parseable JSON.`);
+            }
+            NODE
+            rm -f "$report"
+          done
       - name: Build Frontend SPA & Backend API
         env:
           NODE_ENV: production
