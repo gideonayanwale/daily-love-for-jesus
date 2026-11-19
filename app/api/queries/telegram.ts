@@ -1,4 +1,4 @@
-import { eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { telegramMessages } from "@db/schema";
 import type { TelegramMessage, InsertTelegramMessage } from "@db/schema";
 import { getDb } from "./connection";
@@ -57,6 +57,16 @@ export async function insertTelegramMessage(
   data: InsertTelegramMessage
 ): Promise<TelegramMessage | undefined> {
   const db = await getDb();
+  const existing = await db
+    .select()
+    .from(telegramMessages)
+    .where(and(
+      eq(telegramMessages.messageId, data.messageId),
+      eq(telegramMessages.chatId, data.chatId),
+    ))
+    .limit(1);
+  if (existing[0]) return existing[0];
+
   const result = await db.insert(telegramMessages).values(data).$returningId();
   return getTelegramMessageById(result[0].id);
 }
