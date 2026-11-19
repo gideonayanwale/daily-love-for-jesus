@@ -1262,6 +1262,16 @@ export class CommunityService {
       occurredAt: new Date(),
     });
 
+    const neonDb = this.dbService.getNeonDb();
+    const supabaseDb = this.dbService.getSupabaseDb();
+    const secondaryDb = db === neonDb ? supabaseDb : neonDb;
+    if (secondaryDb && secondaryDb !== db) {
+      await secondaryDb
+        .update(schema.users)
+        .set({ role: targetRole, updatedAt: new Date() })
+        .where(eq(schema.users.id, targetUserId));
+    }
+
     return {
       success: true,
       message: `User ${targetUserId} has been updated to role ${targetRole}.`,
