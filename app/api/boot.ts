@@ -284,7 +284,31 @@ async function pollTelegramMessages(): Promise<void> {
         });
 
         if (inserted && !inserted.processed) {
-          await parseAndCreateDevotional(db, inserted.id, text);
+          const devotionalId = await parseAndCreateDevotional(db, inserted.id, text);
+          if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
+            try {
+              const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  apikey: env.supabaseServiceRoleKey,
+                  Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+                },
+                body: JSON.stringify({
+                  messages: [{
+                    topic: "devotionals",
+                    event: "devotional_changed",
+                    payload: { id: devotionalId, action: "import" },
+                  }],
+                }),
+              });
+              if (!response.ok) {
+                console.error("[scheduler] Realtime broadcast rejected:", response.status, await response.text());
+              }
+            } catch (broadcastError) {
+              console.error("[scheduler] Realtime broadcast failed:", broadcastError);
+            }
+          }
         }
       } catch (err) {
         console.error("[scheduler] Error processing update:", err);
