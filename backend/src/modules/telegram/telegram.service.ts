@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service';
 import * as schema from '@db/schema';
 import { eq, desc, sql } from 'drizzle-orm';
@@ -7,7 +8,10 @@ import { eq, desc, sql } from 'drizzle-orm';
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
 
-  constructor(private readonly dbService: DatabaseService) {}
+  constructor(
+    private readonly dbService: DatabaseService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async handleWebhookUpdate(update: any) {
     const message = update.message ?? update.channel_post ?? update.channelPost;
@@ -56,6 +60,7 @@ export class TelegramService {
 
     const storedId = inserted[0]?.id;
     const devotionalId = await this.tryCreateDevotionalFromText(db, storedId, text);
+    if (devotionalId) await this.broadcastDevotionalChanged(devotionalId, 'import');
 
     return {
       status: 'processed',
@@ -107,6 +112,35 @@ export class TelegramService {
 
     const devotionalId = await this.tryCreateDevotionalFromText(db, message.id, message.text);
     return { status: 'processed', devotionalId };
+  }
+
+  private async broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+    const supabaseUrl = this.configService.get<string>('supabase.url') || process.env.SUPABASE_URL;
+    const serviceRoleKey = this.configService.get<string>('supabase.serviceRoleKey') || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return;
+
+    try {
+      const response = await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          messages: [{
+            topic: 'devotionals',
+            event: 'devotional_changed',
+            payload: { id, action },
+          }],
+        }),
+      });
+      if (!response.ok) {
+        this.logger.error(`Supabase Realtime broadcast failed: ${response.status} ${await response.text()}`);
+      }
+    } catch (error: unknown) {
+      this.logger.error('Supabase Realtime broadcast failed', error instanceof Error ? error.stack : undefined);
+    }
   }
 
   private async tryCreateDevotionalFromText(
