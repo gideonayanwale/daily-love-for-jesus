@@ -23,17 +23,15 @@ All configuration lives in a file called `.env` at the root of the `app/` folder
 | `NEON_DATABASE_URL` | Primary PostgreSQL connection string (Neon) | Neon Console → your project → Connection Details |
 | `DATABASE_URL` | Fallback PostgreSQL connection (Supabase direct) | Supabase Dashboard → Project Settings → Database |
 | `APP_SECRET` | Secret used to sign JWT tokens | Generate a long random string (e.g. `openssl rand -hex 32`) |
-| `ADMIN_USER_ID` | Supabase Auth UUID of the first admin account | Supabase Dashboard → Authentication → Users |
-| `ADMIN_EMAIL` | Email of the first admin account | Your own admin email address |
 | `API_BIBLE_KEY` | Optional key for the API.Bible service | https://scripture.api.bible/signup (free tier available) |
 | `TELEGRAM_BOT_TOKEN` | Token for your Telegram bot | Talk to @BotFather on Telegram → `/newbot` |
-| `TELEGRAM_CHANNEL_ID` | Numeric ID of your church/devotional Telegram channel | Forward a message from the channel to @userinfobot |
+| `TELEGRAM_CHANNEL_ID` | Numeric ID or @username of your church/devotional Telegram channel | Forward a message from the channel to @userinfobot |
 | `TELEGRAM_WEBHOOK_SECRET` | A secret string Telegram will send with every webhook call so you can verify it is genuine | Make up any long random string |
 | `CLOUDINARY_CLOUD_NAME` | Your Cloudinary account name | Cloudinary Dashboard → top-left |
 | `CLOUDINARY_API_KEY` | Cloudinary API key | Cloudinary Dashboard → Settings → Access Keys |
 | `CLOUDINARY_API_SECRET` | Cloudinary API secret — **keep private** | Cloudinary Dashboard → Settings → Access Keys |
 
-> **Tip:** Telegram-related variables are entirely optional. If `TELEGRAM_BOT_TOKEN` is left blank, the scheduler and webhook will simply not run. The app works fully without Telegram.
+ > **Tip:** Telegram import is optional. In production, configure the bot token, channel ID, and webhook secret together. A configured webhook is the preferred near-real-time ingestion path. The polling fallback is for a non-serverless deployment without a webhook secret. The devotional app remains usable without Telegram.
 
 ---
 
@@ -57,7 +55,7 @@ The app always tries Neon first. If Neon is unavailable, it falls back to `DATAB
 Supabase handles three separate jobs:
 
 - **Authentication** — sign up, sign in, password reset, and session management
-- **Realtime** — push notifications to all open admin dashboards when a devotional changes
+- **Realtime** — lightweight change events that refresh public devotional feeds and open admin dashboards
 - **Storage** — a permanent archive copy of every media file uploaded
 
 Steps:
