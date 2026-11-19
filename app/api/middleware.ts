@@ -33,21 +33,6 @@ const requireAuth = t.middleware(async (opts) => {
   return next({ ctx: { ...ctx, user: ctx.user } });
 });
 
-function requireRole(role: string) {
-  return t.middleware(async (opts) => {
-    const { ctx, next } = opts;
-
-    if (!ctx.user || ctx.user.role !== role) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: ErrorMessages.insufficientRole,
-      });
-    }
-
-    return next({ ctx: { ...ctx, user: ctx.user } });
-  });
-}
-
 function requireRoles(roles: string[]) {
   return t.middleware(async (opts) => {
     const { ctx, next } = opts;
