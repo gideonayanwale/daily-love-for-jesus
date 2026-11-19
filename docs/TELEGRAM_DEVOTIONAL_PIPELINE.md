@@ -12,6 +12,10 @@ Telegram is an ingestion and distribution channel for the Devotionals feature. I
 6. The admin can use **Send to Telegram** on a published devotional to send it back to the channel. Long messages are split into safe-sized plain-text messages; Telegram delivery errors are surfaced instead of reported as success.
 7. A small Realtime broadcast tells connected clients to refresh. Public clients refetch published content; admin clients refetch the protected draft list. Draft content is never included in the broadcast.
 
+## Database migration
+
+Before deploying this ingestion version, apply `app/db/migrations/0002_unique_telegram_message_identity.sql` to the primary Neon database and any mirrored Supabase PostgreSQL database. It deduplicates repeated Telegram update rows, preserves extra devotional drafts as unlinked drafts, and adds unique indexes so concurrent Telegram retries cannot create duplicate message rows or duplicate devotional drafts.
+
 ## Required environment variables
 
 - `TELEGRAM_BOT_TOKEN`: bot token; server-side only, never expose it to the browser.
