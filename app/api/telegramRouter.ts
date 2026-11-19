@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createRouter, adminQuery, elevatedAdminQuery } from "./middleware";
+import { env } from "./lib/env";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -60,6 +61,11 @@ export const telegramRouter = createRouter({
           code: "BAD_REQUEST",
           message: "No message data found",
         });
+      }
+
+      const configuredChannel = env.telegramChannelId.trim();
+      if (!configuredChannel || configuredChannel !== String(message.chat.id)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Message is not from the configured Telegram channel." });
       }
 
       const text = message.text ?? message.caption ?? "";
