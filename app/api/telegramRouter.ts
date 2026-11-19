@@ -9,6 +9,7 @@ import {
   listTelegramMessages,
   getTelegramMessageById,
   markTelegramMessageProcessed,
+  insertTelegramMessage,
 } from "./queries/telegram";
 import { parseAndCreateDevotional } from "./lib/devotionalParser";
 import { broadcastDevotionalChanged } from "./devotionalRouter";
@@ -73,38 +74,31 @@ export const telegramRouter = createRouter({
         return { status: "ignored", reason: "empty_message" };
       }
 
-      // Check if message already exists
-      const existing = await db
-        .select()
-        .from(telegramMessages)
-        .where(
-          sql`${telegramMessages.messageId} = ${message.messageId} AND ${telegramMessages.chatId} = ${message.chat.id}`
-        )
-        .limit(1);
-
-      if (existing.length > 0) {
-        return { status: "duplicate", id: existing[0].id };
+      // Store once per Telegram chat/message pair; the unique index protects concurrent retries.
+      const storedMessage = await insertTelegramMessage({
+        messageId: message.messageId,
+        chatId: message.chat.id,
+        chatTitle: message.chat.title ?? null,
+        senderId: input.message?.from?.id ?? null,
+        senderName: input.message?.from?.firstName ?? null,
+        text,
+        processed: false,
+        receivedAt: new Date(message.date * 1000),
+      });
+      if (!storedMessage) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Telegram message could not be stored." });
       }
-
-      // Store the Telegram message
-      const result = await db
-        .insert(telegramMessages)
-        .values({
-          messageId: message.messageId,
-          chatId: message.chat.id,
-          chatTitle: message.chat.title ?? null,
-          senderId: input.message?.from?.id ?? null,
-          senderName: input.message?.from?.firstName ?? null,
-          text: text,
-          processed: false,
-          receivedAt: new Date(message.date * 1000),
-        })
-        .$returningId();
+      const duplicate = storedMessage.receivedAt.getTime() !== message.date * 1000 ||
+        storedMessage.messageId !== message.messageId ||
+        storedMessage.chatId !== message.chat.id;
+      if (duplicate || storedMessage.processed) {
+        return { status: "duplicate", id: storedMessage.id };
+      }
 
       // Try to auto-create devotional from message
       const devotionalId = await tryCreateDevotionalFromMessage(
         db,
-        result[0].id,
+        storedMessage.id,
         text
       );
       if (devotionalId !== null) {
