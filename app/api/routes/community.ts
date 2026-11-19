@@ -34,7 +34,7 @@ const joinGroupSchema = z.object({
 });
 
 const readingLogItemSchema = z.object({
-  contentId: z.string().min(1), // e.g. "bible:40:5" or "devotional:12"
+  contentId: z.string().min(1).max(500), // e.g. "bible:40:5" or "devotional:12"
   contentType: z.enum(["bible_chapter", "devotional", "reading_assignment"]).default("bible_chapter"),
   bookNumber: z.number().int().optional(),
   chapter: z.number().int().optional(),
@@ -52,7 +52,7 @@ const syncTrackingSchema = z.object({
 const announcementCreateSchema = z.object({
   groupId: z.number().int().positive(),
   title: z.string().trim().min(1).max(255),
-  body: z.string().trim().min(1),
+  body: z.string().trim().min(1).max(10000),
   priority: z.enum(["normal", "high", "urgent"]).default("normal"),
   announcementType: z.enum(["general", "assignment", "event", "reminder"]).default("general"),
 });
@@ -60,9 +60,11 @@ const announcementCreateSchema = z.object({
 // Helper: Generate unique 6-digit alphanumeric code (e.g. "LF8421" or "592814")
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const randomValues = new Uint32Array(6);
+  crypto.getRandomValues(randomValues);
   let result = "";
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(randomValues[i] % chars.length);
   }
   return result;
 }
@@ -742,7 +744,7 @@ communityRestRouter.post("/teacher/followup", async (c) => {
       groupId: z.number().int().positive(),
       studentId: z.string().uuid(),
       actionType: z.enum(["reminder_sent", "note_added"]),
-      message: z.string().trim().optional(),
+      message: z.string().trim().max(500).optional(),
     });
     const data = schema.parse(body);
 
@@ -750,6 +752,18 @@ communityRestRouter.post("/teacher/followup", async (c) => {
 
     const db = await getDb();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, data.groupId) });
+    if (!group) return c.json({ error: "Group not found" }, 404);
+    const studentMembership = await db.query.groupMembers.findFirst({
+      where: and(
+        eq(groupMembers.groupId, data.groupId),
+        eq(groupMembers.userId, data.studentId),
+        eq(groupMembers.status, "active"),
+        eq(groupMembers.role, "student"),
+      ),
+    });
+    if (!studentMembership) {
+      throw new AuthorizationError("Follow-up target must be an active student in this group", 403);
+    }
 
     if (data.actionType === "reminder_sent") {
       const reminderText = data.message || `Gentle reminder from your ${group?.name ?? "Sunday School"} teacher: Don't forget this week's Bible reading!`;
