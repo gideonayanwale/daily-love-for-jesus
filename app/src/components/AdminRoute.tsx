@@ -32,7 +32,7 @@ export default function AdminRoute({ children }: AdminRouteProps) {
     );
   }
 
-  if (!user || (user.role !== 'admin' && user.role !== 'elevated_admin')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'elevated_admin' && user.role !== 'superadmin')) {
     return null;
   }
 
