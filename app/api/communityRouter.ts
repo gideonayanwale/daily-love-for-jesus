@@ -54,7 +54,7 @@ export const communityRouter = createRouter({
         description: groups.description,
         groupImage: groups.groupImage,
         category: groups.category,
-        inviteCode: groups.inviteCode,
+        inviteCode: sql<string | null>`case when ${groupMembers.role} in ('teacher', 'assistant_teacher') then ${groups.inviteCode} else null end`,
         role: groupMembers.role, // 'teacher' | 'student' | 'assistant_teacher'
         joinedAt: groupMembers.joinedAt,
       })
@@ -82,6 +82,18 @@ export const communityRouter = createRouter({
       });
 
       const group = await db.query.groups.findFirst({
+        columns: {
+          id: true,
+          communityId: true,
+          name: true,
+          slug: true,
+          description: true,
+          groupImage: true,
+          category: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
         where: eq(groups.id, input.groupId),
       });
 
