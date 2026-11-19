@@ -4,7 +4,6 @@ import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
-import { Paths } from "@contracts/constants";
 import { getDb } from "./queries/connection";
 import { telegramMessages, auditLogs } from "@db/schema";
 import { sql } from "drizzle-orm";
