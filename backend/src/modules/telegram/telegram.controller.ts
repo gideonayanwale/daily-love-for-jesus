@@ -42,6 +42,24 @@ export class TelegramController {
     if (!secretToken || !this.timingSafeEqual(secretToken, expected)) {
       throw new UnauthorizedException('Invalid Telegram webhook secret token');
     }
+
+    const configuredChannel = this.configService.get<string>('integrations.telegramChannelId') ||
+      process.env.TELEGRAM_CHANNEL_ID || '';
+    const message = update?.message ?? update?.channel_post ?? update?.channelPost;
+    if (!message) return { status: 'ignored', reason: 'no_message' };
+    if (!configuredChannel && process.env.NODE_ENV === 'production') {
+      throw new UnauthorizedException('Telegram channel is not configured');
+    }
+    if (configuredChannel) {
+      const incomingId = String(message.chat?.id ?? '');
+      const incomingUsername = message.chat?.username ? `@${message.chat.username}` : '';
+      if (
+        configuredChannel !== incomingId &&
+        configuredChannel.toLowerCase() !== incomingUsername.toLowerCase()
+      ) {
+        throw new UnauthorizedException('Telegram update is not from the configured channel');
+      }
+    }
     return this.telegramService.handleWebhookUpdate(update);
   }
 
