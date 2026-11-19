@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, publicQuery, adminQuery, elevatedAdminQuery } from "./middleware";
+import { createRouter, adminQuery, elevatedAdminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
 import { eq, sql } from "drizzle-orm";
