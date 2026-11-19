@@ -55,7 +55,7 @@ export const teacherAssignmentRouter = createRouter({
 
   // ── List users eligible to be assigned as teacher for a group ─────────────
   listEligibleUsers: elevatedAdminQuery
-    .input(z.object({ groupId: z.number() }))
+    .input(z.object({ groupId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
 
@@ -117,7 +117,7 @@ export const teacherAssignmentRouter = createRouter({
 
   // ── Assign a user as teacher of a group ───────────────────────────────────
   assign: elevatedAdminQuery
-    .input(z.object({ groupId: z.number(), userId: z.string() }))
+    .input(z.object({ groupId: z.number().int().positive(), userId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
 
