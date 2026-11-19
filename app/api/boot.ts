@@ -283,7 +283,7 @@ async function pollTelegramMessages(): Promise<void> {
           receivedAt: new Date((message.date ?? Math.floor(Date.now() / 1000)) * 1000),
         });
 
-        if (inserted) {
+        if (inserted && !inserted.processed) {
           await parseAndCreateDevotional(db, inserted.id, text);
         }
       } catch (err) {
