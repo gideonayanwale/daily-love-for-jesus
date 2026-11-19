@@ -1234,6 +1234,12 @@ export class CommunityService {
     if (!targetRows.length) {
       throw new NotFoundException('Target user not found.');
     }
+    if (targetUserId === requesterId) {
+      throw new ForbiddenException('You cannot change your own platform role.');
+    }
+    if (targetRows[0].role === 'superadmin') {
+      throw new ForbiddenException('Superadmin accounts cannot be modified through this operation.');
+    }
     if (requesterRole !== 'superadmin' && ['admin', 'superadmin'].includes(targetRows[0].role)) {
       throw new ForbiddenException('Only superadmin can change another platform administrator account.');
     }
