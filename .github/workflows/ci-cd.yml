@@ -10,7 +10,7 @@ on:
 
 concurrency:
   group: ${{github.workflow}}-${{github.ref}}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   # ─── Job 1: Code Quality & Type Integrity ──────────────────────────────────
@@ -29,6 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
       - name: Setup Node.js 24
+        id: setup-node
         uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -36,6 +37,7 @@ jobs:
           cache-dependency-path: app/package-lock.json
 
       - name: Install App Dependencies
+        id: install-app
         run: npm --prefix app install --legacy-peer-deps
 
       - name: TypeScript Type-Check
@@ -45,7 +47,7 @@ jobs:
         run: npm --prefix app run lint
 
       - name: Run Test Suites
-        if: always()
+        if: always() && steps.install-app.outcome == 'success'
         run: npm --prefix app run test -- --run
 
   # ─── Job 2: Monorepo Build Verification ────────────────────────────────────
