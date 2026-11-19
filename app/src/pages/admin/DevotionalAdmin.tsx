@@ -105,7 +105,7 @@ function NewDevotionTab() {
       setForm(EMPTY_FORM);
       setErrors({});
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const set = (field: keyof DevotionForm) => (
@@ -318,22 +318,22 @@ function ManageDevotionsTab() {
 
   const updateMutation = trpc.devotional.update.useMutation({
     onSuccess: () => { toast.success('Devotional updated!'); setEditingId(null); setEditForm({}); },
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const deleteMutation = trpc.devotional.delete.useMutation({
     onSuccess: () => toast.success('Devotional deleted.'),
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const publishMutation = trpc.devotional.publish.useMutation({
     onSuccess: () => toast.success('Publish status updated!'),
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const sendToTelegramMutation = trpc.devotional.sendToTelegram.useMutation({
     onSuccess: () => toast.success('Sent to Telegram!'),
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const startEdit = (d: Devotional) => {
@@ -565,11 +565,11 @@ function TelegramMessagesTab() {
 
   const processMutation = trpc.telegram.processMessage.useMutation({
     onSuccess: () => toast.success('Message converted to devotional!'),
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const ingestPastedMutation = trpc.telegram.ingestPasted.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: { devotionalId: number | null; messageId: number }) => {
       if (data.devotionalId) {
         toast.success('Message processed! Devotional created.');
       } else {
@@ -577,7 +577,7 @@ function TelegramMessagesTab() {
       }
       setPasteText('');
     },
-    onError: (err) => toast.error(err.message),
+    onError: (err: { message: string }) => toast.error(err.message),
   });
 
   const messages = (data as { items?: Array<{ id: number; messageText?: string | null; processedAt?: string | null }> } | undefined)?.items ?? [];

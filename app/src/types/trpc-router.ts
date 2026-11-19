@@ -118,11 +118,17 @@ export const appRouter = t.router({
     publish: t.procedure
       .input(z.object({ id: z.number() }))
       .mutation(async () => ({} as any)),
+    sendToTelegram: t.procedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async () => ({ success: true })),
   }),
   telegram: t.router({
     webhook: t.procedure.input(z.any()).mutation(async () => ({} as any)),
     messages: t.procedure.input(z.any()).query(async () => ({ items: [] as any[], total: 0 })),
     processMessage: t.procedure.input(z.any()).mutation(async () => ({} as any)),
+    ingestPasted: t.procedure
+      .input(z.object({ text: z.string() }))
+      .mutation(async () => ({ devotionalId: null as number | null, messageId: 0 })),
   }),
   media: t.router({
     uploadUrl: t.procedure

@@ -27,7 +27,7 @@ export default function AnonymousLogAdmin() {
 
   const { data, isLoading, isFetching } = trpc.anonymousLog.list.useQuery(
     { limit: 50, offset },
-    { placeholderData: (prev) => prev }
+    { placeholderData: (prev: typeof data) => prev }
   );
 
   // Accumulate rows across pages
