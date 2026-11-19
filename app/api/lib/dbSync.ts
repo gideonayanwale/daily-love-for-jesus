@@ -27,7 +27,7 @@ const SYNC_TABLES: TableSyncConfig[] = [
     name: "users",
     direction: "supabase→neon", // Auth truth lives in Supabase
     conflictColumn: "id",
-    updatedAtColumn: "updated_at",
+    updatedAtColumn: "updatedAt",
   },
   {
     table: schema.devotionals,
