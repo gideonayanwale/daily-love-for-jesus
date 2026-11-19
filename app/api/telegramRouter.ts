@@ -10,6 +10,7 @@ import {
   markTelegramMessageProcessed,
 } from "./queries/telegram";
 import { parseAndCreateDevotional } from "./lib/devotionalParser";
+import { broadcastDevotionalChanged } from "./devotionalRouter";
 
 export const telegramRouter = createRouter({
   // Authenticated fallback procedure. Telegram's public webhook is handled by the secret-validated Hono route.
@@ -154,6 +155,7 @@ export const telegramRouter = createRouter({
 
       if (devotionalId !== null) {
         await markTelegramMessageProcessed(message.id, devotionalId);
+        await broadcastDevotionalChanged(devotionalId, "import");
       }
 
       return { status: "processed", devotionalId };
@@ -182,6 +184,7 @@ export const telegramRouter = createRouter({
       const messageId = result[0].id;
 
       const devotionalId = await parseAndCreateDevotional(db, messageId, input.text);
+      if (devotionalId !== null) await broadcastDevotionalChanged(devotionalId, "import");
 
       return { devotionalId: devotionalId ?? null, messageId };
     }),
