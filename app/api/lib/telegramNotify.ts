@@ -88,7 +88,7 @@ export async function sendDevotionalToTelegram(devotional: Devotional): Promise<
       }
     );
     const result = await res.json().catch(() => null) as { ok?: boolean; description?: string } | null;
-    if (!res.ok || result?.ok === false) {
+    if (!res.ok || result?.ok !== true) {
       throw new Error(result?.description || `Telegram sendMessage failed with status ${res.status}`);
     }
     return true;
