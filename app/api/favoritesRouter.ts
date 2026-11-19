@@ -78,9 +78,8 @@ export const favoritesRouter = createRouter({
   remove: authedQuery
     .input(
       z.object({
-        userId: z.string(),
         type: z.enum(["verse", "hymn", "devotional"]),
-        itemId: z.number(),
+        itemId: z.number().int().positive(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -89,7 +88,7 @@ export const favoritesRouter = createRouter({
         .delete(userFavorites)
         .where(
           and(
-            eq(userFavorites.userId, input.userId),
+            eq(userFavorites.userId, ctx.user.id),
             eq(userFavorites.type, input.type),
             eq(userFavorites.itemId, input.itemId)
           )
