@@ -89,6 +89,10 @@ export const communityRouter = createRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
 
+      if (!membership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You are not an active member of this group." });
+      }
+
       // Fetch announcements
       const recentAnnouncements = await db
         .select({
