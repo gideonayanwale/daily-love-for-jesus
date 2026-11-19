@@ -15,6 +15,7 @@ import { eq, and, sql, desc, inArray, asc } from "drizzle-orm";
 import {
   authenticateRequestUser,
   assertGroupRole,
+  assertGroupMember,
   AuthorizationError,
 } from "../lib/rbac";
 import { sendTargetedPushNotification } from "../lib/pushNotifications";
@@ -237,6 +238,10 @@ communityRestRouter.post("/tracking/sync", async (c) => {
 
     // Process logs with idempotency on clientLogId
     for (const log of logs) {
+      if (log.groupId !== undefined) {
+        await assertGroupMember(user.id, log.groupId);
+      }
+
       // Check if already synced using unique clientLogId
       const existing = await db.query.readingLogs.findFirst({
         where: eq(readingLogs.clientLogId, log.clientLogId),
@@ -344,7 +349,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
         lastCompletedAt: sql<string>`max(${readingLogs.completedAt})`,
       })
       .from(readingLogs)
-      .where(inArray(readingLogs.userId, studentUserIds))
+      .where(and(inArray(readingLogs.userId, studentUserIds), eq(readingLogs.groupId, groupId)))
       .groupBy(readingLogs.userId);
 
     const aggMap = new Map<string, any>(readingAggregations.map((a: any) => [a.userId, a]));
@@ -360,6 +365,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
       .where(
         and(
           inArray(readingLogs.userId, studentUserIds),
+          eq(readingLogs.groupId, groupId),
           sql`${readingLogs.completedAt} >= now() - interval '60 days'`
         )
       )
@@ -647,7 +653,7 @@ communityRestRouter.get("/dashboard/reports/weekly", async (c) => {
         timeSpent: sql<number>`coalesce(sum(${readingLogs.timeSpent}), 0)::int`,
       })
       .from(readingLogs)
-      .where(and(inArray(readingLogs.userId, studentIds), sql`${readingLogs.completedAt} >= now() - interval '7 days'`))
+      .where(and(inArray(readingLogs.userId, studentIds), eq(readingLogs.groupId, groupId), sql`${readingLogs.completedAt} >= now() - interval '7 days'`))
       .groupBy(readingLogs.userId) : [];
 
     // Previous week readings (7 to 14 days ago)
@@ -656,7 +662,7 @@ communityRestRouter.get("/dashboard/reports/weekly", async (c) => {
         chaptersCount: sql<number>`count(distinct ${readingLogs.contentId})::int`,
       })
       .from(readingLogs)
-      .where(and(inArray(readingLogs.userId, studentIds), sql`${readingLogs.completedAt} >= now() - interval '14 days' AND ${readingLogs.completedAt} < now() - interval '7 days'`)) : [];
+      .where(and(inArray(readingLogs.userId, studentIds), eq(readingLogs.groupId, groupId), sql`${readingLogs.completedAt} >= now() - interval '14 days' AND ${readingLogs.completedAt} < now() - interval '7 days'`)) : [];
 
     const currentWeekTotalChapters = currentWeekLogs.reduce((acc, row) => acc + row.chaptersCount, 0);
     const prevWeekTotalChapters = previousWeekLogs[0]?.chaptersCount ?? 0;
