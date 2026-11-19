@@ -46,7 +46,7 @@ export class DevotionalsController {
   @Post()
   @ApiBearerAuth()
   @UseGuards(SupabaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'elevated_admin')
   @ApiOperation({ summary: 'Create new devotional (Admin only)' })
   async create(@Body() dto: CreateDevotionalDto) {
     return this.devotionalsService.create(dto);
