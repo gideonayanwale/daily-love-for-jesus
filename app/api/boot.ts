@@ -16,6 +16,21 @@ import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 
 const anonLogCache = new Map<string, number>();
+
+async function pseudonymizeVisitorIp(ip: string | null): Promise<string | null> {
+  if (!ip || !env.appSecret) return null;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 40);
+}
 setInterval(() => anonLogCache.clear(), 10 * 60 * 1000).unref();
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -58,12 +73,13 @@ app.use('*', async (c, next) => {
       anonLogCache.set(cacheKey, Date.now());
       (async () => {
         const db = await getDb();
+        const visitorHash = await pseudonymizeVisitorIp(ip);
         await db.insert(auditLogs).values({
           action: 'anonymous_visit',
           resourceType: 'page',
           resourceId: path,
           actorId: null,
-          ipAddress: ip,
+          ipAddress: visitorHash,
           userAgent: ua,
           metadata: { method: 'GET', timestamp: new Date().toISOString() },
         });
