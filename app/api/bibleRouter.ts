@@ -25,7 +25,7 @@ export const bibleRouter = createRouter({
   }),
 
   bookById: publicQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
       return db.query.bibleBooks.findFirst({
@@ -34,7 +34,7 @@ export const bibleRouter = createRouter({
     }),
 
   chapters: publicQuery
-    .input(z.object({ bookNumber: z.number() }))
+    .input(z.object({ bookNumber: z.number().int().min(1).max(66) }))
     .query(async ({ input }) => {
       const db = await getDb();
       try {
@@ -73,9 +73,9 @@ export const bibleRouter = createRouter({
   verses: publicQuery
     .input(
       z.object({
-        bookNumber: z.number(),
-        chapter: z.number(),
-        translation: z.string().optional().default("KJV"),
+        bookNumber: z.number().int().min(1).max(66),
+        chapter: z.number().int().min(1).max(150),
+        translation: z.string().trim().min(2).max(20).regex(/^[A-Za-z0-9_-]+$/).optional().default("KJV"),
       })
     )
     .query(async ({ input }) => {
@@ -116,7 +116,7 @@ export const bibleRouter = createRouter({
       z.object({
         bookNumber: z.number(),
         chapter: z.number(),
-        verse: z.number(),
+        verse: z.number().int().min(1).max(176),
         translation: z.string().optional().default("KJV"),
       })
     )
@@ -160,7 +160,7 @@ export const bibleRouter = createRouter({
         bookNumber: z.number(),
         chapter: z.number(),
         verse: z.number(),
-        translations: z.array(z.string()).optional(),
+        translations: z.array(z.string().trim().min(2).max(20).regex(/^[A-Za-z0-9_-]+$/)).max(10).optional(),
       })
     )
     .query(async ({ input }) => {
@@ -175,7 +175,7 @@ export const bibleRouter = createRouter({
   search: publicQuery
     .input(
       z.object({
-        query: z.string().min(1),
+        query: z.string().trim().min(1).max(200),
         translation: z.string().optional().default("KJV"),
       })
     )
