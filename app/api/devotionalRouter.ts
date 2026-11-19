@@ -19,7 +19,7 @@ const stripHtml = (s: string): string => s.replace(/(<([^>]+)>)/gi, '').trim();
 export async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
   if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return;
   try {
-    const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+    const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast?private=true`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -27,11 +27,18 @@ export async function broadcastDevotionalChanged(id: number, action: string): Pr
         Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
       },
       body: JSON.stringify({
-        messages: [{
-          topic: "devotionals",
-          event: "devotional_changed",
-          payload: { id, action },
-        }],
+        messages: [
+          {
+            topic: "devotionals",
+            event: "devotional_changed",
+            payload: { id, action },
+          },
+          {
+            topic: "admin:devotionals",
+            event: "devotional_changed",
+            payload: { id, action },
+          },
+        ],
       }),
     });
     if (!response.ok) {
