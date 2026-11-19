@@ -78,7 +78,7 @@ app.use('*', async (c, next) => {
 
 // Telegram webhook endpoint - receives bot updates directly
 app.post("/api/telegram/webhook", async (c) => {
-  // Validate webhook secret token (skip if not configured — dev mode)
+  // Validate the Telegram webhook secret; production requires it.
   if (env.telegramWebhookSecret) {
     const incomingSecret = c.req.header("x-telegram-bot-api-secret-token");
     if (incomingSecret !== env.telegramWebhookSecret) {
@@ -100,6 +100,21 @@ app.post("/api/telegram/webhook", async (c) => {
     const text = message.text ?? message.caption ?? "";
     if (!text.trim()) {
       return c.json({ status: "ignored", reason: "empty_message" });
+    }
+
+    const configuredChannel = env.telegramChannelId.trim();
+    if (!configuredChannel && env.isProduction) {
+      return c.json({ error: "Telegram channel is not configured" }, 503);
+    }
+    if (configuredChannel) {
+      const incomingId = String(message.chat?.id ?? "");
+      const incomingUsername = message.chat?.username ? `@${message.chat.username}` : "";
+      if (
+        configuredChannel !== incomingId &&
+        configuredChannel.toLowerCase() !== incomingUsername.toLowerCase()
+      ) {
+        return c.json({ error: "Telegram update is not from the configured channel" }, 403);
+      }
     }
 
     const db = await getDb();
@@ -135,6 +150,25 @@ app.post("/api/telegram/webhook", async (c) => {
 
     // Try auto-create devotional
     const devotionalId = await parseAndCreateDevotional(db, result[0].id, text);
+
+    if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
+      try {
+        await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+          },
+          body: JSON.stringify({
+            topic: "devotionals",
+            event: "devotional_changed",
+            payload: { id: devotionalId, action: "import" },
+          }),
+        });
+      } catch (broadcastError) {
+        console.error("[telegram] Realtime broadcast failed:", broadcastError);
+      }
+    }
 
     return c.json({
       status: "processed",
@@ -235,24 +269,12 @@ async function pollTelegramMessages(): Promise<void> {
   }
 }
 
-if (env.telegramBotToken && !isServerless) {
-  const lastFiredSlot: Record<string, Date | null> = { "2": null, "4": null };
-
+if (env.telegramBotToken && !env.telegramWebhookSecret && !isServerless) {
+  // Long-polling is a fallback only. When a webhook secret is configured,
+  // Telegram push delivery is the single ingestion path.
+  pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
   setInterval(() => {
-    const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes();
-
-    if (m === 0 && (h === 2 || h === 4)) {
-      const slot = String(h);
-      if (
-        !lastFiredSlot[slot] ||
-        now.getTime() - lastFiredSlot[slot]!.getTime() > 60 * 60 * 1000
-      ) {
-        lastFiredSlot[slot] = now;
-        pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
-      }
-    }
-  }, 60_000);
+    pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
+  }, 5 * 60 * 1000).unref();
 }
 
