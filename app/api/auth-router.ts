@@ -28,13 +28,12 @@ export const authRouter = createRouter({
     }),
 
   logout: authedQuery.mutation(async ({ ctx }) => {
-    ctx.resHeaders.append(
-      "set-cookie",
-      cookie.serialize("sb-access-token", "", {
-        path: "/",
-        maxAge: 0,
-      }),
-    );
+    for (const name of ["sb-access-token", "daily_love_token"]) {
+      ctx.resHeaders.append(
+        "set-cookie",
+        cookie.serialize(name, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax", secure: true }),
+      );
+    }
     return { success: true };
   }),
 
