@@ -3,7 +3,7 @@
 // Bidirectional Supabase ↔ Neon PostgreSQL Sync
 // ==============================================================================
 
-import { sql } from "drizzle-orm";
+import { getTableColumns, sql } from "drizzle-orm";
 import { getSupabaseDb, getNeonDb } from "./db";
 import * as schema from "@db/schema";
 
@@ -160,10 +160,29 @@ async function syncTable(
     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
       try {
-        await destDb
-          .insert(config.table)
-          .values(chunk)
-          .onConflictDoNothing();
+        const insert = destDb.insert(config.table).values(chunk);
+        if (config.name === "users") {
+          // Supabase Auth identity/profile sync may create missing profiles, but
+          // must never overwrite the Neon-controlled application role.
+          await insert.onConflictDoNothing();
+        } else {
+          const columns = getTableColumns(config.table) as Record<string, { name: string }>;
+          const conflictTarget = columns[config.conflictColumn];
+          if (!conflictTarget) throw new Error(`Unknown conflict column: ${config.conflictColumn}`);
+          const updateSet = Object.fromEntries(
+            Object.entries(columns)
+              .filter(([key]) => key !== config.conflictColumn)
+              .map(([key, column]) => [key, sql.raw(`excluded."${column.name}"`)]),
+          );
+          const updatedAt = config.updatedAtColumn ? columns[config.updatedAtColumn] : undefined;
+          await insert.onConflictDoUpdate({
+            target: conflictTarget as any,
+            set: updateSet,
+            ...(updatedAt
+              ? { setWhere: sql` ${updatedAt as any} < ${sql.raw(`excluded."${updatedAt.name}"`)} ` }
+              : {}),
+          });
+        }
         result.rowsSynced += chunk.length;
       } catch (err: any) {
         result.errors.push(
