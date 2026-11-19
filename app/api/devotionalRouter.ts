@@ -88,7 +88,7 @@ export const devotionalRouter = createRouter({
   }),
 
   byId: publicQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
       const devotional = await getDevotionalById(input.id);
       return devotional?.isPublished ? devotional : null;
