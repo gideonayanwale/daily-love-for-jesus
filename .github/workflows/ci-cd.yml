@@ -52,7 +52,7 @@ jobs:
   build-production:
     name: Build Production Bundles
     needs: quality-check
-    if: always() && needs.quality-check.result != 'cancelled'
+    if: always() && needs['quality-check'].result != 'cancelled'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -107,8 +107,8 @@ jobs:
   # ─── Job 4: Automated Deploy Trigger (Main branch only) ──────────────────────
   deploy-trigger:
     name: Trigger Production Deployments
-    needs: [build-production, docker-build]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [quality-check, build-production, docker-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs['quality-check'].result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Railway Deploy Webhook (if configured)
