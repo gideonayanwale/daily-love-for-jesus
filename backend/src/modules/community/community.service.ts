@@ -775,7 +775,19 @@ export class CommunityService {
     const db = this.dbService.getDb();
 
     const groups = await db
-      .select()
+      .select({
+        id: schema.groups.id,
+        communityId: schema.groups.communityId,
+        name: schema.groups.name,
+        slug: schema.groups.slug,
+        description: schema.groups.description,
+        groupImage: schema.groups.groupImage,
+        category: schema.groups.category,
+        status: schema.groups.status,
+        onlyAdminsCanPost: schema.groups.onlyAdminsCanPost,
+        createdAt: schema.groups.createdAt,
+        updatedAt: schema.groups.updatedAt,
+      })
       .from(schema.groups)
       .where(eq(schema.groups.id, groupId))
       .limit(1);
