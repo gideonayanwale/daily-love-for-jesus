@@ -55,18 +55,24 @@ export async function sendDevotionalToTelegram(devotional: Devotional): Promise<
   if (chunks.length === 0) return false;
 
   for (const text of chunks) {
-    const response = await fetch(
-      `https://api.telegram.org/bot${env.telegramBotToken}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: env.telegramChannelId,
-          text,
-          disable_web_page_preview: true,
-        }),
-      },
-    );
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://api.telegram.org/bot${env.telegramBotToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: env.telegramChannelId,
+            text,
+            disable_web_page_preview: true,
+          }),
+        },
+      );
+    } catch {
+      console.error('[telegramNotify] Telegram request failed before a response was received.');
+      throw new Error('Telegram delivery failed due to a network error.');
+    }
 
     const result = await response.json().catch(() => null) as
       | { ok?: boolean; description?: string }
