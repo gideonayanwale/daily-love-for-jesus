@@ -44,7 +44,7 @@ class RealtimeChannel {
       this.ws = ws;
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ topic: `realtime:${this.name}`, event: 'phx_join', payload: { access_token: token, config: { broadcast: { self: true } } }, ref: '1' }));
+        ws.send(JSON.stringify({ topic: `realtime:${this.name}`, event: 'phx_join', payload: { access_token: token, config: { broadcast: { self: true }, private: true } }, ref: '1' }));
         this.heartbeatTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: null }));
