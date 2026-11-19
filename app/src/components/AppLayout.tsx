@@ -151,7 +151,7 @@ export default function AppLayout() {
 
           {/* Right Header Actions: Explore navigation, theme and profile */}
           <div className="flex items-center gap-2">
-            <ExplorePanel userId={user?.id} userName={user?.name} />
+            <ExplorePanel userId={user?.id} userName={user?.name} userRole={user?.role} />
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
