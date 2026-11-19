@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   UseGuards,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -47,6 +48,16 @@ export class TelegramController {
       process.env.TELEGRAM_CHANNEL_ID || '';
     const message = update?.message ?? update?.channel_post ?? update?.channelPost;
     if (!message) return { status: 'ignored', reason: 'no_message' };
+    if (
+      !Number.isSafeInteger(message.message_id) ||
+      !Number.isSafeInteger(message.chat?.id)
+    ) {
+      throw new BadRequestException('Telegram message ID and chat ID must be valid integers.');
+    }
+    const messageText = message.text ?? message.caption ?? '';
+    if (typeof messageText !== 'string' || messageText.length > 10000) {
+      throw new BadRequestException('Telegram message text is invalid or exceeds 10,000 characters.');
+    }
     if (!configuredChannel && process.env.NODE_ENV === 'production') {
       throw new UnauthorizedException('Telegram channel is not configured');
     }
