@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, Query, ParseIntPipe, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { BibleService } from './bible.service';
 
@@ -28,6 +28,7 @@ export class BibleController {
   @Get('books/:id')
   @ApiOperation({ summary: 'Get single Bible book metadata by ID' })
   async getBookById(@Param('id', ParseIntPipe) id: number) {
+    if (id < 1 || id > 66) throw new BadRequestException('Book ID must be between 1 and 66.');
     return this.bibleService.getBookById(id);
   }
 
@@ -35,6 +36,7 @@ export class BibleController {
   @ApiOperation({ summary: 'Get list of chapters for a given book number' })
   @ApiQuery({ name: 'bookNumber', required: true, type: Number })
   async getChapters(@Query('bookNumber', ParseIntPipe) bookNumber: number) {
+    if (bookNumber < 1 || bookNumber > 66) throw new BadRequestException('Book number must be between 1 and 66.');
     return this.bibleService.getChapters(bookNumber);
   }
 
@@ -48,6 +50,8 @@ export class BibleController {
     @Query('chapter', ParseIntPipe) chapter: number,
     @Query('translation') translation?: string,
   ) {
+    if (bookNumber < 1 || bookNumber > 66 || chapter < 1 || chapter > 200) throw new BadRequestException('Invalid book or chapter number.');
+    if (translation && !/^[A-Za-z0-9_-]{1,12}$/.test(translation)) throw new BadRequestException('Invalid translation code.');
     return this.bibleService.getChapter(translation || 'KJV', bookNumber, chapter);
   }
 
@@ -63,6 +67,8 @@ export class BibleController {
     @Query('verse', ParseIntPipe) verse: number,
     @Query('translation') translation?: string,
   ) {
+    if (bookNumber < 1 || bookNumber > 66 || chapter < 1 || chapter > 200 || verse < 1 || verse > 200) throw new BadRequestException('Invalid book, chapter or verse number.');
+    if (translation && !/^[A-Za-z0-9_-]{1,12}$/.test(translation)) throw new BadRequestException('Invalid translation code.');
     return this.bibleService.getVerse(translation || 'KJV', bookNumber, chapter, verse);
   }
 
@@ -78,7 +84,9 @@ export class BibleController {
     @Query('verse', ParseIntPipe) verse: number,
     @Query('translations') translations?: string,
   ) {
-    const list = translations ? translations.split(',') : ['KJV', 'WEB', 'ESV', 'NIV'];
+    if (bookNumber < 1 || bookNumber > 66 || chapter < 1 || chapter > 200 || verse < 1 || verse > 200) throw new BadRequestException('Invalid book, chapter or verse number.');
+    const list = translations ? translations.split(',').slice(0, 8) : ['KJV', 'WEB', 'ESV', 'NIV'];
+    if (list.some((code) => !/^[A-Za-z0-9_-]{1,12}$/.test(code))) throw new BadRequestException('Invalid translation list.');
     return this.bibleService.compareVerse(bookNumber, chapter, verse, list);
   }
 
@@ -90,7 +98,9 @@ export class BibleController {
     @Query('query') query: string,
     @Query('translation') translation?: string,
   ) {
-    return this.bibleService.search(translation || 'KJV', query);
+    if (typeof query !== 'string' || query.trim().length < 1 || query.length > 100) throw new BadRequestException('Search query must be between 1 and 100 characters.');
+    if (translation && !/^[A-Za-z0-9_-]{1,12}$/.test(translation)) throw new BadRequestException('Invalid translation code.');
+    return this.bibleService.search(translation || 'KJV', query.trim());
   }
 
   @Get('random')
