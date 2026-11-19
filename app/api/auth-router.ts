@@ -5,6 +5,7 @@ import { createRouter, authedQuery, strictAdminQuery } from "./middleware";
 import { upsertUser } from "./queries/users";
 import { getDb } from "./queries/connection";
 import * as schema from "@db/schema";
+import { TRPCError } from "@trpc/server";
 
 export const authRouter = createRouter({
   me: authedQuery.query((opts) => opts.ctx.user),
@@ -39,12 +40,24 @@ export const authRouter = createRouter({
 
   promoteToElevatedAdmin: strictAdminQuery
     .input(z.object({ userId: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      await db
+      const updated = await db
         .update(schema.users)
         .set({ role: "elevated_admin", updatedAt: new Date() })
-        .where(eq(schema.users.id, input.userId));
-      return { success: true };
+        .where(eq(schema.users.id, input.userId))
+        .returning({ id: schema.users.id, role: schema.users.role });
+      if (!updated.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
+      }
+      await db.insert(schema.auditLogs).values({
+        actorId: ctx.user.id,
+        action: "promote_elevated_admin",
+        resourceType: "user",
+        resourceId: input.userId,
+        metadata: { previousRole: "user", targetRole: "elevated_admin" },
+        occurredAt: new Date(),
+      });
+      return { success: true, user: updated[0] };
     }),
 });
