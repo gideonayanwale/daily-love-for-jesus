@@ -78,11 +78,20 @@ export class TrpcService {
     }
 
     let user: any = undefined;
+    let authError = false;
+    const credentialSupplied = Boolean(token);
+
+    if (credentialSupplied && !this.supabaseAdmin) {
+      authError = true;
+    }
 
     if (token && this.supabaseAdmin) {
       try {
-        const { data: { user: authUser } } = await this.supabaseAdmin.auth.getUser(token);
-        if (authUser) {
+        const { data: { user: authUser }, error } = await this.supabaseAdmin.auth.getUser(token);
+        if (error || !authUser?.id) {
+          authError = true;
+        }
+        if (authUser?.id && !error) {
           const db = this.dbService.getDb();
           const rows = await db
             .select()
@@ -109,11 +118,12 @@ export class TrpcService {
           }
         }
       } catch (err: any) {
+        authError = true;
         this.logger.warn(`tRPC auth error: ${err.message}`);
       }
     }
 
-    return { req, res, user };
+    return { req, res, user, authError };
   }
 
   getExpressMiddleware() {
