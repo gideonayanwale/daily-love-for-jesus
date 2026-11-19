@@ -18,6 +18,20 @@ import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 const anonLogCache = new Map<string, number>();
 
+async function timingSafeStringEqual(left: string, right: string): Promise<boolean> {
+  if (left.length !== right.length) return false;
+  const encoder = new TextEncoder();
+  const [leftDigest, rightDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(left)),
+    crypto.subtle.digest("SHA-256", encoder.encode(right)),
+  ]);
+  const a = new Uint8Array(leftDigest);
+  const b = new Uint8Array(rightDigest);
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
+  return difference === 0;
+}
+
 async function pseudonymizeVisitorIp(ip: string | null): Promise<string | null> {
   if (!ip || !env.appSecret) return null;
   const key = await crypto.subtle.importKey(
@@ -118,7 +132,7 @@ app.post("/api/telegram/webhook", async (c) => {
   // Validate the Telegram webhook secret; production requires it.
   if (env.telegramWebhookSecret) {
     const incomingSecret = c.req.header("x-telegram-bot-api-secret-token");
-    if (incomingSecret !== env.telegramWebhookSecret) {
+    if (!incomingSecret || !(await timingSafeStringEqual(incomingSecret, env.telegramWebhookSecret))) {
       return c.json({ error: "Unauthorized" }, 401);
     }
   } else if (env.isProduction) {
