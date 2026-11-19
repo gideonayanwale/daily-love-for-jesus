@@ -5,8 +5,7 @@
 
 // Priority chain: 1. Neon (NEON_DATABASE_URL) — preferred for fast serverless reads/writes and branching.
 // 2. Supabase PostgreSQL (DATABASE_URL) — auth source-of-truth and fallback.
-// 3. Dev stub — graceful no-op for local dev without any DB configured.
-// The getDb() function implements this chain automatically.
+// 3. No stub fallback: requests fail if neither database is available.
 //
 // NOTE: All DB functions are async because the package is "type": "module" (ESM),
 // so dynamic import() must be used instead of require(). Call sites must await getDb().
@@ -78,7 +77,7 @@ export async function getSupabaseDb(): Promise<any> {
  * Returns the best available database:
  *   1. Neon (preferred — faster, serverless-native, branching)
  *   2. Supabase PostgreSQL (fallback)
- *   3. Dev stub proxy (graceful no-op for local dev without any DB configured)
+ *   3. Throws when neither configured database is available.
  */
 export async function getDb(): Promise<any> {
   const neon = await getNeonDb();
