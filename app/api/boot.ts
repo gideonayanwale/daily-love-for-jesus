@@ -195,7 +195,7 @@ app.post("/api/telegram/webhook", async (c) => {
 
     if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
       try {
-        const broadcastResponse = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+        const broadcastResponse = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast?private=true`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -203,11 +203,18 @@ app.post("/api/telegram/webhook", async (c) => {
             Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
           },
           body: JSON.stringify({
-            messages: [{
-              topic: "devotionals",
-              event: "devotional_changed",
-              payload: { id: devotionalId, action: "import" },
-            }],
+            messages: [
+              {
+                topic: "devotionals",
+                event: "devotional_changed",
+                payload: { id: devotionalId, action: "import" },
+              },
+              {
+                topic: "admin:devotionals",
+                event: "devotional_changed",
+                payload: { id: devotionalId, action: "import" },
+              },
+            ],
           }),
         });
         if (!broadcastResponse.ok) {
@@ -339,11 +346,18 @@ async function pollTelegramMessages(): Promise<void> {
                   Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
                 },
                 body: JSON.stringify({
-                  messages: [{
-                    topic: "devotionals",
-                    event: "devotional_changed",
-                    payload: { id: devotionalId, action: "import" },
-                  }],
+                  messages: [
+                    {
+                      topic: "devotionals",
+                      event: "devotional_changed",
+                      payload: { id: devotionalId, action: "import" },
+                    },
+                    {
+                      topic: "admin:devotionals",
+                      event: "devotional_changed",
+                      payload: { id: devotionalId, action: "import" },
+                    },
+                  ],
                 }),
               });
               if (!response.ok) {
