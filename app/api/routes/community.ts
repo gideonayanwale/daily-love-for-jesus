@@ -327,7 +327,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
       })
       .from(groupMembers)
       .innerJoin(users, eq(groupMembers.userId, users.id))
-      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "active")))
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "active"), eq(groupMembers.role, "student")))
       .orderBy(asc(users.name));
 
     if (studentMemberships.length === 0) {
@@ -582,6 +582,20 @@ communityRestRouter.post("/attendance/record", async (c) => {
     if (!session) return c.json({ error: "Attendance session not found" }, 404);
 
     await assertGroupRole(user.id, session.groupId, ["teacher", "assistant_teacher"]);
+
+    const targetStudentIds = [...new Set(records.map((record) => record.userId))];
+    const validStudents = await db
+      .select({ userId: groupMembers.userId })
+      .from(groupMembers)
+      .where(and(
+        eq(groupMembers.groupId, session.groupId),
+        eq(groupMembers.status, "active"),
+        eq(groupMembers.role, "student"),
+        inArray(groupMembers.userId, targetStudentIds),
+      ));
+    if (validStudents.length !== targetStudentIds.length) {
+      throw new AuthorizationError("Attendance can only be recorded for active students in this group", 403);
+    }
 
     let recordedCount = 0;
     for (const rec of records) {
