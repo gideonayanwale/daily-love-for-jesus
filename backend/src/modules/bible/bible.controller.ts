@@ -107,6 +107,7 @@ export class BibleController {
   @ApiOperation({ summary: 'Get an inspirational random verse of the day' })
   @ApiQuery({ name: 'translation', required: false, type: String })
   async getRandomVerse(@Query('translation') translation?: string) {
+    if (translation && !/^[A-Za-z0-9_-]{1,12}$/.test(translation)) throw new BadRequestException('Invalid translation code.');
     return this.bibleService.getRandomVerse(translation || 'KJV');
   }
 }
