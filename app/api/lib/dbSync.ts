@@ -160,7 +160,10 @@ async function syncTable(
     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
       try {
-        const insert = destDb.insert(config.table).values(chunk);
+        const safeChunk = config.name === "users"
+          ? chunk.map((row: any) => ({ ...row, role: "user" }))
+          : chunk;
+        const insert = destDb.insert(config.table).values(safeChunk);
         if (config.name === "users") {
           // Supabase Auth identity/profile sync may create missing profiles, but
           // must never overwrite the Neon-controlled application role.
