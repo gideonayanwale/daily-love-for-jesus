@@ -121,6 +121,17 @@ export const teacherAssignmentRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = await getDb();
 
+      const group = await db.query.groups.findFirst({ where: eq(groups.id, input.groupId) });
+      if (!group) throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found' });
+      const eligible = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, group.communityId),
+          eq(communityMembers.userId, input.userId),
+          eq(communityMembers.status, 'active'),
+        ),
+      });
+      if (!eligible) throw new TRPCError({ code: 'FORBIDDEN', message: 'Teacher must be an active member of the group community' });
+
       const existing = await db.query.groupMembers.findFirst({
         where: and(
           eq(groupMembers.groupId, input.groupId),
@@ -155,6 +166,12 @@ export const teacherAssignmentRouter = createRouter({
     .input(z.object({ groupId: z.number(), userId: z.string() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
+      const existing = await db.query.groupMembers.findFirst({
+        where: and(eq(groupMembers.groupId, input.groupId), eq(groupMembers.userId, input.userId)),
+      });
+      if (!existing || existing.role !== 'teacher') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Active teacher assignment not found' });
+      }
 
       await db
         .update(groupMembers)
