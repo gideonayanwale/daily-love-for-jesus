@@ -31,8 +31,8 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
   );
 
   // CORS - Support Web SPA and Mobile (Expo, Android/iOS Emulators, Physical Devices)
-  const frontendUrlRaw = configService.get<string>('frontendUrl') || 'http://localhost:3000';
   const isProduction = configService.get<string>('nodeEnv') === 'production';
+  const frontendUrlRaw = configService.get<string>('frontendUrl') || (isProduction ? '' : 'http://localhost:3000');
 
   // Parse comma-separated domains and normalize by removing trailing slashes
   const configuredOrigins = frontendUrlRaw
@@ -53,7 +53,10 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
     'ionic://localhost',
   ];
 
-  const allowedOrigins = new Set<string>([...configuredOrigins, ...defaultLocalOrigins]);
+  const allowedOrigins = new Set<string>([
+    ...configuredOrigins,
+    ...(!isProduction ? defaultLocalOrigins : []),
+  ]);
 
   app.enableCors({
     origin: (origin, callback) => {
@@ -71,18 +74,7 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
         return;
       }
 
-      // 2. Allow preview and branch deployments from trusted hosts (Vercel, Netlify, Cloudflare Pages)
-      const isTrustedPreview =
-        /^https:\/\/[a-zA-Z0-9_-]+\.netlify\.app$/.test(normalizedOrigin) ||
-        /^https:\/\/[a-zA-Z0-9_-]+\.pages\.dev$/.test(normalizedOrigin) ||
-        /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(normalizedOrigin);
-
-      if (isTrustedPreview) {
-        callback(null, true);
-        return;
-      }
-
-      // 3. In non-production, allow all localhost ports
+      // In non-production, allow all localhost ports
       if (!isProduction && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalizedOrigin)) {
         callback(null, true);
         return;
