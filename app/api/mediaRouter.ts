@@ -71,13 +71,13 @@ export const mediaRouter = createRouter({
 
       try {
         // Fetch only verified Cloudinary URLs; reject oversized or unexpected media.
-        const fileResponse = await fetch(cloudinaryUrl);
+        const fileResponse = await fetch(cloudinaryUrl, { redirect: "error" });
         if (!fileResponse.ok) {
           throw new Error(`Failed to fetch Cloudinary file: ${fileResponse.statusText}`);
         }
 
         const mimeType = (fileResponse.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-        if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
+        if ((!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) || mimeType === "image/svg+xml") {
           throw new Error("Only image and video uploads are supported.");
         }
         const declaredLength = Number(fileResponse.headers.get("content-length") ?? 0);
