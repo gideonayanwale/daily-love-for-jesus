@@ -16,8 +16,8 @@ This comprehensive reference document lists all environment variables, API keys,
 | `DATABASE_URL` | **Yes** | **SECRET** (Server) | Supabase Postgres pooled connection | [Supabase Dashboard](#2-database-connection-strings) &rarr; Settings &rarr; Database |
 | `NEON_DATABASE_URL` | **Yes** | **SECRET** (Server) | Neon Serverless Postgres connection | [Neon Console](#3-neon-serverless-postgresql) &rarr; Dashboard &rarr; Connection Details |
 | `APP_SECRET` | Optional | **SECRET** (Server) | Secret token for sync admin API | Custom random 32-char string |
-| `ADMIN_USER_ID` | Optional | Server | UUID of admin user in Supabase Auth | [Supabase Dashboard](#4-admin-access) &rarr; Authentication &rarr; Users |
-| `ADMIN_EMAIL` | Optional | Server | Email of admin user | Your personal/admin email |
+| `ADMIN_USER_ID` | Deprecated | Server | Retained for backward-compatible deployment only; does not grant a role | Do not use for role provisioning |
+| `ADMIN_EMAIL` | Deprecated | Server | Retained for backward-compatible deployment only; does not grant a role | Do not use for role provisioning |
 | `TELEGRAM_BOT_TOKEN` | Optional | **SECRET** (Server) | Telegram bot token for devotional sync | [@BotFather on Telegram](#5-telegram-integration-optional) |
 | `TELEGRAM_CHANNEL_ID` | Optional | Server | Devotional Telegram channel ID | Channel info / Forward message |
 | `API_BIBLE_KEY` | Optional | **SECRET** (Server) | American Bible Society API Key | [scripture.api.bible](#6-bible-api-integration-optional) |
@@ -79,8 +79,8 @@ Neon provides ultra-fast cold starts and autoscaling serverless Postgres instanc
   ```bash
   openssl rand -hex 32
   ```
-- `ADMIN_USER_ID`: The UUID string from Supabase Auth (`auth.users.id`). Any user matching this UUID automatically receives administrative permissions within the app.
-- `ADMIN_EMAIL`: Email address (e.g. `admin@yourdomain.com`). Users authenticating with this email are automatically assigned the `admin` role.
+- `ADMIN_USER_ID`: Deprecated. It does not grant administrative permissions. Provision roles through the server-controlled role-management workflow.
+- `ADMIN_EMAIL`: Deprecated. Email matching never grants an application role. Provision roles through the server-controlled role-management workflow.
 
 ---
 
