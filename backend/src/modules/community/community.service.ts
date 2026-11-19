@@ -1125,6 +1125,12 @@ export class CommunityService {
   }
 
   async registerPushToken(userId: string, token: string, platform: 'expo' | 'fcm' | 'apns' = 'expo') {
+    if (typeof token !== 'string' || token.trim().length < 10 || token.length > 512) {
+      throw new BadRequestException('Push token must be between 10 and 512 characters.');
+    }
+    if (!['expo', 'fcm', 'apns'].includes(platform)) {
+      throw new BadRequestException('Unsupported push token platform.');
+    }
     const db = this.dbService.getDb();
     await db
       .insert(schema.pushTokens)
@@ -1425,8 +1431,21 @@ export class CommunityService {
     if (!data.content?.trim() || data.content.length > 10000) {
       throw new BadRequestException('Message content must be between 1 and 10,000 characters.');
     }
-    if (data.mediaUrl && (!data.mediaUrl.startsWith('https://') || data.mediaUrl.length > 2048)) {
-      throw new BadRequestException('Only HTTPS media URLs are accepted.');
+    if (data.mediaUrl) {
+      try {
+        const media = new URL(data.mediaUrl);
+        if (media.protocol !== 'https:' || media.username || media.password || data.mediaUrl.length > 2048) {
+          throw new Error('invalid');
+        }
+      } catch {
+        throw new BadRequestException('A valid HTTPS media URL is required.');
+      }
+    }
+    if (
+      (data.isAnnouncement !== undefined && typeof data.isAnnouncement !== 'boolean') ||
+      (data.isEncrypted !== undefined && typeof data.isEncrypted !== 'boolean')
+    ) {
+      throw new BadRequestException('Message flags must be boolean values.');
     }
 
     if (data.channelType === 'general' && !platformAdmin) {
@@ -1437,7 +1456,7 @@ export class CommunityService {
     }
 
     if (data.channelType === 'group') {
-      if (!data.groupId) throw new BadRequestException('groupId is required for group messages.');
+      if (!Number.isSafeInteger(data.groupId) || data.groupId! < 1) throw new BadRequestException('A valid groupId is required for group messages.');
       const groupRows = await db.select().from(schema.groups).where(eq(schema.groups.id, data.groupId)).limit(1);
       const group = groupRows[0];
       if (!group) throw new NotFoundException('Group not found.');
@@ -1457,7 +1476,9 @@ export class CommunityService {
     }
 
     if (data.channelType === 'community') {
-      if (!data.communityId) throw new BadRequestException('communityId is required for community messages.');
+      if (!data.communityId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.communityId)) {
+        throw new BadRequestException('A valid communityId is required for community messages.');
+      }
       const membership = await db.select({ id: schema.communityMembers.id })
         .from(schema.communityMembers)
         .where(and(
@@ -1471,8 +1492,12 @@ export class CommunityService {
     }
 
     if (data.channelType === 'dm') {
-      if (!data.receiverId || data.receiverId === senderId) {
-        throw new BadRequestException('A different receiverId is required for direct messages.');
+      if (
+        !data.receiverId ||
+        data.receiverId === senderId ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.receiverId)
+      ) {
+        throw new BadRequestException('A valid, different receiverId is required for direct messages.');
       }
       const receiver = await db.select({ id: schema.users.id }).from(schema.users)
         .where(eq(schema.users.id, data.receiverId)).limit(1);
@@ -1528,7 +1553,9 @@ export class CommunityService {
       throw new ForbiddenException('Leadership channel access is restricted to platform administrators.');
     }
     if (channelType === 'community') {
-      if (!options.communityId) throw new BadRequestException('communityId is required.');
+      if (!options.communityId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(options.communityId)) {
+        throw new BadRequestException('A valid communityId is required.');
+      }
       const membership = await db.select({ id: schema.communityMembers.id }).from(schema.communityMembers)
         .where(and(
           eq(schema.communityMembers.communityId, options.communityId),
@@ -1538,7 +1565,8 @@ export class CommunityService {
       if (!membership.length && !platformAdmin) throw new ForbiddenException('You are not a member of this community.');
     }
     if (channelType === 'group') {
-      if (!options.groupId) throw new BadRequestException('groupId is required.');
+      if (!Number.isSafeInteger(options.groupId) || options.groupId! < 1) throw new BadRequestException('A valid groupId is required.');
+
       const membership = await db.select({ id: schema.groupMembers.id }).from(schema.groupMembers)
         .where(and(
           eq(schema.groupMembers.groupId, options.groupId),
@@ -1548,8 +1576,12 @@ export class CommunityService {
       if (!membership.length && !platformAdmin) throw new ForbiddenException('You are not a member of this group.');
     }
     if (channelType === 'dm') {
-      if (!options.receiverId || options.receiverId === userId) {
-        throw new BadRequestException('A different receiverId is required.');
+      if (
+        !options.receiverId ||
+        options.receiverId === userId ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(options.receiverId)
+      ) {
+        throw new BadRequestException('A valid, different receiverId is required.');
       }
     }
 
