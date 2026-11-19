@@ -6,13 +6,14 @@
 import { Hono } from "hono";
 import { runFullSync, checkDbHealth, type SyncResult } from "./lib/dbSync";
 import { env } from "./lib/env";
+import { findUserById } from "./queries/users";
 
 export const syncRouter = new Hono();
 
 // ── Auth guard: require Admin-Secret or valid Admin user for sync triggers ───
 const adminAuth = async (c: any, next: any) => {
   const secret = c.req.header("x-admin-secret");
-  if (secret && secret === env.appSecret) {
+  if (secret && env.appSecret && secret === env.appSecret) {
     return next();
   }
 
@@ -22,16 +23,10 @@ const adminAuth = async (c: any, next: any) => {
     try {
       const token = authHeader.substring(7).trim();
       const { supabaseAdmin } = await import("./lib/supabase");
-      const user = await supabaseAdmin.getUser(token);
-      if (user && user.id) {
-        // Allow authenticated admin, or if no admin configured, any authenticated user
-        if (
-          !env.adminUserId ||
-          user.id === env.adminUserId ||
-          (user.email && user.email.toLowerCase() === env.adminEmail.toLowerCase())
-        ) {
-          return next();
-        }
+      const authUser = await supabaseAdmin.getUser(token);
+      if (authUser?.id) {
+        const profile = await findUserById(authUser.id);
+        if (profile?.role === "admin") return next();
       }
     } catch {
       // Fall through to unauthorized
