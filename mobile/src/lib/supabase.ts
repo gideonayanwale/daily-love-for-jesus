@@ -1,107 +1,46 @@
-// ==============================================================================
-// Daily Love For Jesus - Mobile Supabase Auth Client
-// ==============================================================================
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createClient, type AuthError } from '@supabase/supabase-js';
+
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
 
 export interface MobileAuthResponse {
   data: {
-    user: any | null;
-    session: any | null;
+    user: Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];
+    session: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
   };
-  error: { message: string } | null;
+  error: AuthError | null;
 }
 
-// Read credentials from environment (.env)
-const SUPABASE_URL = (process.env.EXPO_PUBLIC_SUPABASE_URL || "").replace(/\/$/, "");
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || "";
-
-let currentToken: string | null = null;
-
-export function getMobileAuthToken(): string | null {
-  return currentToken;
-}
-
-export function setMobileAuthToken(token: string | null) {
-  currentToken = token;
-  try {
-    if (typeof window !== "undefined" && window.localStorage) {
-      if (token) window.localStorage.setItem("@daily_love_mobile_token", token);
-      else window.localStorage.removeItem("@daily_love_mobile_token");
-    }
-  } catch {}
+export async function getMobileAuthToken(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) return null;
+  return data.session?.access_token ?? null;
 }
 
 export const mobileSupabase = {
   signIn: async (email: string, password: string): Promise<MobileAuthResponse> => {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return {
-          data: { user: null, session: null },
-          error: { message: data.error_description || data.msg || "Login failed" },
-        };
-      }
-
-      if (data.access_token) {
-        setMobileAuthToken(data.access_token);
-      }
-
-      return {
-        data: { user: data.user, session: data },
-        error: null,
-      };
-    } catch (err: any) {
-      return {
-        data: { user: null, session: null },
-        error: { message: err.message || "Network error" },
-      };
-    }
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    return { data: { user: data.user, session: data.session }, error };
   },
 
   signUp: async (email: string, password: string, name?: string): Promise<MobileAuthResponse> => {
-    try {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          data: { name, full_name: name },
-        }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        return {
-          data: { user: null, session: null },
-          error: { message: data.msg || data.message || "Registration failed" },
-        };
-      }
-
-      if (data.access_token) {
-        setMobileAuthToken(data.access_token);
-      }
-
-      return {
-        data: { user: data.user, session: data },
-        error: null,
-      };
-    } catch (err: any) {
-      return {
-        data: { user: null, session: null },
-        error: { message: err.message || "Network error" },
-      };
-    }
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name, full_name: name } },
+    });
+    return { data: { user: data.user, session: data.session }, error };
   },
+
+  signOut: async () => supabase.auth.signOut(),
 };

@@ -69,7 +69,7 @@ export default function AnonymousLogAdmin() {
                   Date / Time
                 </TableHead>
                 <TableHead className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold">
-                  IP Address
+                  Visitor ID (hashed)
                 </TableHead>
                 <TableHead className="text-xs text-zinc-500 dark:text-zinc-400 font-semibold">
                   Page
@@ -89,7 +89,7 @@ export default function AnonymousLogAdmin() {
                     {format(new Date(row.occurredAt), 'MMM d, yyyy HH:mm')}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
-                    {row.ipAddress ?? '—'}
+                    {row.ipAddress ? row.ipAddress.slice(0, 12) + '…' : '—'}
                   </TableCell>
                   <TableCell className="text-zinc-700 dark:text-zinc-300 max-w-[200px] truncate">
                     {row.resourceId ?? '—'}

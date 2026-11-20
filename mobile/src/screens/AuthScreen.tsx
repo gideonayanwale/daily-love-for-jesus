@@ -27,8 +27,13 @@ export function AuthScreen() {
         if (res.error) {
           Alert.alert('Sign Up Failed', res.error.message);
         } else {
-          Alert.alert('Success', 'Account created! Welcome to Daily Love For Jesus.');
-          navigation.replace('Home');
+          if (res.data.session) {
+            Alert.alert('Success', 'Account created! Welcome to Daily Love For Jesus.');
+            navigation.replace('Home');
+          } else {
+            Alert.alert('Verify your email', 'Your account has been created. Please verify your email, then sign in to continue.');
+            setIsSignUp(false);
+          }
         }
       } else {
         const res = await mobileSupabase.signIn(email.trim(), password);

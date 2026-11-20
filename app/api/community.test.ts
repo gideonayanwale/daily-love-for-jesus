@@ -118,7 +118,7 @@ describe("Community & Sunday School System - Deliverables & Security", () => {
         .mockResolvedValueOnce(null) // log 1: new
         .mockResolvedValueOnce({ id: 99, clientLogId: "client_uuid_dup" }); // log 2: duplicate
 
-      const req = new Request("http://localhost/api/tracking/sync", {
+      const req = new Request("http://localhost/tracking/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -181,7 +181,7 @@ describe("Community & Sunday School System - Deliverables & Security", () => {
       // Mock insertion
       db.insert().values().returning.mockResolvedValue([{ id: 42 }]);
 
-      const req = new Request("http://localhost/api/groups/join", {
+      const req = new Request("http://localhost/groups/join", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

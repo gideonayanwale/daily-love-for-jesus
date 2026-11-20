@@ -20,7 +20,7 @@ export const env = {
   supabaseServiceRoleKey: get("SUPABASE_SERVICE_ROLE_KEY"),
 
   // Supabase Postgres connection string (fallback / migrations)
-  databaseUrl: get("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/postgres"),
+  databaseUrl: process.env.DATABASE_URL ?? "",
 
   // Neon Serverless PostgreSQL (primary app data - fast serverless reads/writes)
   // Get from: https://console.neon.tech → your project → Connection string
@@ -30,10 +30,6 @@ export const env = {
   appId: get("APP_ID", "daily-love-app"),
   appSecret: get("APP_SECRET"),
   isProduction: process.env.NODE_ENV === "production",
-
-  // Admin Configuration
-  adminUserId: process.env.ADMIN_USER_ID ?? "",
-  adminEmail: process.env.ADMIN_EMAIL ?? "",
 
   // Telegram Bot Configuration
   telegramBotToken: get("TELEGRAM_BOT_TOKEN"),

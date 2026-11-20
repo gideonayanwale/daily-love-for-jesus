@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { AiService } from './ai.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
@@ -20,7 +20,16 @@ export class AiController {
       userContext?: string;
     },
   ) {
-    return this.aiService.explainPassage(body.scripture, body.verseText, body.userContext);
+    if (!body || typeof body.scripture !== 'string' || body.scripture.trim().length < 1 || body.scripture.length > 200) {
+      throw new BadRequestException('A valid scripture reference (max 200 characters) is required.');
+    }
+    if (typeof body.verseText !== 'string' || body.verseText.trim().length < 1 || body.verseText.length > 5000) {
+      throw new BadRequestException('Verse text must be between 1 and 5,000 characters.');
+    }
+    if (body.userContext !== undefined && (typeof body.userContext !== 'string' || body.userContext.length > 2000)) {
+      throw new BadRequestException('User context cannot exceed 2,000 characters.');
+    }
+    return this.aiService.explainPassage(body.scripture.trim(), body.verseText.trim(), body.userContext?.slice(0, 2000));
   }
 
   @ApiBearerAuth()
@@ -34,6 +43,12 @@ export class AiController {
       transcript: string;
     },
   ) {
-    return this.aiService.summarizeSermon(body.title || '', body.transcript);
+    if (!body || typeof body.transcript !== 'string' || body.transcript.trim().length < 1 || body.transcript.length > 15000) {
+      throw new BadRequestException('Sermon transcript must be between 1 and 15,000 characters.');
+    }
+    if (body.title !== undefined && (typeof body.title !== 'string' || body.title.length > 200)) {
+      throw new BadRequestException('Sermon title cannot exceed 200 characters.');
+    }
+    return this.aiService.summarizeSermon(body.title?.trim() || '', body.transcript.trim());
   }
 }

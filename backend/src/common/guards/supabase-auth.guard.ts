@@ -28,37 +28,34 @@ export class SupabaseAuthGuard implements CanActivate {
   ) {}
 
   private getSupabaseAdmin() {
-    if (this.supabaseAdmin !== undefined) {
-      return this.supabaseAdmin;
-    }
+    if (this.supabaseAdmin !== undefined) return this.supabaseAdmin;
 
     const url =
       this.configService?.get<string>('supabase.url') ||
       process.env.SUPABASE_URL ||
       process.env.VITE_SUPABASE_URL ||
       '';
-
     const key =
       this.configService?.get<string>('supabase.serviceRoleKey') ||
-      this.configService?.get<string>('supabase.anonKey') ||
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      this.configService?.get<string>('supabase.anonKey') ||
       process.env.SUPABASE_ANON_KEY ||
       process.env.VITE_SUPABASE_ANON_KEY ||
       '';
 
-    if (url && key) {
-      try {
-        this.supabaseAdmin = createClient(url, key, {
-          auth: { autoRefreshToken: false, persistSession: false },
-        });
-      } catch (err: any) {
-        this.logger.warn(`Failed to initialize Supabase client: ${err.message}`);
-        this.supabaseAdmin = null;
-      }
-    } else {
+    if (!url || !key) {
       this.supabaseAdmin = null;
+      return this.supabaseAdmin;
     }
 
+    try {
+      this.supabaseAdmin = createClient(url, key, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+    } catch (error: any) {
+      this.logger.error(`Failed to initialize Supabase auth client: ${error.message}`);
+      this.supabaseAdmin = null;
+    }
     return this.supabaseAdmin;
   }
 
@@ -67,87 +64,40 @@ export class SupabaseAuthGuard implements CanActivate {
       context.getHandler(),
       context.getClass(),
     ]);
-
     const request = context.switchToHttp().getRequest();
     const token = this.extractToken(request);
 
+    // Public routes allow genuinely anonymous requests. A supplied but invalid
+    // credential must never be silently downgraded to anonymous access.
     if (!token) {
       if (isPublic) return true;
       throw new UnauthorizedException('Authentication required to access this resource');
     }
 
     try {
-      const isProduction =
-        this.configService?.get<string>('nodeEnv') === 'production' ||
-        process.env.NODE_ENV === 'production';
-
-      const supabaseAdmin = this.getSupabaseAdmin();
-      if (!supabaseAdmin) {
-        if (isProduction) {
-          throw new UnauthorizedException(
-            'Authentication service unavailable. Please try again later.',
-          );
-        }
-        if (isPublic) return true;
-        // In local dev without Supabase configured, create a mock user with limited role
-        // so anonymous requests can still probe the API. This mode is dev-only.
-        const isDevEnv = !isProduction;
-        if (!isDevEnv) {
-          throw new UnauthorizedException('Authentication service not configured.');
-        }
-        request.user = {
-          id: 'dev-user-00000000-0000-0000-0000-000000000000',
-          email: 'dev@dailyloveforjesus.org',
-          name: 'Developer Mode',
-          role: 'user',
-        };
-        return true;
+      const supabase = this.getSupabaseAdmin();
+      if (!supabase) {
+        throw new UnauthorizedException('Authentication service is not configured.');
       }
 
-      const { data: { user: authUser }, error } = await supabaseAdmin.auth.getUser(token);
-      if (error || !authUser) {
-        if (isPublic) return true;
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data?.user?.id) {
         throw new UnauthorizedException('Invalid or expired authentication token');
       }
 
-      // Upsert/find user in database
       const db = this.dbService?.getDb();
-      const adminUserId =
-        this.configService?.get<string>('security.adminUserId') ||
-        process.env.ADMIN_USER_ID;
-      const adminEmail =
-        this.configService?.get<string>('security.adminEmail') ||
-        process.env.ADMIN_EMAIL;
-
-      const isAdmin =
-        (adminUserId && authUser.id === adminUserId) ||
-        (adminEmail && authUser.email?.toLowerCase() === adminEmail.toLowerCase());
-
-      const userRole = isAdmin ? 'admin' : 'user';
-
       if (!db) {
-        request.user = {
-          id: authUser.id,
-          email: authUser.email ?? null,
-          name:
-            authUser.user_metadata?.full_name ??
-            authUser.user_metadata?.name ??
-            authUser.email?.split('@')[0] ??
-            'Believer',
-          avatar: authUser.user_metadata?.avatar_url ?? null,
-          role: userRole,
-        };
-        return true;
+        throw new UnauthorizedException('Application profile database is unavailable.');
       }
 
-      const existingUsers = await db
+      const authUser = data.user;
+      const existing = await db
         .select()
         .from(schema.users)
         .where(eq(schema.users.id, authUser.id))
         .limit(1);
 
-      let appUser = existingUsers[0];
-
+      let appUser = existing[0];
       if (!appUser) {
         const insertData = {
           id: authUser.id,
@@ -158,7 +108,7 @@ export class SupabaseAuthGuard implements CanActivate {
             authUser.email?.split('@')[0] ??
             'Believer',
           avatar: authUser.user_metadata?.avatar_url ?? null,
-          role: userRole,
+          role: 'user',
           createdAt: new Date(),
           updatedAt: new Date(),
           lastSignInAt: new Date(),
@@ -167,42 +117,39 @@ export class SupabaseAuthGuard implements CanActivate {
         const inserted = await db
           .insert(schema.users)
           .values(insertData)
-          .onConflictDoUpdate({
-            target: schema.users.id,
-            set: {
-              lastSignInAt: new Date(),
-              updatedAt: new Date(),
-              role: userRole,
-            },
-          })
+          .onConflictDoNothing({ target: schema.users.id })
           .returning();
-        appUser = inserted[0] ?? insertData;
+        appUser = inserted[0] ?? (
+          await db.select().from(schema.users).where(eq(schema.users.id, authUser.id)).limit(1)
+        )[0];
       }
 
+      if (!appUser) {
+        throw new UnauthorizedException('User profile could not be loaded.');
+      }
+
+      // Role is read only from the server-controlled application profile.
+      // Sign-in never promotes, demotes, or overwrites an existing role.
       request.user = appUser;
       return true;
-    } catch (err: any) {
-      if (isPublic) return true;
-      if (err instanceof UnauthorizedException) throw err;
-      this.logger.error(`SupabaseAuthGuard error: ${err.message}`);
+    } catch (error: any) {
+      if (error instanceof UnauthorizedException) throw error;
+      this.logger.error(`SupabaseAuthGuard verification failed: ${error.message}`);
       throw new UnauthorizedException('Authentication verification failed');
     }
   }
 
   private extractToken(request: any): string | undefined {
-    // 1. Authorization header: Bearer <token>
     const authHeader = request.headers['authorization'] || request.headers['Authorization'];
     if (authHeader && typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')) {
-      return authHeader.substring(7).trim();
+      return authHeader.substring(7).trim() || undefined;
     }
 
-    // 2. Cookie extraction
     const rawCookies = request.headers['cookie'];
     if (rawCookies && typeof rawCookies === 'string') {
       const parsed = cookie.parse(rawCookies);
-      return parsed['sb-access-token'] || parsed['daily_love_token'];
+      return parsed['sb-access-token'] || parsed['daily_love_token'] || undefined;
     }
-
     return undefined;
   }
 }

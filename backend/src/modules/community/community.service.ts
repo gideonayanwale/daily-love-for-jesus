@@ -121,6 +121,9 @@ export class CommunityService {
 
   // ─── Helpers: Role checks ──────────────────────────────────────────────────
   async assertGroupRole(userId: string, groupId: number, allowedRoles: string[] = ['teacher', 'assistant_teacher']) {
+    if (!Number.isSafeInteger(groupId) || groupId < 1) {
+      throw new BadRequestException('A valid group ID is required.');
+    }
     const db = this.dbService.getDb();
 
     // Check if system admin
@@ -130,7 +133,7 @@ export class CommunityService {
       .where(eq(schema.users.id, userId))
       .limit(1);
 
-    if (users[0]?.role === 'admin') {
+    if (['admin', 'elevated_admin', 'superadmin'].includes(users[0]?.role)) {
       return { role: 'teacher', status: 'active' };
     }
 
@@ -166,11 +169,26 @@ export class CommunityService {
 
   // ─── Invite Code Generation ────────────────────────────────────────────────
   async generateInvite(userId: string, groupId: number, regenerate: boolean = false) {
+    if (!Number.isSafeInteger(groupId) || groupId < 1 || typeof regenerate !== 'boolean') {
+      throw new BadRequestException('Group ID and regenerate flag are invalid.');
+    }
     await this.assertGroupRole(userId, groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
     const groups = await db
-      .select()
+      .select({
+        id: schema.groups.id,
+        communityId: schema.groups.communityId,
+        name: schema.groups.name,
+        slug: schema.groups.slug,
+        description: schema.groups.description,
+        groupImage: schema.groups.groupImage,
+        category: schema.groups.category,
+        status: schema.groups.status,
+        onlyAdminsCanPost: schema.groups.onlyAdminsCanPost,
+        createdAt: schema.groups.createdAt,
+        updatedAt: schema.groups.updatedAt,
+      })
       .from(schema.groups)
       .where(eq(schema.groups.id, groupId))
       .limit(1);
@@ -223,6 +241,16 @@ export class CommunityService {
 
   // ─── Join Group with 6-Digit Code ──────────────────────────────────────────
   async joinGroup(userId: string, inviteCode: string, whatsappNumber?: string) {
+    if (typeof inviteCode !== 'string' || !/^[A-Z0-9]{4,10}$/i.test(inviteCode.trim())) {
+      throw new BadRequestException('A valid group invite code is required.');
+    }
+    if (whatsappNumber !== undefined && (
+      typeof whatsappNumber !== 'string' ||
+      whatsappNumber.length > 25 ||
+      !/^[+0-9()\-\s]*$/.test(whatsappNumber)
+    )) {
+      throw new BadRequestException('WhatsApp number format is invalid.');
+    }
     const db = this.dbService.getDb();
     const cleanCode = inviteCode.trim().toUpperCase();
 
@@ -328,15 +356,44 @@ export class CommunityService {
 
   // ─── Batch Offline Reading Log Ingestion ───────────────────────────────────
   async syncTracking(userId: string, logs: ReadingLogItemDto[]) {
+    if (!Array.isArray(logs) || logs.length > 100) {
+      throw new BadRequestException('A maximum of 100 reading logs can be synced per request.');
+    }
     const db = this.dbService.getDb();
     const syncedIds: string[] = [];
     const skippedDuplicateIds: string[] = [];
 
     for (const log of logs) {
+      if (!log || typeof log.clientLogId !== 'string' || log.clientLogId.length > 128 ||
+          typeof log.contentId !== 'string' || log.contentId.length > 200) {
+        throw new BadRequestException('Reading log identifiers are invalid.');
+      }
+      const completedAt = new Date(log.completedAt);
+      if (Number.isNaN(completedAt.getTime()) || completedAt.getTime() > Date.now() + 5 * 60 * 1000) {
+        throw new BadRequestException('Reading log completion time is invalid.');
+      }
+      if (log.groupId !== undefined && log.groupId !== null) {
+        const membership = await db
+          .select({ id: schema.groupMembers.id })
+          .from(schema.groupMembers)
+          .where(and(
+            eq(schema.groupMembers.groupId, log.groupId),
+            eq(schema.groupMembers.userId, userId),
+            eq(schema.groupMembers.status, 'active'),
+          ))
+          .limit(1);
+        if (!membership.length) {
+          throw new ForbiddenException('Reading logs can only be assigned to one of your active groups.');
+        }
+      }
+
       const existing = await db
         .select()
         .from(schema.readingLogs)
-        .where(eq(schema.readingLogs.clientLogId, log.clientLogId))
+        .where(and(
+          eq(schema.readingLogs.userId, userId),
+          eq(schema.readingLogs.clientLogId, log.clientLogId),
+        ))
         .limit(1);
 
       if (existing.length > 0) {
@@ -351,9 +408,9 @@ export class CommunityService {
         contentType: log.contentType ?? 'bible_chapter',
         bookNumber: log.bookNumber ?? null,
         chapter: log.chapter ?? null,
-        timeSpent: log.timeSpent ?? 0,
-        scrollDepth: log.scrollDepth ?? 100,
-        completedAt: new Date(log.completedAt),
+        timeSpent: Math.min(Math.max(Number(log.timeSpent) || 0, 0), 86400),
+        scrollDepth: Math.min(Math.max(Number(log.scrollDepth) || 0, 0), 100),
+        completedAt,
         clientLogId: log.clientLogId,
         syncedAt: new Date(),
       });
@@ -423,7 +480,7 @@ export class CommunityService {
         lastCompletedAt: sql<string>`max(${schema.readingLogs.completedAt})`,
       })
       .from(schema.readingLogs)
-      .where(inArray(schema.readingLogs.userId, studentUserIds))
+      .where(and(inArray(schema.readingLogs.userId, studentUserIds), eq(schema.readingLogs.groupId, groupId)))
       .groupBy(schema.readingLogs.userId);
 
     const aggMap = new Map<string, any>(
@@ -439,6 +496,7 @@ export class CommunityService {
       .where(
         and(
           inArray(schema.readingLogs.userId, studentUserIds),
+          eq(schema.readingLogs.groupId, groupId),
           sql`${schema.readingLogs.completedAt} >= now() - interval '60 days'`,
         ),
       )
@@ -524,6 +582,9 @@ export class CommunityService {
       announcementType?: 'general' | 'assignment' | 'event' | 'reminder';
     },
   ) {
+    if (!data.title?.trim() || data.title.length > 255 || !data.body?.trim() || data.body.length > 10000) {
+      throw new BadRequestException('Announcement title/body is invalid or too long.');
+    }
     await this.assertGroupRole(userId, data.groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -586,6 +647,18 @@ export class CommunityService {
       sessionDate?: string;
     },
   ) {
+    if (!data || !Number.isSafeInteger(data.groupId) || data.groupId < 1) {
+      throw new BadRequestException('A valid group ID is required.');
+    }
+    if (data.title !== undefined && (typeof data.title !== 'string' || data.title.length > 255)) {
+      throw new BadRequestException('Session title cannot exceed 255 characters.');
+    }
+    if (data.sessionType !== undefined && !['sunday_school', 'bible_study', 'prayer_meeting', 'event'].includes(data.sessionType)) {
+      throw new BadRequestException('Invalid attendance session type.');
+    }
+    if (data.sessionDate !== undefined && Number.isNaN(new Date(data.sessionDate).getTime())) {
+      throw new BadRequestException('Session date is invalid.');
+    }
     await this.assertGroupRole(userId, data.groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -616,6 +689,25 @@ export class CommunityService {
       notes?: string;
     }>,
   ) {
+    if (!Number.isSafeInteger(sessionId) || sessionId < 1) {
+      throw new BadRequestException('A valid attendance session ID is required.');
+    }
+    if (!Array.isArray(records) || records.length < 1 || records.length > 500) {
+      throw new BadRequestException('Between 1 and 500 attendance records must be submitted.');
+    }
+    if (records.some((record) =>
+      !record ||
+      (record.userId !== undefined && typeof record.userId !== 'string') ||
+      (record.guestName !== undefined && (typeof record.guestName !== 'string' || record.guestName.length > 255)) ||
+      (record.guestPhone !== undefined && (typeof record.guestPhone !== 'string' || record.guestPhone.length > 25)) ||
+      (record.notes !== undefined && (typeof record.notes !== 'string' || record.notes.length > 1000))
+    )) {
+      throw new BadRequestException('Attendance record fields are invalid.');
+    }
+    const allowedStatuses = ['present', 'absent', 'excused', 'late'];
+    if (records.some((record) => !allowedStatuses.includes(record.status))) {
+      throw new BadRequestException('Invalid attendance status.');
+    }
     const db = this.dbService.getDb();
     const sessions = await db
       .select()
@@ -627,6 +719,21 @@ export class CommunityService {
     if (!session) throw new NotFoundException('Attendance session not found');
 
     await this.assertGroupRole(userId, session.groupId, ['teacher', 'assistant_teacher']);
+    const targetIds = [...new Set(records.filter((r) => !r.isGuest && r.userId).map((r) => r.userId!))];
+    if (targetIds.length > 0) {
+      const validStudents = await db
+        .select({ userId: schema.groupMembers.userId })
+        .from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, session.groupId),
+          eq(schema.groupMembers.status, 'active'),
+          eq(schema.groupMembers.role, 'student'),
+          inArray(schema.groupMembers.userId, targetIds),
+        ));
+      if (validStudents.length !== targetIds.length) {
+        throw new ForbiddenException('Attendance can only be recorded for active students in this group.');
+      }
+    }
 
     let recordedCount = 0;
     for (const rec of records) {
@@ -668,7 +775,19 @@ export class CommunityService {
     const db = this.dbService.getDb();
 
     const groups = await db
-      .select()
+      .select({
+        id: schema.groups.id,
+        communityId: schema.groups.communityId,
+        name: schema.groups.name,
+        slug: schema.groups.slug,
+        description: schema.groups.description,
+        groupImage: schema.groups.groupImage,
+        category: schema.groups.category,
+        status: schema.groups.status,
+        onlyAdminsCanPost: schema.groups.onlyAdminsCanPost,
+        createdAt: schema.groups.createdAt,
+        updatedAt: schema.groups.updatedAt,
+      })
       .from(schema.groups)
       .where(eq(schema.groups.id, groupId))
       .limit(1);
@@ -707,6 +826,7 @@ export class CommunityService {
             .where(
               and(
                 inArray(schema.readingLogs.userId, studentIds),
+                eq(schema.readingLogs.groupId, groupId),
                 sql`${schema.readingLogs.completedAt} >= now() - interval '7 days'`,
               ),
             )
@@ -723,6 +843,7 @@ export class CommunityService {
             .where(
               and(
                 inArray(schema.readingLogs.userId, studentIds),
+                eq(schema.readingLogs.groupId, groupId),
                 sql`${schema.readingLogs.completedAt} >= now() - interval '14 days' AND ${schema.readingLogs.completedAt} < now() - interval '7 days'`,
               ),
             )
@@ -793,6 +914,8 @@ export class CommunityService {
       message?: string;
     },
   ) {
+    if (!['reminder_sent', 'note_added'].includes(data.actionType)) throw new BadRequestException('Invalid follow-up action.');
+    if (data.message && data.message.length > 500) throw new BadRequestException('Follow-up message cannot exceed 500 characters.');
     await this.assertGroupRole(userId, data.groupId, ['teacher', 'assistant_teacher']);
     const db = this.dbService.getDb();
 
@@ -803,6 +926,20 @@ export class CommunityService {
       .limit(1);
 
     const group = groups[0];
+    if (!group) throw new NotFoundException('Group not found.');
+    const studentMembership = await db
+      .select({ id: schema.groupMembers.id })
+      .from(schema.groupMembers)
+      .where(and(
+        eq(schema.groupMembers.groupId, data.groupId),
+        eq(schema.groupMembers.userId, data.studentId),
+        eq(schema.groupMembers.status, 'active'),
+        eq(schema.groupMembers.role, 'student'),
+      ))
+      .limit(1);
+    if (!studentMembership.length) {
+      throw new ForbiddenException('Follow-up target must be an active student in this group.');
+    }
 
     if (data.actionType === 'reminder_sent') {
       const reminderText =
@@ -874,7 +1011,7 @@ export class CommunityService {
         description: schema.groups.description,
         groupImage: schema.groups.groupImage,
         category: schema.groups.category,
-        inviteCode: schema.groups.inviteCode,
+        inviteCode: sql<string | null>`case when ${schema.groupMembers.role} in ('teacher', 'assistant_teacher') then ${schema.groups.inviteCode} else null end`,
         role: schema.groupMembers.role,
         joinedAt: schema.groupMembers.joinedAt,
       })
@@ -912,6 +1049,10 @@ export class CommunityService {
 
     const group = groups[0];
     if (!group) throw new NotFoundException('Group not found');
+    const requesterRole = await this.getUserRole(userId);
+    if (!membership.length && !['admin', 'elevated_admin', 'superadmin'].includes(requesterRole)) {
+      throw new ForbiddenException('You are not an active member of this group.');
+    }
 
     const recentAnnouncements = await db
       .select({
@@ -1023,6 +1164,12 @@ export class CommunityService {
   }
 
   async registerPushToken(userId: string, token: string, platform: 'expo' | 'fcm' | 'apns' = 'expo') {
+    if (typeof token !== 'string' || token.trim().length < 10 || token.length > 512) {
+      throw new BadRequestException('Push token must be between 10 and 512 characters.');
+    }
+    if (!['expo', 'fcm', 'apns'].includes(platform)) {
+      throw new BadRequestException('Unsupported push token platform.');
+    }
     const db = this.dbService.getDb();
     await db
       .insert(schema.pushTokens)
@@ -1054,39 +1201,86 @@ export class CommunityService {
     return user[0]?.role || 'user';
   }
 
+  async assertPlatformRole(userId: string, allowedRoles: string[] = ['admin', 'superadmin']) {
+    const role = await this.getUserRole(userId);
+    if (!allowedRoles.includes(role)) {
+      throw new ForbiddenException('This operation requires platform administrator privileges.');
+    }
+    return role;
+  }
+
   async elevateUser(
     requesterId: string,
     targetUserId: string,
     targetRole: 'elevated_admin' | 'admin' | 'user',
   ) {
-    const requesterRole = await this.getUserRole(requesterId);
-    if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
-      throw new ForbiddenException('Only superadmin or elevated_admin can assign administrative roles.');
+    if (!['user', 'elevated_admin', 'admin'].includes(targetRole)) {
+      throw new BadRequestException('Invalid target role.');
     }
-
-    if (requesterRole === 'elevated_admin' && targetRole === 'elevated_admin') {
-      throw new ForbiddenException('Only superadmin can appoint an elevated_admin.');
+    const requesterRole = await this.getUserRole(requesterId);
+    if (requesterRole !== 'admin' && requesterRole !== 'superadmin') {
+      throw new ForbiddenException('Only a platform admin can assign administrative roles.');
+    }
+    if (targetRole === 'admin' && requesterRole !== 'superadmin') {
+      throw new ForbiddenException('Only superadmin can appoint another admin.');
     }
 
     const db = this.dbService.getDb();
-    const updated = await db
-      .update(schema.users)
-      .set({ role: targetRole, updatedAt: new Date() })
+    const targetRows = await db
+      .select({ role: schema.users.role })
+      .from(schema.users)
       .where(eq(schema.users.id, targetUserId))
-      .returning();
-
-    if (!updated.length) {
+      .limit(1);
+    if (!targetRows.length) {
       throw new NotFoundException('Target user not found.');
     }
+    if (targetUserId === requesterId) {
+      throw new ForbiddenException('You cannot change your own platform role.');
+    }
+    if (targetRows[0].role === 'superadmin') {
+      throw new ForbiddenException('Superadmin accounts cannot be modified through this operation.');
+    }
+    if (requesterRole !== 'superadmin' && ['admin', 'superadmin'].includes(targetRows[0].role)) {
+      throw new ForbiddenException('Only superadmin can change another platform administrator account.');
+    }
+    const updated = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(schema.users)
+        .set({ role: targetRole, updatedAt: new Date() })
+        .where(eq(schema.users.id, targetUserId))
+        .returning();
 
-    await db.insert(schema.auditLogs).values({
-      actorId: requesterId,
-      action: 'elevate_user_role',
-      resourceType: 'user',
-      resourceId: targetUserId,
-      metadata: { targetRole, requesterRole },
-      occurredAt: new Date(),
+      if (!rows.length) {
+        throw new NotFoundException('Target user not found.');
+      }
+
+      await tx.insert(schema.auditLogs).values({
+        actorId: requesterId,
+        action: 'elevate_user_role',
+        resourceType: 'user',
+        resourceId: targetUserId,
+        metadata: { targetRole, requesterRole },
+        occurredAt: new Date(),
+      });
+      return rows;
     });
+
+    const neonDb = this.dbService.getNeonDb();
+    const supabaseDb = this.dbService.getSupabaseDb();
+    const secondaryDb = db === neonDb ? supabaseDb : neonDb;
+    if (secondaryDb && secondaryDb !== db) {
+      try {
+        await secondaryDb
+          .update(schema.users)
+          .set({ role: targetRole, updatedAt: new Date() })
+          .where(eq(schema.users.id, targetUserId));
+      } catch (error) {
+        this.logger.error(
+          `Role mirror failed for user ${targetUserId}; primary role change is audited but Realtime authorization may lag.`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
 
     return {
       success: true,
@@ -1126,6 +1320,18 @@ export class CommunityService {
       category?: string;
     },
   ) {
+    if (!data || typeof data.name !== 'string' || data.name.trim().length < 3 || data.name.trim().length > 120) {
+      throw new BadRequestException('Community name must be between 3 and 120 characters.');
+    }
+    if (data.description !== undefined && (typeof data.description !== 'string' || data.description.length > 2000)) {
+      throw new BadRequestException('Community description cannot exceed 2,000 characters.');
+    }
+    if (data.location !== undefined && (typeof data.location !== 'string' || data.location.length > 255)) {
+      throw new BadRequestException('Community location cannot exceed 255 characters.');
+    }
+    if (data.category !== undefined && (typeof data.category !== 'string' || data.category.length > 100)) {
+      throw new BadRequestException('Community category cannot exceed 100 characters.');
+    }
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
     const slug =
@@ -1194,6 +1400,12 @@ export class CommunityService {
   }
 
   async approveCommunity(requesterId: string, communityId: string, approve: boolean) {
+    if (typeof communityId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(communityId)) {
+      throw new BadRequestException('Community ID must be a valid UUID.');
+    }
+    if (typeof approve !== 'boolean') {
+      throw new BadRequestException('Approval decision must be a boolean.');
+    }
     const requesterRole = await this.getUserRole(requesterId);
     if (requesterRole !== 'superadmin' && requesterRole !== 'elevated_admin') {
       throw new ForbiddenException('Only superadmin and elevated_admin can approve communities.');
@@ -1222,7 +1434,23 @@ export class CommunityService {
   }
 
   async getCommunityMembers(requesterId: string, communityId: string) {
+    if (typeof communityId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(communityId)) {
+      throw new BadRequestException('Community ID must be a valid UUID.');
+    }
     const db = this.dbService.getDb();
+    const requesterRole = await this.getUserRole(requesterId);
+    const membership = await db
+      .select({ id: schema.communityMembers.id, role: schema.communityMembers.role })
+      .from(schema.communityMembers)
+      .where(and(
+        eq(schema.communityMembers.communityId, communityId),
+        eq(schema.communityMembers.userId, requesterId),
+        eq(schema.communityMembers.status, 'active'),
+      ))
+      .limit(1);
+    if (!['admin', 'elevated_admin', 'superadmin'].includes(requesterRole) && !['COMMUNITY_OWNER', 'COMMUNITY_ADMIN'].includes(membership[0]?.role ?? '')) {
+      throw new ForbiddenException('Community leader access is required to view the member directory.');
+    }
     return db
       .select({
         id: schema.communityMembers.id,
@@ -1260,90 +1488,116 @@ export class CommunityService {
   ) {
     const db = this.dbService.getDb();
     const senderRole = await this.getUserRole(senderId);
+    const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(senderRole);
 
-    if (data.channelType === 'general') {
-      if (senderRole !== 'superadmin' && senderRole !== 'elevated_admin') {
-        throw new ForbiddenException(
-          'Only elevated administrators can broadcast in the general announcement channel.',
-        );
-      }
+    if (!['general', 'community', 'group', 'dm', 'leadership'].includes(data.channelType)) {
+      throw new BadRequestException('Unsupported chat channel type.');
     }
-
-    if (data.channelType === 'leadership') {
-      if (
-        senderRole !== 'superadmin' &&
-        senderRole !== 'elevated_admin' &&
-        senderRole !== 'admin'
-      ) {
-        throw new ForbiddenException(
-          'Only leadership council members (elevated admins and community admins) can message in this channel.',
-        );
-      }
+    if (!data.content?.trim() || data.content.length > 10000) {
+      throw new BadRequestException('Message content must be between 1 and 10,000 characters.');
     }
-
-    if (data.channelType === 'group' && data.groupId) {
-      const groupRows = await db
-        .select()
-        .from(schema.groups)
-        .where(eq(schema.groups.id, data.groupId))
-        .limit(1);
-      const group = groupRows[0];
-      if (group?.onlyAdminsCanPost) {
-        const isGroupAdmin =
-          senderRole === 'superadmin' ||
-          senderRole === 'elevated_admin' ||
-          (await this.assertGroupRole(senderId, data.groupId, ['teacher', 'assistant_teacher'])
-            .then(() => true)
-            .catch(() => false));
-        if (!isGroupAdmin) {
-          throw new ForbiddenException(
-            'Only group administrators can send messages in this group (admin-only mode active).',
-          );
+    if (data.mediaUrl) {
+      try {
+        const media = new URL(data.mediaUrl);
+        if (media.protocol !== 'https:' || media.username || media.password || data.mediaUrl.length > 2048) {
+          throw new Error('invalid');
         }
+      } catch {
+        throw new BadRequestException('A valid HTTPS media URL is required.');
+      }
+    }
+    if (
+      (data.isAnnouncement !== undefined && typeof data.isAnnouncement !== 'boolean') ||
+      (data.isEncrypted !== undefined && typeof data.isEncrypted !== 'boolean')
+    ) {
+      throw new BadRequestException('Message flags must be boolean values.');
+    }
+
+    if (data.channelType === 'general' && !platformAdmin) {
+      throw new ForbiddenException('Only platform administrators can post to the general channel.');
+    }
+    if (data.channelType === 'leadership' && !platformAdmin) {
+      throw new ForbiddenException('Leadership channel access is restricted to platform administrators.');
+    }
+
+    if (data.channelType === 'group') {
+      if (!Number.isSafeInteger(data.groupId) || data.groupId! < 1) throw new BadRequestException('A valid groupId is required for group messages.');
+      const groupRows = await db.select().from(schema.groups).where(eq(schema.groups.id, data.groupId)).limit(1);
+      const group = groupRows[0];
+      if (!group) throw new NotFoundException('Group not found.');
+      const membership = await db.select({ id: schema.groupMembers.id, role: schema.groupMembers.role })
+        .from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, data.groupId),
+          eq(schema.groupMembers.userId, senderId),
+          eq(schema.groupMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) {
+        throw new ForbiddenException('You must be an active group member to post here.');
+      }
+      if (group.onlyAdminsCanPost && !platformAdmin && !['teacher', 'assistant_teacher'].includes(membership[0]?.role ?? '')) {
+        throw new ForbiddenException('Only group administrators can post in this group.');
       }
     }
 
-    // Ephemeral 7-day auto-deletion for community group chats
+    if (data.channelType === 'community') {
+      if (!data.communityId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.communityId)) {
+        throw new BadRequestException('A valid communityId is required for community messages.');
+      }
+      const membership = await db.select({ id: schema.communityMembers.id })
+        .from(schema.communityMembers)
+        .where(and(
+          eq(schema.communityMembers.communityId, data.communityId),
+          eq(schema.communityMembers.userId, senderId),
+          eq(schema.communityMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) {
+        throw new ForbiddenException('You must be an active community member to post here.');
+      }
+    }
+
+    if (data.channelType === 'dm') {
+      if (
+        !data.receiverId ||
+        data.receiverId === senderId ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(data.receiverId)
+      ) {
+        throw new BadRequestException('A valid, different receiverId is required for direct messages.');
+      }
+      const receiver = await db.select({ id: schema.users.id }).from(schema.users)
+        .where(eq(schema.users.id, data.receiverId)).limit(1);
+      if (!receiver.length) throw new NotFoundException('Message recipient not found.');
+    }
+
     const expiresAt =
       data.channelType === 'community' || data.channelType === 'group'
         ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
         : null;
 
-    const inserted = await db
-      .insert(schema.chatMessages)
-      .values({
-        channelType: data.channelType,
-        communityId: data.communityId || null,
-        groupId: data.groupId || null,
-        senderId,
-        receiverId: data.receiverId || null,
-        content: data.content,
-        mediaUrl: data.mediaUrl || null,
-        isEncrypted: Boolean(data.isEncrypted),
-        isAnnouncement: data.isAnnouncement || data.channelType === 'general',
-        expiresAt,
-      })
-      .returning();
+    const inserted = await db.insert(schema.chatMessages).values({
+      channelType: data.channelType,
+      communityId: data.communityId || null,
+      groupId: data.groupId || null,
+      senderId,
+      receiverId: data.receiverId || null,
+      content: data.content.trim(),
+      mediaUrl: data.mediaUrl || null,
+      isEncrypted: Boolean(data.isEncrypted),
+      isAnnouncement: data.isAnnouncement || data.channelType === 'general',
+      expiresAt,
+    }).returning();
 
-    const senderRows = await db
-      .select({
-        id: schema.users.id,
-        name: schema.users.name,
-        avatar: schema.users.avatar,
-        role: schema.users.role,
-      })
-      .from(schema.users)
-      .where(eq(schema.users.id, senderId))
-      .limit(1);
+    const senderRows = await db.select({
+      id: schema.users.id,
+      name: schema.users.name,
+      avatar: schema.users.avatar,
+      role: schema.users.role,
+    }).from(schema.users).where(eq(schema.users.id, senderId)).limit(1);
 
-    return {
-      success: true,
-      message: inserted[0],
-      sender: senderRows[0] || null,
-    };
+    return { success: true, message: inserted[0], sender: senderRows[0] || null };
   }
 
-  async listChatMessages(
+    async listChatMessages(
     userId: string,
     channelType: 'general' | 'community' | 'group' | 'dm' | 'leadership',
     options: {
@@ -1355,17 +1609,48 @@ export class CommunityService {
   ) {
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
+    const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(userRole);
 
-    if (channelType === 'leadership') {
-      if (userRole !== 'superadmin' && userRole !== 'elevated_admin' && userRole !== 'admin') {
-        throw new ForbiddenException(
-          'Access denied: leadership channel is exclusive to elevated admins and community admins.',
-        );
+    if (!['general', 'community', 'group', 'dm', 'leadership'].includes(channelType)) {
+      throw new BadRequestException('Unsupported chat channel type.');
+    }
+    if (channelType === 'leadership' && !platformAdmin) {
+      throw new ForbiddenException('Leadership channel access is restricted to platform administrators.');
+    }
+    if (channelType === 'community') {
+      if (!options.communityId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(options.communityId)) {
+        throw new BadRequestException('A valid communityId is required.');
+      }
+      const membership = await db.select({ id: schema.communityMembers.id }).from(schema.communityMembers)
+        .where(and(
+          eq(schema.communityMembers.communityId, options.communityId),
+          eq(schema.communityMembers.userId, userId),
+          eq(schema.communityMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) throw new ForbiddenException('You are not a member of this community.');
+    }
+    if (channelType === 'group') {
+      if (!Number.isSafeInteger(options.groupId) || options.groupId! < 1) throw new BadRequestException('A valid groupId is required.');
+
+      const membership = await db.select({ id: schema.groupMembers.id }).from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, options.groupId),
+          eq(schema.groupMembers.userId, userId),
+          eq(schema.groupMembers.status, 'active'),
+        )).limit(1);
+      if (!membership.length && !platformAdmin) throw new ForbiddenException('You are not a member of this group.');
+    }
+    if (channelType === 'dm') {
+      if (
+        !options.receiverId ||
+        options.receiverId === userId ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(options.receiverId)
+      ) {
+        throw new BadRequestException('A valid, different receiverId is required.');
       }
     }
 
-    const limit = options.limit || 50;
-
+    const limit = Math.min(Math.max(Number(options.limit) || 50, 1), 100);
     let condition = and(
       eq(schema.chatMessages.channelType, channelType),
       eq(schema.chatMessages.isDeleted, false),
@@ -1377,126 +1662,117 @@ export class CommunityService {
       ),
     );
 
-    if (channelType === 'general' || channelType === 'leadership') {
-      // General or leadership channel condition
-    } else if (channelType === 'community' && options.communityId) {
-      condition = and(condition, eq(schema.chatMessages.communityId, options.communityId));
-    } else if (channelType === 'group' && options.groupId) {
-      condition = and(condition, eq(schema.chatMessages.groupId, options.groupId));
-    } else if (channelType === 'dm' && options.receiverId) {
+    if (channelType === 'community') {
+      condition = and(condition, eq(schema.chatMessages.communityId, options.communityId!));
+    } else if (channelType === 'group') {
+      condition = and(condition, eq(schema.chatMessages.groupId, options.groupId!));
+    } else if (channelType === 'dm') {
       condition = and(
         eq(schema.chatMessages.channelType, 'dm'),
         eq(schema.chatMessages.isDeleted, false),
         or(
-          and(
-            eq(schema.chatMessages.senderId, userId),
-            eq(schema.chatMessages.receiverId, options.receiverId),
-          ),
-          and(
-            eq(schema.chatMessages.senderId, options.receiverId),
-            eq(schema.chatMessages.receiverId, userId),
-          ),
+          and(eq(schema.chatMessages.senderId, userId), eq(schema.chatMessages.receiverId, options.receiverId!)),
+          and(eq(schema.chatMessages.senderId, options.receiverId!), eq(schema.chatMessages.receiverId, userId)),
         ),
       );
     }
 
-    return db
-      .select({
-        id: schema.chatMessages.id,
-        channelType: schema.chatMessages.channelType,
-        communityId: schema.chatMessages.communityId,
-        groupId: schema.chatMessages.groupId,
-        senderId: schema.chatMessages.senderId,
-        receiverId: schema.chatMessages.receiverId,
-        content: schema.chatMessages.content,
-        mediaUrl: schema.chatMessages.mediaUrl,
-        isEncrypted: schema.chatMessages.isEncrypted,
-        isPinned: schema.chatMessages.isPinned,
-        isKept: schema.chatMessages.isKept,
-        isAnnouncement: schema.chatMessages.isAnnouncement,
-        expiresAt: schema.chatMessages.expiresAt,
-        createdAt: schema.chatMessages.createdAt,
-        senderName: schema.users.name,
-        senderAvatar: schema.users.avatar,
-        senderRole: schema.users.role,
-      })
-      .from(schema.chatMessages)
+    return db.select({
+      id: schema.chatMessages.id,
+      channelType: schema.chatMessages.channelType,
+      communityId: schema.chatMessages.communityId,
+      groupId: schema.chatMessages.groupId,
+      senderId: schema.chatMessages.senderId,
+      receiverId: schema.chatMessages.receiverId,
+      content: schema.chatMessages.content,
+      mediaUrl: schema.chatMessages.mediaUrl,
+      isEncrypted: schema.chatMessages.isEncrypted,
+      isPinned: schema.chatMessages.isPinned,
+      isKept: schema.chatMessages.isKept,
+      isAnnouncement: schema.chatMessages.isAnnouncement,
+      expiresAt: schema.chatMessages.expiresAt,
+      createdAt: schema.chatMessages.createdAt,
+      senderName: schema.users.name,
+      senderAvatar: schema.users.avatar,
+      senderRole: schema.users.role,
+    }).from(schema.chatMessages)
       .innerJoin(schema.users, eq(schema.chatMessages.senderId, schema.users.id))
       .where(condition)
       .orderBy(asc(schema.chatMessages.createdAt))
       .limit(limit);
   }
 
-  async moderateMessage(
+    async moderateMessage(
     userId: string,
     messageId: number,
     action: 'pin' | 'unpin' | 'delete' | 'keep' | 'unkeep',
   ) {
+    if (!['pin', 'unpin', 'delete', 'keep', 'unkeep'].includes(action)) {
+      throw new BadRequestException('Invalid moderation action.');
+    }
     const db = this.dbService.getDb();
     const userRole = await this.getUserRole(userId);
+    const platformAdmin = ['admin', 'elevated_admin', 'superadmin'].includes(userRole);
 
-    const msgRows = await db
-      .select()
-      .from(schema.chatMessages)
-      .where(eq(schema.chatMessages.id, messageId))
-      .limit(1);
-
+    const msgRows = await db.select().from(schema.chatMessages)
+      .where(eq(schema.chatMessages.id, messageId)).limit(1);
     const msg = msgRows[0];
     if (!msg) throw new NotFoundException('Message not found.');
 
-    const isPlatformAdmin = userRole === 'superadmin' || userRole === 'elevated_admin';
     const isSender = msg.senderId === userId;
+    let scopedModerator = false;
+    if (msg.groupId) {
+      const member = await db.select({ role: schema.groupMembers.role }).from(schema.groupMembers)
+        .where(and(
+          eq(schema.groupMembers.groupId, msg.groupId),
+          eq(schema.groupMembers.userId, userId),
+          eq(schema.groupMembers.status, 'active'),
+        )).limit(1);
+      scopedModerator = ['teacher', 'assistant_teacher'].includes(member[0]?.role ?? '');
+    } else if (msg.communityId) {
+      const member = await db.select({ role: schema.communityMembers.role }).from(schema.communityMembers)
+        .where(and(
+          eq(schema.communityMembers.communityId, msg.communityId),
+          eq(schema.communityMembers.userId, userId),
+          eq(schema.communityMembers.status, 'active'),
+        )).limit(1);
+      scopedModerator = ['COMMUNITY_OWNER', 'COMMUNITY_ADMIN'].includes(member[0]?.role ?? '');
+    }
 
-    if (!isPlatformAdmin && !isSender && action === 'delete') {
+    if (action === 'delete' && !platformAdmin && !isSender && !scopedModerator) {
       throw new ForbiddenException('Not authorized to delete this message.');
     }
-    if (!isPlatformAdmin && (action === 'pin' || action === 'unpin')) {
-      throw new ForbiddenException('Only administrators can pin/unpin messages.');
+    if ((action === 'pin' || action === 'unpin') && !platformAdmin && !scopedModerator) {
+      throw new ForbiddenException('Only platform or group/community moderators can pin messages.');
+    }
+    if ((action === 'keep' || action === 'unkeep') && !platformAdmin && !isSender && !scopedModerator) {
+      throw new ForbiddenException('Not authorized to change message retention.');
     }
 
     if (action === 'delete') {
-      await db
-        .update(schema.chatMessages)
-        .set({ isDeleted: true, updatedAt: new Date() })
+      await db.update(schema.chatMessages).set({ isDeleted: true, updatedAt: new Date() })
         .where(eq(schema.chatMessages.id, messageId));
       return { success: true, message: 'Message deleted.' };
     }
-
     if (action === 'keep' || action === 'unkeep') {
       const isKept = action === 'keep';
-      await db
-        .update(schema.chatMessages)
-        .set({
-          isKept,
-          updatedAt: new Date(),
-        })
+      await db.update(schema.chatMessages).set({ isKept, updatedAt: new Date() })
         .where(eq(schema.chatMessages.id, messageId));
-      return {
-        success: true,
-        message: isKept
-          ? 'Message saved permanently (auto-deletion exempted).'
-          : 'Message unkept.',
-        isKept,
-      };
+      return { success: true, message: isKept ? 'Message saved permanently (auto-deletion exempted).' : 'Message unkept.', isKept };
     }
 
     const pinned = action === 'pin';
-    await db
-      .update(schema.chatMessages)
-      .set({
-        isPinned: pinned,
-        updatedAt: new Date(),
-      })
+    await db.update(schema.chatMessages).set({ isPinned: pinned, updatedAt: new Date() })
       .where(eq(schema.chatMessages.id, messageId));
-
     return { success: true, message: pinned ? 'Message pinned (auto-deletion exempted).' : 'Message unpinned.' };
   }
 
-  async toggleGroupAdminOnlyPosting(
+    async toggleGroupAdminOnlyPosting(
     userId: string,
     groupId: number,
     onlyAdminsCanPost: boolean,
   ) {
+    if (typeof onlyAdminsCanPost !== 'boolean') throw new BadRequestException('onlyAdminsCanPost must be boolean.');
     await this.assertGroupRole(userId, groupId, ['teacher']);
     const db = this.dbService.getDb();
     await db
@@ -1515,24 +1791,21 @@ export class CommunityService {
   }
 
   // ─── 7-Day Auto-Deletion Sweeper ───────────────────────────────────────────
-  async cleanupExpiredChatMessages() {
+  async cleanupExpiredChatMessages(requesterId: string) {
+    await this.assertPlatformRole(requesterId, ['admin', 'superadmin']);
     const db = this.dbService.getDb();
-    const purged = await db
-      .delete(schema.chatMessages)
-      .where(
-        and(
-          sql`${schema.chatMessages.expiresAt} IS NOT NULL`,
-          sql`${schema.chatMessages.expiresAt} <= NOW()`,
-          eq(schema.chatMessages.isPinned, false),
-          eq(schema.chatMessages.isKept, false),
-        ),
-      )
+    const purged = await db.delete(schema.chatMessages)
+      .where(and(
+        sql`${schema.chatMessages.expiresAt} IS NOT NULL`,
+        sql`${schema.chatMessages.expiresAt} <= NOW()`,
+        eq(schema.chatMessages.isPinned, false),
+        eq(schema.chatMessages.isKept, false),
+      ))
       .returning({ id: schema.chatMessages.id });
-
     return { success: true, purgedCount: purged.length };
   }
 
-  // ─── Superadmin Cloudinary Backup Sync ─────────────────────────────────────
+    // ─── Superadmin Cloudinary Backup Sync ─────────────────────────────────────
   private parseCloudinaryUrl(): { cloudName: string; apiKey: string; apiSecret: string } | null {
     const rawUrl =
       this.configService.get<string>('integrations.cloudinaryUrl') ||
@@ -1551,6 +1824,9 @@ export class CommunityService {
   }
 
   async backupCommunityChatToCloudinary(requesterId: string, communityId: string) {
+    if (typeof communityId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(communityId)) {
+      throw new BadRequestException('Community ID must be a valid UUID.');
+    }
     const requesterRole = await this.getUserRole(requesterId);
     if (requesterRole !== 'superadmin') {
       throw new ForbiddenException('Only superadmin can perform Cloudinary backup sync.');

@@ -14,13 +14,12 @@ export interface AppConfig {
   security: {
     appId: string;
     appSecret: string;
-    adminUserId: string;
-    adminEmail: string;
   };
   integrations: {
     apiBibleKey: string;
     telegramBotToken: string;
     telegramChannelId: string;
+    telegramWebhookSecret: string;
     geminiApiKey: string;
     openrouterApiKey: string;
     cloudinaryCloudName: string;
@@ -51,13 +50,12 @@ export default (): AppConfig => ({
   security: {
     appId: process.env.APP_ID || 'daily-love-app',
     appSecret: process.env.APP_SECRET || '',
-    adminUserId: process.env.ADMIN_USER_ID || '',
-    adminEmail: process.env.ADMIN_EMAIL || '',
   },
   integrations: {
     apiBibleKey: process.env.API_BIBLE_KEY || '',
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || '',
     telegramChannelId: process.env.TELEGRAM_CHANNEL_ID || '',
+    telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET || '',
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     openrouterApiKey: process.env.OPENROUTER_API_KEY || '',
     cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME || '',

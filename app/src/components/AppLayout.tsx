@@ -8,17 +8,15 @@ import {
   Users,
   Settings,
   WifiOff,
-  Wifi,
   Sun,
   Moon,
-  Sparkles,
-  User,
   Heart,
   ShieldCheck,
   LayoutDashboard,
 } from 'lucide-react';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
+import ExplorePanel from './ExplorePanel';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
@@ -151,8 +149,9 @@ export default function AppLayout() {
             )}
           </nav>
 
-          {/* Right Header Actions: Theme Switcher & Profile */}
+          {/* Right Header Actions: Explore navigation, theme and profile */}
           <div className="flex items-center gap-2">
+            <ExplorePanel userId={user?.id} userName={user?.name} userRole={user?.role} />
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}

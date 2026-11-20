@@ -25,7 +25,8 @@
     "db:push": "drizzle-kit push",
     "db:push:neon": "cross-env NEON_DATABASE_URL=$NEON_DATABASE_URL drizzle-kit push",
     "db:push:supabase": "cross-env NEON_DATABASE_URL= drizzle-kit push",
-    "db:seed": "tsx db/seed.ts"
+    "db:seed": "tsx db/seed.ts",
+    "lint:ui": "eslint src/components/ExplorePanel.tsx src/components/AppLayout.tsx src/pages/admin/DevotionalAdmin.tsx src/hooks/useDevotionalRealtime.ts src/lib/supabase.ts"
   },
   "scripts-windows-help": {
     "fix:windows": "powershell -ExecutionPolicy Bypass -NoProfile -File ./scripts/windows-fix.ps1"

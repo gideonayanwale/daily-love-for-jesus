@@ -87,11 +87,11 @@ export async function deleteDevotional(id: number): Promise<void> {
   await db.delete(devotionals).where(eq(devotionals.id, id));
 }
 
-export async function publishDevotional(id: number): Promise<Devotional | undefined> {
+export async function publishDevotional(id: number, isPublished = true): Promise<Devotional | undefined> {
   const db = await getDb();
   await db
     .update(devotionals)
-    .set({ isPublished: true, updatedAt: new Date() })
+    .set({ isPublished, updatedAt: new Date() })
     .where(eq(devotionals.id, id));
   return getDevotionalById(id);
 }

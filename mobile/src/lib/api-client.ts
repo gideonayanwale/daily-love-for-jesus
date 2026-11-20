@@ -27,7 +27,7 @@ const BASE_URL = getApiBaseUrl();
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   
-  const token = getMobileAuthToken();
+  const token = await getMobileAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',

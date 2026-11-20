@@ -104,10 +104,10 @@ export const appRouter = t.router({
         z.object({
           limit: z.number().optional(),
           offset: z.number().optional(),
-          publishedOnly: z.boolean().optional(),
         }).optional(),
       )
       .query(async () => ({ items: [] as any[], total: 0 })),
+    adminList: t.procedure.input(z.object({ limit: z.number().optional(), offset: z.number().optional() }).optional()).query(async () => ({ items: [] as any[], total: 0 })),
     create: t.procedure.input(z.any()).mutation(async () => ({} as any)),
     update: t.procedure
       .input(z.object({ id: z.number(), data: z.any() }))
@@ -116,7 +116,7 @@ export const appRouter = t.router({
       .input(z.object({ id: z.number() }))
       .mutation(async () => ({ success: true })),
     publish: t.procedure
-      .input(z.object({ id: z.number() }))
+      .input(z.object({ id: z.number(), isPublished: z.boolean().optional() }))
       .mutation(async () => ({} as any)),
     sendToTelegram: t.procedure
       .input(z.object({ id: z.number() }))

@@ -1,10 +1,10 @@
 import { Hono } from "hono";
+import { z } from "zod";
 import { bodyLimit } from "hono/body-limit";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
-import { Paths } from "@contracts/constants";
 import { getDb } from "./queries/connection";
 import { telegramMessages, auditLogs } from "@db/schema";
 import { sql } from "drizzle-orm";
@@ -17,11 +17,61 @@ import { parseAndCreateDevotional } from "./lib/devotionalParser";
 
 
 const anonLogCache = new Map<string, number>();
+
+async function timingSafeStringEqual(left: string, right: string): Promise<boolean> {
+  if (left.length !== right.length) return false;
+  const encoder = new TextEncoder();
+  const [leftDigest, rightDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", encoder.encode(left)),
+    crypto.subtle.digest("SHA-256", encoder.encode(right)),
+  ]);
+  const a = new Uint8Array(leftDigest);
+  const b = new Uint8Array(rightDigest);
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference |= a[i] ^ b[i];
+  return difference === 0;
+}
+
+async function pseudonymizeVisitorIp(ip: string | null): Promise<string | null> {
+  if (!ip || !env.appSecret) return null;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(env.appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ip));
+  return Array.from(new Uint8Array(signature), (byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 40);
+}
 setInterval(() => anonLogCache.clear(), 10 * 60 * 1000).unref();
+
+const telegramMessageSchema = z.object({
+  message_id: z.number().int().positive(),
+  chat: z.object({
+    id: z.number().int(),
+    username: z.string().max(64).optional(),
+    title: z.string().max(500).optional(),
+  }),
+  from: z.object({
+    id: z.number().int().positive(),
+    first_name: z.string().max(255).optional(),
+  }).passthrough().optional(),
+  date: z.number().int().nonnegative().optional(),
+  text: z.string().max(10000).optional(),
+  caption: z.string().max(10000).optional(),
+}).passthrough();
+
+const telegramUpdateSchema = z.object({
+  message: telegramMessageSchema.optional(),
+  channel_post: telegramMessageSchema.optional(),
+}).passthrough();
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
+app.use(bodyLimit({ maxSize: 5 * 1024 * 1024 }));
 
 app.use('*', async (c, next) => {
   // Only track anonymous GET requests
@@ -59,12 +109,13 @@ app.use('*', async (c, next) => {
       anonLogCache.set(cacheKey, Date.now());
       (async () => {
         const db = await getDb();
+        const visitorHash = await pseudonymizeVisitorIp(ip);
         await db.insert(auditLogs).values({
           action: 'anonymous_visit',
           resourceType: 'page',
           resourceId: path,
           actorId: null,
-          ipAddress: ip,
+          ipAddress: visitorHash,
           userAgent: ua,
           metadata: { method: 'GET', timestamp: new Date().toISOString() },
         });
@@ -78,10 +129,10 @@ app.use('*', async (c, next) => {
 
 // Telegram webhook endpoint - receives bot updates directly
 app.post("/api/telegram/webhook", async (c) => {
-  // Validate webhook secret token (skip if not configured — dev mode)
+  // Validate the Telegram webhook secret; production requires it.
   if (env.telegramWebhookSecret) {
     const incomingSecret = c.req.header("x-telegram-bot-api-secret-token");
-    if (incomingSecret !== env.telegramWebhookSecret) {
+    if (!incomingSecret || !(await timingSafeStringEqual(incomingSecret, env.telegramWebhookSecret))) {
       return c.json({ error: "Unauthorized" }, 401);
     }
   } else if (env.isProduction) {
@@ -89,7 +140,12 @@ app.post("/api/telegram/webhook", async (c) => {
   }
 
   try {
-    const update = await c.req.json();
+    const rawUpdate = await c.req.json();
+    const parsedUpdate = telegramUpdateSchema.safeParse(rawUpdate);
+    if (!parsedUpdate.success) {
+      return c.json({ error: "Invalid Telegram update payload" }, 400);
+    }
+    const update = parsedUpdate.data;
 
     // Handle both messages and channel posts
     const message = update.message ?? update.channel_post;
@@ -100,6 +156,21 @@ app.post("/api/telegram/webhook", async (c) => {
     const text = message.text ?? message.caption ?? "";
     if (!text.trim()) {
       return c.json({ status: "ignored", reason: "empty_message" });
+    }
+
+    const configuredChannel = env.telegramChannelId.trim();
+    if (!configuredChannel && env.isProduction) {
+      return c.json({ error: "Telegram channel is not configured" }, 503);
+    }
+    if (configuredChannel) {
+      const incomingId = String(message.chat?.id ?? "");
+      const incomingUsername = message.chat?.username ? `@${message.chat.username}` : "";
+      if (
+        configuredChannel !== incomingId &&
+        configuredChannel.toLowerCase() !== incomingUsername.toLowerCase()
+      ) {
+        return c.json({ error: "Telegram update is not from the configured channel" }, 403);
+      }
     }
 
     const db = await getDb();
@@ -136,6 +207,38 @@ app.post("/api/telegram/webhook", async (c) => {
     // Try auto-create devotional
     const devotionalId = await parseAndCreateDevotional(db, result[0].id, text);
 
+    if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
+      try {
+        const broadcastResponse = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast?private=true`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: env.supabaseServiceRoleKey,
+            Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                topic: "devotionals",
+                event: "devotional_changed",
+                payload: { id: devotionalId, action: "import" },
+              },
+              {
+                topic: "admin:devotionals",
+                event: "devotional_changed",
+                payload: { id: devotionalId, action: "import" },
+              },
+            ],
+          }),
+        });
+        if (!broadcastResponse.ok) {
+          console.error("[telegram] Supabase Realtime rejected broadcast:", broadcastResponse.status, await broadcastResponse.text());
+        }
+      } catch (broadcastError) {
+        console.error("[telegram] Realtime broadcast failed:", broadcastError);
+      }
+    }
+
     return c.json({
       status: "processed",
       messageId: result[0].id,
@@ -163,13 +266,17 @@ app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;
 
+const runtime = globalThis as unknown as {
+  WebSocketPair?: unknown;
+  navigator?: { userAgent?: string };
+};
 const isServerless =
   Boolean(process.env.VERCEL) ||
   Boolean(process.env.NETLIFY) ||
   Boolean(process.env.CF_PAGES) ||
   Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
-  typeof (globalThis as any).WebSocketPair !== "undefined" ||
-  Boolean((globalThis as any).navigator?.userAgent?.includes("Cloudflare-Workers"));
+  typeof runtime.WebSocketPair !== "undefined" ||
+  Boolean(runtime.navigator?.userAgent?.includes("Cloudflare-Workers"));
 
 if (env.isProduction && !isServerless) {
   const { serve } = await import("@hono/node-server");
@@ -182,8 +289,8 @@ if (env.isProduction && !isServerless) {
   });
 }
 
-// ─── Telegram Polling Scheduler (2am & 4am) ───────────────────────────────────
-// Only runs in non-serverless environments when bot token is configured
+// ─── Telegram Polling Fallback ────────────────────────────────────────────────
+// Only runs in non-serverless environments when webhook mode is not configured.
 let updateOffset = 0;
 
 async function pollTelegramMessages(): Promise<void> {
@@ -191,7 +298,20 @@ async function pollTelegramMessages(): Promise<void> {
     const response = await fetch(
       `https://api.telegram.org/bot${env.telegramBotToken}/getUpdates?offset=${updateOffset}&timeout=0`
     );
-    const data: any = await response.json();
+    type TelegramChatMessage = {
+      message_id: number;
+      chat: { id: number; username?: string; title?: string };
+      from?: { id: number; first_name?: string };
+      date: number;
+      text?: string;
+      caption?: string;
+    };
+    type TelegramUpdate = {
+      update_id: number;
+      message?: TelegramChatMessage;
+      channel_post?: TelegramChatMessage;
+    };
+    const data = await response.json() as { ok?: boolean; result?: TelegramUpdate[] };
 
     if (!data.ok || !Array.isArray(data.result)) {
       console.error("[scheduler] Telegram getUpdates returned non-ok response:", data);
@@ -203,6 +323,15 @@ async function pollTelegramMessages(): Promise<void> {
     for (const update of data.result) {
       const message = update.message ?? update.channel_post;
       if (!message) continue;
+
+      const configuredChannel = env.telegramChannelId.trim();
+      const incomingId = String(message.chat?.id ?? "");
+      const incomingUsername = message.chat?.username ? `@${message.chat.username}` : "";
+      if (
+        !configuredChannel ||
+        (configuredChannel !== incomingId &&
+          configuredChannel.toLowerCase() !== incomingUsername.toLowerCase())
+      ) continue;
 
       const text = message.text ?? message.caption ?? "";
       if (!text.trim()) continue;
@@ -219,11 +348,42 @@ async function pollTelegramMessages(): Promise<void> {
           receivedAt: new Date((message.date ?? Math.floor(Date.now() / 1000)) * 1000),
         });
 
-        if (inserted) {
-          await parseAndCreateDevotional(db, inserted.id, text);
+        if (inserted && !inserted.processed) {
+          const devotionalId = await parseAndCreateDevotional(db, inserted.id, text);
+          if (devotionalId && env.supabaseUrl && env.supabaseServiceRoleKey) {
+            try {
+              const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast?private=true`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  apikey: env.supabaseServiceRoleKey,
+                  Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
+                },
+                body: JSON.stringify({
+                  messages: [
+                    {
+                      topic: "devotionals",
+                      event: "devotional_changed",
+                      payload: { id: devotionalId, action: "import" },
+                    },
+                    {
+                      topic: "admin:devotionals",
+                      event: "devotional_changed",
+                      payload: { id: devotionalId, action: "import" },
+                    },
+                  ],
+                }),
+              });
+              if (!response.ok) {
+                console.error("[scheduler] Realtime broadcast rejected:", response.status, await response.text());
+              }
+            } catch (broadcastError) {
+              console.error("[scheduler] Realtime broadcast failed:", broadcastError);
+            }
+          }
         }
       } catch (err) {
-        console.error("[scheduler] Error processing update:", err);
+        console.error("[scheduler] Failed to process a Telegram update.");
       }
     }
 
@@ -231,28 +391,16 @@ async function pollTelegramMessages(): Promise<void> {
       updateOffset = data.result[data.result.length - 1].update_id + 1;
     }
   } catch (err) {
-    console.error("[scheduler] pollTelegramMessages error:", err);
+    console.error("[scheduler] Telegram polling failed before completion.");
   }
 }
 
-if (env.telegramBotToken && !isServerless) {
-  const lastFiredSlot: Record<string, Date | null> = { "2": null, "4": null };
-
+if (env.telegramBotToken && env.telegramChannelId && !env.telegramWebhookSecret && !isServerless) {
+  // Long-polling is a fallback only. When a webhook secret is configured,
+  // Telegram push delivery is the single ingestion path.
+  pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
   setInterval(() => {
-    const now = new Date();
-    const h = now.getHours();
-    const m = now.getMinutes();
-
-    if (m === 0 && (h === 2 || h === 4)) {
-      const slot = String(h);
-      if (
-        !lastFiredSlot[slot] ||
-        now.getTime() - lastFiredSlot[slot]!.getTime() > 60 * 60 * 1000
-      ) {
-        lastFiredSlot[slot] = now;
-        pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
-      }
-    }
-  }, 60_000);
+    pollTelegramMessages().catch((e) => console.error("[scheduler]", e));
+  }, 5 * 60 * 1000).unref();
 }
 

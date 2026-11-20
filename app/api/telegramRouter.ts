@@ -1,27 +1,30 @@
 import { z } from "zod";
-import { createRouter, publicQuery, adminQuery, elevatedAdminQuery } from "./middleware";
+import { createRouter, adminQuery, elevatedAdminQuery } from "./middleware";
+import { env } from "./lib/env";
 import { getDb } from "./queries/connection";
 import { telegramMessages, devotionals } from "@db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import {
   listTelegramMessages,
   getTelegramMessageById,
   markTelegramMessageProcessed,
+  insertTelegramMessage,
 } from "./queries/telegram";
 import { parseAndCreateDevotional } from "./lib/devotionalParser";
+import { broadcastDevotionalChanged } from "./devotionalRouter";
 
 export const telegramRouter = createRouter({
-  // Webhook endpoint for Telegram bot (public — called by Telegram servers)
-  webhook: publicQuery
+  // Authenticated fallback procedure. Telegram's public webhook is handled by the secret-validated Hono route.
+  webhook: elevatedAdminQuery
     .input(
       z.object({
-        updateId: z.number(),
+        updateId: z.number().int().nonnegative(),
         message: z
           .object({
-            messageId: z.number(),
+            messageId: z.number().int().positive(),
             chat: z.object({
-              id: z.number(),
+              id: z.number().int(),
               title: z.string().optional(),
             }),
             from: z
@@ -31,21 +34,21 @@ export const telegramRouter = createRouter({
                 username: z.string().optional(),
               })
               .optional(),
-            text: z.string().optional(),
-            caption: z.string().optional(),
-            date: z.number(),
+            text: z.string().max(10000).optional(),
+            caption: z.string().max(10000).optional(),
+            date: z.number().int().nonnegative(),
           })
           .optional(),
         channelPost: z
           .object({
-            messageId: z.number(),
+            messageId: z.number().int().positive(),
             chat: z.object({
-              id: z.number(),
-              title: z.string().optional(),
+              id: z.number().int(),
+              title: z.string().max(255).optional(),
             }),
-            text: z.string().optional(),
-            caption: z.string().optional(),
-            date: z.number(),
+            text: z.string().max(10000).optional(),
+            caption: z.string().max(10000).optional(),
+            date: z.number().int().nonnegative(),
           })
           .optional(),
       })
@@ -61,49 +64,47 @@ export const telegramRouter = createRouter({
         });
       }
 
+      const configuredChannel = env.telegramChannelId.trim();
+      if (!configuredChannel || configuredChannel !== String(message.chat.id)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Message is not from the configured Telegram channel." });
+      }
+
       const text = message.text ?? message.caption ?? "";
       if (!text.trim()) {
         return { status: "ignored", reason: "empty_message" };
       }
 
-      // Check if message already exists
-      const existing = await db
-        .select()
-        .from(telegramMessages)
-        .where(
-          sql`${telegramMessages.messageId} = ${message.messageId} AND ${telegramMessages.chatId} = ${message.chat.id}`
-        )
-        .limit(1);
-
-      if (existing.length > 0) {
-        return { status: "duplicate", id: existing[0].id };
+      // Store once per Telegram chat/message pair; the unique index protects concurrent retries.
+      const storedMessage = await insertTelegramMessage({
+        messageId: message.messageId,
+        chatId: message.chat.id,
+        chatTitle: message.chat.title ?? null,
+        senderId: input.message?.from?.id ?? null,
+        senderName: input.message?.from?.firstName ?? null,
+        text,
+        processed: false,
+        receivedAt: new Date(message.date * 1000),
+      });
+      if (!storedMessage) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Telegram message could not be stored." });
       }
-
-      // Store the Telegram message
-      const result = await db
-        .insert(telegramMessages)
-        .values({
-          messageId: message.messageId,
-          chatId: message.chat.id,
-          chatTitle: message.chat.title ?? null,
-          senderId: input.message?.from?.id ?? null,
-          senderName: input.message?.from?.firstName ?? null,
-          text: text,
-          processed: false,
-          receivedAt: new Date(message.date * 1000),
-        })
-        .$returningId();
+      if (storedMessage.processed) {
+        return { status: "duplicate", id: storedMessage.id };
+      }
 
       // Try to auto-create devotional from message
       const devotionalId = await tryCreateDevotionalFromMessage(
         db,
-        result[0].id,
+        storedMessage.id,
         text
       );
+      if (devotionalId !== null) {
+        await broadcastDevotionalChanged(devotionalId, "import");
+      }
 
       return {
         status: "processed",
-        messageId: result[0].id,
+        messageId: storedMessage.id,
         devotionalId,
       };
     }),
@@ -129,7 +130,7 @@ export const telegramRouter = createRouter({
 
   // Admin-only: manually process a stored Telegram message into a devotional
   processMessage: adminQuery
-    .input(z.object({ messageId: z.number() }))
+    .input(z.object({ messageId: z.number().int().positive() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
 
@@ -154,6 +155,7 @@ export const telegramRouter = createRouter({
 
       if (devotionalId !== null) {
         await markTelegramMessageProcessed(message.id, devotionalId);
+        await broadcastDevotionalChanged(devotionalId, "import");
       }
 
       return { status: "processed", devotionalId };
@@ -182,6 +184,7 @@ export const telegramRouter = createRouter({
       const messageId = result[0].id;
 
       const devotionalId = await parseAndCreateDevotional(db, messageId, input.text);
+      if (devotionalId !== null) await broadcastDevotionalChanged(devotionalId, "import");
 
       return { devotionalId: devotionalId ?? null, messageId };
     }),
@@ -189,7 +192,7 @@ export const telegramRouter = createRouter({
 
 // Helper function to parse devotional from Telegram message text
 async function tryCreateDevotionalFromMessage(
-  db: any,
+  db: Parameters<typeof parseAndCreateDevotional>[0],
   telegramMessageId: number,
   text: string
 ): Promise<number | null> {
@@ -197,7 +200,7 @@ async function tryCreateDevotionalFromMessage(
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length < 2) return null;
 
-    let title = lines[0].substring(0, 200);
+    const title = lines[0].substring(0, 200);
     let scripture = "";
     let scriptureText = "";
     let body = "";
@@ -237,7 +240,7 @@ async function tryCreateDevotionalFromMessage(
       body = bodyText.substring(0, 2000);
     }
 
-    const result = await db
+    const inserted = await db
       .insert(devotionals)
       .values({
         title,
@@ -247,18 +250,30 @@ async function tryCreateDevotionalFromMessage(
         reflection: null,
         prayer: prayer || null,
         source: "telegram",
-        telegramMessageId: telegramMessageId,
+        telegramMessageId,
         devotionalDate: new Date(),
-        isPublished: true,
+        isPublished: false,
       })
-      .$returningId();
+      .onConflictDoNothing({ target: devotionals.telegramMessageId })
+      .returning({ id: devotionals.id });
+
+    let devotionalId = inserted[0]?.id;
+    if (!devotionalId) {
+      const existing = await db
+        .select({ id: devotionals.id })
+        .from(devotionals)
+        .where(eq(devotionals.telegramMessageId, telegramMessageId))
+        .limit(1);
+      devotionalId = existing[0]?.id;
+    }
+    if (!devotionalId) return null;
 
     await db
       .update(telegramMessages)
-      .set({ processed: true, devotionalId: result[0].id })
+      .set({ processed: true, devotionalId })
       .where(eq(telegramMessages.id, telegramMessageId));
 
-    return result[0].id;
+    return devotionalId;
   } catch (error) {
     console.error("Failed to create devotional from message:", error);
     return null;
