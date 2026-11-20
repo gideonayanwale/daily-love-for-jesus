@@ -265,8 +265,8 @@ class SupabaseClient {
           },
           error: null,
         };
-      } catch (err: any) {
-        return { data: { user: null, session: null }, error: { message: err.message || "Network error" } };
+      } catch (err: unknown) {
+        return { data: { user: null, session: null }, error: { message: getErrorMessage(err) } };
       }
     },
 
@@ -342,8 +342,8 @@ class SupabaseClient {
           return { error: { message: data.msg || "Password reset failed" } };
         }
         return { error: null };
-      } catch (err: any) {
-        return { error: { message: err.message || "Network error" } };
+      } catch (err: unknown) {
+        return { error: { message: getErrorMessage(err) } };
       }
     },
   };
