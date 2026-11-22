@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import {
   BookOpen, CalendarHeart, Check, ChevronRight, Compass, Heart,
-  LayoutDashboard, LogIn, Music, Move, X,
+  LayoutDashboard, LogIn, Music, X,
 } from 'lucide-react';
 
 type Props = { userId?: string; userName?: string | null; userRole?: string | null };
