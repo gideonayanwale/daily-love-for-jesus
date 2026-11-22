@@ -1,17 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { trpc } from '@/providers/trpc';
 import { getAnalyticsConsent, setAnalyticsConsent, type AnalyticsConsent } from '@/lib/analytics';
-import { ShieldCheck, X } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 export default function AnalyticsConsentBanner({ visible }: { visible: boolean }) {
   const [consent, setConsent] = useState<AnalyticsConsent>(() => getAnalyticsConsent());
+  const [isOpen, setIsOpen] = useState(() => getAnalyticsConsent() === null);
   const utils = trpc.useUtils();
 
-  if (!visible || consent !== null) return null;
+  useEffect(() => {
+    const open = () => setIsOpen(true);
+    window.addEventListener('dlfj:open-analytics-consent', open);
+    return () => window.removeEventListener('dlfj:open-analytics-consent', open);
+  }, []);
+
+  if (!visible || (!isOpen && consent !== null)) return null;
 
   const choose = (value: Exclude<AnalyticsConsent, null>) => {
     setAnalyticsConsent(value);
     setConsent(value);
+    setIsOpen(false);
     if (value === 'granted') void utils.invalidate();
   };
 
