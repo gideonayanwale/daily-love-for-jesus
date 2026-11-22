@@ -32,7 +32,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const { user } = useAuth();
-  const visibleNavItems = user ? navItems : navItems.filter((item) => item.path !== '/community' && item.path !== '/settings');
+  const visibleNavItems = user ? navItems : navItems.filter((item) => item.path !== '/settings');
 
   // Dark mode state synced with DOM and localStorage
   const [isDark, setIsDark] = useState(() => {
