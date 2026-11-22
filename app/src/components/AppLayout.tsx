@@ -240,7 +240,7 @@ export default function AppLayout() {
               </button>
             );
           })}
-          {(user?.role === 'admin' || user?.role === 'elevated_admin') && (
+          {(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin') && (
             <button
               onClick={() => navigate('/admin/devotionals')}
               className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all duration-150 ${
