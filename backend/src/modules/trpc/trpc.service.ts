@@ -137,7 +137,7 @@ export class TrpcService {
       }
     }
 
-    if (!user && req.method === 'GET') {
+    if (!user && !authError && req.method === 'GET') {
       this.trackAnonymousVisit(req);
     }
 
