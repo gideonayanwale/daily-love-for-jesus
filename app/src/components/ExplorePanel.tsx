@@ -104,7 +104,7 @@ export default function ExplorePanel({ userId }: Props) {
     <>
       <div className="fixed z-[65]" style={position ? { left: position.x, top: position.y } : { right: 'max(1rem, env(safe-area-inset-right))', bottom: 'max(5.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))' }}>
         {expanded && (
-          <section className="absolute bottom-16 right-0 flex max-h-[min(72vh,34rem)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-[#111116]" aria-label="Explore and navigation guide">
+          <section className={`absolute bottom-16 ${position && position.x < window.innerWidth / 2 ? "left-0" : "right-0"} flex max-h-[min(72vh,34rem)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-[#111116]" aria-label="Explore and navigation guide">
             <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-600">Daily Love For Jesus</p>
@@ -134,7 +134,7 @@ export default function ExplorePanel({ userId }: Props) {
             </footer>
           </section>
         )}
-        <button ref={fabRef} type="button" onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current = null; }} aria-label={expanded ? 'Collapse floating explore guide' : 'Expand floating explore guide; drag to move'} aria-expanded={expanded} title="Drag to move · Click to expand" className="flex h-13 w-13 touch-none select-none items-center justify-center rounded-full border border-amber-300 bg-amber-500 text-zinc-950 shadow-xl shadow-amber-900/20 transition-transform hover:scale-105 active:scale-95" style={{ width: 52, height: 52 }}>
+        <button ref={fabRef} type="button" onClick={(event) => { if (event.detail === 0) setExpanded(value => !value); }} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current = null; }} aria-label={expanded ? 'Collapse floating explore guide' : 'Expand floating explore guide; drag to move'} aria-expanded={expanded} title="Drag to move · Click to expand" className="flex h-13 w-13 touch-none select-none items-center justify-center rounded-full border border-amber-300 bg-amber-500 text-zinc-950 shadow-xl shadow-amber-900/20 transition-transform hover:scale-105 active:scale-95" style={{ width: 52, height: 52 }}>
           {expanded ? <X className="h-5 w-5" /> : <Compass className="h-6 w-6" />}
         </button>
         {!expanded && <span className="pointer-events-none absolute right-0 top-14 whitespace-nowrap rounded-full bg-zinc-900/90 px-2.5 py-1 text-[10px] font-medium text-white shadow-lg">Explore · drag me</span>}
