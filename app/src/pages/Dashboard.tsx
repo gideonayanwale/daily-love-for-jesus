@@ -48,7 +48,7 @@ export default function Dashboard() {
     { label: 'Devotionals', path: '/devotionals', Icon: CalendarHeart, color: 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' },
     { label: 'Community', path: '/community', Icon: Users, color: 'bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400' },
     { label: 'Settings', path: '/settings', Icon: Settings, color: 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400' },
-    ...(user?.role === 'admin' || user?.role === 'elevated_admin'
+    ...(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin'
       ? [{ label: 'Admin Panel', path: '/admin/devotionals', Icon: ShieldCheck, color: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' }]
       : []),
   ];
