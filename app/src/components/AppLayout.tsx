@@ -17,6 +17,7 @@ import {
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
 import ExplorePanel from './ExplorePanel';
+import AnalyticsConsentBanner from './AnalyticsConsentBanner';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
@@ -31,7 +32,7 @@ export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const visibleNavItems = user ? navItems : navItems.filter((item) => item.path !== '/settings');
 
   // Dark mode state synced with DOM and localStorage
@@ -189,6 +190,8 @@ export default function AppLayout() {
           </div>
         </div>
       </header>
+
+      <AnalyticsConsentBanner visible={!authLoading && !isAuthenticated} />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 pb-24 md:pb-12">
