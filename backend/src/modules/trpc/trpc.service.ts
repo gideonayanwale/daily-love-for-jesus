@@ -24,6 +24,7 @@ export class TrpcService {
   private readonly logger = new Logger(TrpcService.name);
   public appRouter: AppRouter;
   private supabaseAdmin: any;
+  private warnedMissingVisitorSecret = false;
 
   constructor(
     @Optional() @Inject(ConfigService) private configService: ConfigService,
@@ -164,6 +165,10 @@ export class TrpcService {
     }
 
     const appSecret = this.configService?.get<string>('security.appSecret');
+    if (!appSecret && !this.warnedMissingVisitorSecret) {
+      this.warnedMissingVisitorSecret = true;
+      this.logger.warn('APP_SECRET is not configured; anonymous visits will be recorded without a pseudonymous IP identifier.');
+    }
     const visitorHash = appSecret
       ? createHmac('sha256', appSecret).update(ip).digest('hex').slice(0, 40)
       : null;
