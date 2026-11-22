@@ -6,7 +6,10 @@ import { Loader2, Calendar, Bookmark, BookOpen, Music, CalendarHeart, Users, Set
 
 function getRoleBadge(role?: string) {
   if (role === 'admin') {
-    return { label: 'Super Admin', className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' };
+    return { label: 'Administrator', className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' };
+  }
+  if (role === 'superadmin') {
+    return { label: 'Super Administrator', className: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' };
   }
   if (role === 'elevated_admin') {
     return { label: 'Elevated Admin', className: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300' };
