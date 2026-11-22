@@ -90,7 +90,9 @@ app.use('*', async (c, next) => {
         c.req.header('x-real-ip') ||
         null;
       const ua = c.req.header('user-agent') || null;
-      const path = new URL(c.req.url).pathname;
+      const requestPath = new URL(c.req.url).pathname;
+      const clientPath = c.req.header('x-client-path')?.split('?')[0] ?? '';
+      const path = /^\/[a-zA-Z0-9/_-]{0,99}$/.test(clientPath) ? clientPath : requestPath;
 
       // Skip static assets — only track meaningful API traffic
       const isStaticAsset =
@@ -103,7 +105,7 @@ app.use('*', async (c, next) => {
 
       // Fire-and-forget — wrapped so errors from getDb() are caught,
       // not turned into an unhandled rejection that could crash the process.
-      const cacheKey = ip ?? 'unknown';
+      const cacheKey = `${ip ?? 'unknown'}:${path}`;
       const lastLogged = anonLogCache.get(cacheKey) ?? 0;
       if (Date.now() - lastLogged < 60_000) return next();
       anonLogCache.set(cacheKey, Date.now());
