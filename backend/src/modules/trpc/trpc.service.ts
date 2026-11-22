@@ -145,6 +145,13 @@ export class TrpcService {
   }
 
   private trackAnonymousVisit(req: Request): void {
+    if (req.headers['x-analytics-consent'] !== 'granted') return;
+    const rawSessionId = req.headers['x-anonymous-session'];
+    const sessionId = typeof rawSessionId === 'string' && /^[0-9a-f-]{36}$/i.test(rawSessionId)
+      ? rawSessionId
+      : null;
+    if (!sessionId) return;
+
     const rawClientPath = req.headers['x-client-path'];
     const candidate = typeof rawClientPath === 'string' ? rawClientPath.split('?')[0] : '';
     const pagePath = /^\/[a-zA-Z0-9/_-]{0,99}$/.test(candidate) ? candidate : '';
@@ -154,7 +161,7 @@ export class TrpcService {
     if (!ip) return;
 
     const now = Date.now();
-    const cacheKey = `${ip}:${pagePath}`;
+    const cacheKey = `${sessionId}:${pagePath}`;
     const lastLogged = anonymousVisitCache.get(cacheKey) ?? 0;
     if (now - lastLogged < 60_000) return;
     anonymousVisitCache.set(cacheKey, now);
@@ -183,7 +190,7 @@ export class TrpcService {
         actorId: null,
         ipAddress: visitorHash,
         userAgent,
-        metadata: { method: 'GET', timestamp: new Date(now).toISOString() },
+        metadata: { method: 'GET', timestamp: new Date(now).toISOString(), sessionId, consentVersion: 'v1' },
       })
       .catch((error: unknown) => {
         this.logger.warn(`Anonymous visitor tracking failed: ${error instanceof Error ? error.message : 'unknown error'}`);
