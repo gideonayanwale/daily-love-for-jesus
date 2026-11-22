@@ -41,13 +41,10 @@ export class AuthController {
   @Post('logout')
   @ApiOperation({ summary: 'Log out current session and clear auth cookie' })
   async logout(@Res({ passthrough: true }) res: Response) {
-    res.setHeader(
-      'Set-Cookie',
-      cookie.serialize('sb-access-token', '', {
-        path: '/',
-        maxAge: 0,
-      }),
-    );
+    res.setHeader('Set-Cookie', [
+      cookie.serialize('sb-access-token', '', { path: '/', maxAge: 0, httpOnly: true, sameSite: 'lax', secure: true }),
+      cookie.serialize('daily_love_token', '', { path: '/', maxAge: 0, httpOnly: true, sameSite: 'lax', secure: true }),
+    ]);
     return { success: true };
   }
 }

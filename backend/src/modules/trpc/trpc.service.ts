@@ -78,11 +78,20 @@ export class TrpcService {
     }
 
     let user: any = undefined;
+    let authError = false;
+    const credentialSupplied = Boolean(token);
+
+    if (credentialSupplied && !this.supabaseAdmin) {
+      authError = true;
+    }
 
     if (token && this.supabaseAdmin) {
       try {
-        const { data: { user: authUser } } = await this.supabaseAdmin.auth.getUser(token);
-        if (authUser) {
+        const { data: { user: authUser }, error } = await this.supabaseAdmin.auth.getUser(token);
+        if (error || !authUser?.id) {
+          authError = true;
+        }
+        if (authUser?.id && !error) {
           const db = this.dbService.getDb();
           const rows = await db
             .select()
@@ -92,16 +101,6 @@ export class TrpcService {
 
           user = rows[0];
           if (!user) {
-            const adminUserId =
-              this.configService?.get<string>('security.adminUserId') ||
-              process.env.ADMIN_USER_ID;
-            const adminEmail =
-              this.configService?.get<string>('security.adminEmail') ||
-              process.env.ADMIN_EMAIL;
-            const isAdmin =
-              (adminUserId && authUser.id === adminUserId) ||
-              (adminEmail && authUser.email?.toLowerCase() === adminEmail.toLowerCase());
-
             const inserted = await db
               .insert(schema.users)
               .values({
@@ -112,26 +111,19 @@ export class TrpcService {
                   authUser.user_metadata?.name ??
                   'User',
                 avatar: authUser.user_metadata?.avatar_url ?? null,
-                role: isAdmin ? 'admin' : 'user',
+                role: 'user',
               })
               .returning();
             user = inserted[0];
           }
         }
       } catch (err: any) {
+        authError = true;
         this.logger.warn(`tRPC auth error: ${err.message}`);
       }
-    } else if (!this.supabaseAdmin) {
-      // Dev mode fallback
-      user = {
-        id: 'dev-user-00000000-0000-0000-0000-000000000000',
-        email: 'dev@dailyloveforjesus.org',
-        name: 'Developer Mode',
-        role: 'admin',
-      };
     }
 
-    return { req, res, user };
+    return { req, res, user, authError };
   }
 
   getExpressMiddleware() {

@@ -3,63 +3,46 @@ import {
   Get,
   Post,
   Body,
-  Headers,
-  UnauthorizedException,
+  UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SyncService } from './sync.service';
-import { ConfigService } from '@nestjs/config';
+import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
+import { Roles, RolesGuard } from '../../common/guards/roles.guard';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Sync')
 @Controller('api/sync')
 export class SyncController {
-  constructor(
-    private readonly syncService: SyncService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly syncService: SyncService) {}
 
-  private verifyAdmin(headers: Record<string, string>) {
-    const secret = headers['x-admin-secret'];
-    const appSecret = this.configService.get<string>('security.appSecret');
-    if (secret && secret === appSecret) {
-      return;
-    }
-
-    const auth = headers['authorization'];
-    if (auth && auth.toLowerCase().startsWith('bearer ')) {
-      // Allowed if bearer token is provided
-      return;
-    }
-
-    throw new UnauthorizedException('x-admin-secret or admin bearer token required');
-  }
-
+  @Public()
   @Get('health')
-  @ApiOperation({ summary: 'Check health status of both database connections' })
+  @ApiOperation({ summary: 'Check database service health without exposing connection diagnostics' })
   async getHealth() {
     const status = await this.syncService.checkHealth();
     const allHealthy = status.neon.connected && status.supabase.connected;
     return {
       status: allHealthy ? 'healthy' : 'degraded',
-      databases: status,
       timestamp: new Date().toISOString(),
     };
   }
 
   @Post('run')
-  @ApiOperation({ summary: 'Trigger bidirectional database synchronization' })
-  @ApiHeader({ name: 'x-admin-secret', required: false })
-  async runSync(
-    @Headers() headers: Record<string, string>,
-    @Body() body: { direction?: string },
-  ) {
-    this.verifyAdmin(headers);
+  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Trigger database synchronization (platform admin only)' })
+  async runSync(@Body() body: { direction?: string }) {
     const direction = body?.direction ?? 'all';
+    if (!['all', 'supabase→neon', 'neon→supabase'].includes(direction)) {
+      throw new BadRequestException('Invalid sync direction.');
+    }
     const start = Date.now();
     const results = await this.syncService.runSync(direction);
     const totalRows = results.reduce((acc, r) => acc + r.rowsSynced, 0);
     const totalErrors = results.flatMap((r) => r.errors);
-
     return {
       ok: totalErrors.length === 0,
       direction,
@@ -71,9 +54,11 @@ export class SyncController {
   }
 
   @Post('supabase-to-neon')
-  @ApiOperation({ summary: 'Copy data from Supabase to Neon' })
-  async syncSupabaseToNeon(@Headers() headers: Record<string, string>) {
-    this.verifyAdmin(headers);
+  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Copy data from Supabase to Neon (platform admin only)' })
+  async syncSupabaseToNeon() {
     const start = Date.now();
     const results = await this.syncService.runSync('supabase→neon');
     return {
@@ -85,9 +70,11 @@ export class SyncController {
   }
 
   @Post('neon-to-supabase')
-  @ApiOperation({ summary: 'Copy data from Neon to Supabase' })
-  async syncNeonToSupabase(@Headers() headers: Record<string, string>) {
-    this.verifyAdmin(headers);
+  @UseGuards(SupabaseAuthGuard, RolesGuard)
+  @Roles('admin')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Copy data from Neon to Supabase (platform admin only)' })
+  async syncNeonToSupabase() {
     const start = Date.now();
     const results = await this.syncService.runSync('neon→supabase');
     return {

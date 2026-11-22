@@ -3,42 +3,34 @@
 // Exposes endpoints to trigger and monitor the Supabase ↔ Neon sync
 // ==============================================================================
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { runFullSync, checkDbHealth, type SyncResult } from "./lib/dbSync";
-import { env } from "./lib/env";
+import { findUserById } from "./queries/users";
 
 export const syncRouter = new Hono();
 
-// ── Auth guard: require Admin-Secret or valid Admin user for sync triggers ───
-const adminAuth = async (c: any, next: any) => {
-  const secret = c.req.header("x-admin-secret");
-  if (secret && secret === env.appSecret) {
-    return next();
+// ── Auth guard: sync mutations require a verified platform-admin session ──
+const adminAuth: MiddlewareHandler = async (c, next) => {
+  const authHeader = c.req.header("authorization") || "";
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    return c.json({ error: "A platform administrator session is required." }, 401);
   }
 
-  // Also accept Supabase Bearer token for authenticated users
-  const authHeader = c.req.header("authorization");
-  if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
-    try {
-      const token = authHeader.substring(7).trim();
-      const { supabaseAdmin } = await import("./lib/supabase");
-      const user = await supabaseAdmin.getUser(token);
-      if (user && user.id) {
-        // Allow authenticated admin, or if no admin configured, any authenticated user
-        if (
-          !env.adminUserId ||
-          user.id === env.adminUserId ||
-          (user.email && user.email.toLowerCase() === env.adminEmail.toLowerCase())
-        ) {
-          return next();
-        }
-      }
-    } catch {
-      // Fall through to unauthorized
+  try {
+    const token = authHeader.substring(7).trim();
+    if (!token) return c.json({ error: "A platform administrator session is required." }, 401);
+    const { supabaseAdmin } = await import("./lib/supabase");
+    const authUser = await supabaseAdmin.getUser(token);
+    if (!authUser?.id) return c.json({ error: "Invalid or expired authentication token." }, 401);
+
+    const profile = await findUserById(authUser.id);
+    if (!profile || !["admin", "superadmin"].includes(profile.role)) {
+      return c.json({ error: "Platform administrator access is required." }, 403);
     }
+    return next();
+  } catch {
+    return c.json({ error: "Authentication verification failed." }, 401);
   }
-
-  return c.json({ error: "Unauthorized — x-admin-secret or admin bearer token required" }, 401);
 };
 
 // ── GET /api/sync/health — check both DB connections ──────────────────────────
@@ -50,20 +42,22 @@ syncRouter.get("/health", async (c) => {
     return c.json(
       {
         status: allHealthy ? "healthy" : "degraded",
-        databases: status,
         timestamp: new Date().toISOString(),
       },
       allHealthy ? 200 : 207
     );
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch {
+    return c.json({ status: "unavailable" }, 503);
   }
 });
 
 // ── POST /api/sync/run — trigger a full bidirectional sync ────────────────────
 syncRouter.post("/run", adminAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const direction = body?.direction ?? "all"; // "all" | "supabase→neon" | "neon→supabase"
+  const direction = body?.direction ?? "all";
+  if (!["all", "supabase→neon", "neon→supabase"].includes(direction)) {
+    return c.json({ error: "Invalid sync direction" }, 400);
+  }
 
   console.log(`[sync-router] Starting sync (direction: ${direction})`);
   const start = Date.now();
@@ -81,8 +75,9 @@ syncRouter.post("/run", adminAuth, async (c) => {
       tables: results,
       errors: totalErrors.length > 0 ? totalErrors : undefined,
     });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Sync failed";
+    return c.json({ error: message }, 500);
   }
 });
 

@@ -314,7 +314,7 @@ function ManageDevotionsTab() {
   const [offset, setOffset] = useState(0);
   const PAGE_SIZE = 20;
 
-  const { data } = trpc.devotional.list.useQuery({ limit: PAGE_SIZE, offset, publishedOnly: false });
+  const { data } = trpc.devotional.adminList.useQuery({ limit: PAGE_SIZE, offset });
 
   const updateMutation = trpc.devotional.update.useMutation({
     onSuccess: () => { toast.success('Devotional updated!'); setEditingId(null); setEditForm({}); },
@@ -420,13 +420,18 @@ function ManageDevotionsTab() {
                 <span className={`px-1.5 py-0.5 rounded font-semibold ${d.isPublished ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-100 text-zinc-500'}`}>
                   {d.isPublished ? 'Published' : 'Draft'}
                 </span>
+                {d.source === 'telegram' && (
+                  <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold">
+                    Telegram import
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => publishMutation.mutate({ id: d.id })}
+                onClick={() => publishMutation.mutate({ id: d.id, isPublished: !d.isPublished })}
                 disabled={publishMutation.isPending}
                 title={d.isPublished ? 'Unpublish' : 'Publish'}
               >
@@ -580,13 +585,13 @@ function TelegramMessagesTab() {
     onError: (err: { message: string }) => toast.error(err.message),
   });
 
-  const messages = (data as { items?: Array<{ id: number; messageText?: string | null; processedAt?: string | null }> } | undefined)?.items ?? [];
+  const messages = (data as { items?: Array<{ id: number; text?: string | null; receivedAt?: string | null }> } | undefined)?.items ?? [];
 
   return (
     <div className="space-y-4 max-w-2xl">
       {/* Paste form */}
       <div className="border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Paste Telegram Message</h3>
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Import a devotional from Telegram</h3>
         <Textarea
           rows={8}
           placeholder="Paste the Telegram message text here..."
@@ -625,7 +630,7 @@ function TelegramMessagesTab() {
         {messages.map((msg) => (
           <div key={msg.id} className="border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 space-y-3 bg-white dark:bg-[#0c0c0f]">
             <p className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-4">
-              {msg.messageText || '(no text)'}
+              {msg.text || '(no text)'}
             </p>
             <Button
               size="sm"
@@ -673,7 +678,7 @@ export default function DevotionalAdmin() {
         <TabsList className="w-full sm:w-auto mb-4">
           <TabsTrigger value="new">New Devotion</TabsTrigger>
           <TabsTrigger value="manage">Manage Devotions</TabsTrigger>
-          <TabsTrigger value="telegram">Telegram Messages</TabsTrigger>
+          <TabsTrigger value="telegram">Import from Telegram</TabsTrigger>
           {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
             <TabsTrigger value="teacher-assignment">Teacher Assignment</TabsTrigger>
           )}

@@ -55,7 +55,7 @@ export const teacherAssignmentRouter = createRouter({
 
   // ── List users eligible to be assigned as teacher for a group ─────────────
   listEligibleUsers: elevatedAdminQuery
-    .input(z.object({ groupId: z.number() }))
+    .input(z.object({ groupId: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
 
@@ -117,9 +117,20 @@ export const teacherAssignmentRouter = createRouter({
 
   // ── Assign a user as teacher of a group ───────────────────────────────────
   assign: elevatedAdminQuery
-    .input(z.object({ groupId: z.number(), userId: z.string() }))
+    .input(z.object({ groupId: z.number().int().positive(), userId: z.string().uuid() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
+
+      const group = await db.query.groups.findFirst({ where: eq(groups.id, input.groupId) });
+      if (!group) throw new TRPCError({ code: 'NOT_FOUND', message: 'Group not found' });
+      const eligible = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, group.communityId),
+          eq(communityMembers.userId, input.userId),
+          eq(communityMembers.status, 'active'),
+        ),
+      });
+      if (!eligible) throw new TRPCError({ code: 'FORBIDDEN', message: 'Teacher must be an active member of the group community' });
 
       const existing = await db.query.groupMembers.findFirst({
         where: and(
@@ -155,6 +166,12 @@ export const teacherAssignmentRouter = createRouter({
     .input(z.object({ groupId: z.number(), userId: z.string() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
+      const existing = await db.query.groupMembers.findFirst({
+        where: and(eq(groupMembers.groupId, input.groupId), eq(groupMembers.userId, input.userId)),
+      });
+      if (!existing || existing.role !== 'teacher') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Active teacher assignment not found' });
+      }
 
       await db
         .update(groupMembers)

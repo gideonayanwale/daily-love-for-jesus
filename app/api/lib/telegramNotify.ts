@@ -1,97 +1,86 @@
 import { env } from './env';
-import { Devotional } from '@db/schema';
+import type { Devotional } from '@db/schema';
 import { format } from 'date-fns';
 
-// Escapes characters that are special in Telegram's HTML parse mode.
-function escHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function chunkTelegramText(value: string, maxLength = 3800): string[] {
+  const chunks: string[] = [];
+  let offset = 0;
+
+  while (offset < value.length) {
+    let end = Math.min(offset + maxLength, value.length);
+    if (end < value.length) {
+      const newline = value.lastIndexOf('\n', end);
+      if (newline > offset + Math.floor(maxLength * 0.6)) {
+        end = newline;
+      }
+      // Avoid cutting a UTF-16 surrogate pair at the chunk boundary.
+      const lastCodeUnit = value.charCodeAt(end - 1);
+      if (lastCodeUnit >= 0xd800 && lastCodeUnit <= 0xdbff) end -= 1;
+    }
+
+    const chunk = value.slice(offset, end).trim();
+    if (chunk) chunks.push(chunk);
+    offset = end;
+  }
+
+  return chunks;
 }
 
-// Formats a devotional as an HTML Telegram message.
-// Only sections with content are included.
-export async function sendDevotionalToTelegram(devotional: Devotional): Promise<void> {
-  if (!env.telegramBotToken?.trim() || !env.telegramChannelId?.trim()) return;
-
-  const lines: string[] = [];
+// Sends a published devotional to the configured Telegram channel.
+// Plain text is used to avoid HTML injection and malformed markup from imported content.
+export async function sendDevotionalToTelegram(devotional: Devotional): Promise<boolean> {
+  if (!env.telegramBotToken?.trim() || !env.telegramChannelId?.trim()) return false;
 
   const dateStr = devotional.devotionalDate
     ? format(new Date(devotional.devotionalDate), 'MMMM d, yyyy')
     : format(new Date(), 'MMMM d, yyyy');
-  lines.push(`\uD83D\uDCC5 <b>${dateStr}</b>`);
+  const sections = [
+    `📅 ${dateStr}`,
+    devotional.title ? devotional.title : '',
+    devotional.topic ? `TOPIC: ${devotional.topic}` : '',
+    devotional.declarationOfFaith ? `DECLARATION OF FAITH:\n${devotional.declarationOfFaith}` : '',
+    devotional.scripture
+      ? `📖 ${devotional.scripture}${devotional.scriptureText ? `\n${devotional.scriptureText}` : ''}`
+      : '',
+    devotional.body ?? '',
+    devotional.reflection ? `REFLECTION:\n${devotional.reflection}` : '',
+    devotional.prayer ? `🙏 PRAYER:\n${devotional.prayer}` : '',
+    devotional.dailyCapsule ? `DAILY CAPSULE:\n${devotional.dailyCapsule}` : '',
+    devotional.brothersKeeper ? `🤝 BE YOUR BROTHER'S KEEPER:\n${devotional.brothersKeeper}` : '',
+    devotional.dailyBibleReading ? `📚 DAILY BIBLE READING:\n${devotional.dailyBibleReading}` : '',
+    devotional.otherInfo ? `ℹ️ ${devotional.otherInfo}` : '',
+  ].filter(Boolean);
 
-  if (devotional.topic) {
-    lines.push('');
-    lines.push(`<b>TOPIC: ${escHtml(devotional.topic)}</b>`);
-  }
+  const chunks = chunkTelegramText(sections.join('\n\n'));
+  if (chunks.length === 0) return false;
 
-  if (devotional.declarationOfFaith) {
-    lines.push('');
-    lines.push(`<b>DECLARATION OF FAITH:</b>`);
-    lines.push(`<i>${escHtml(devotional.declarationOfFaith)}</i>`);
-  }
+  for (const text of chunks) {
+    let response: Response;
+    try {
+      response = await fetch(
+        `https://api.telegram.org/bot${env.telegramBotToken}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: env.telegramChannelId,
+            text,
+            disable_web_page_preview: true,
+          }),
+        },
+      );
+    } catch {
+      console.error('[telegramNotify] Telegram request failed before a response was received.');
+      throw new Error('Telegram delivery failed due to a network error.');
+    }
 
-  if (devotional.scripture) {
-    lines.push('');
-    lines.push(`\uD83D\uDCD6 <b>${escHtml(devotional.scripture)}</b>`);
-    if (devotional.scriptureText) {
-      lines.push(`<i>${escHtml(devotional.scriptureText)}</i>`);
+    const result = await response.json().catch(() => null) as
+      | { ok?: boolean; description?: string }
+      | null;
+    if (!response.ok || result?.ok !== true) {
+      throw new Error(result?.description || `Telegram sendMessage failed with status ${response.status}`);
     }
   }
 
-  if (devotional.body) {
-    lines.push('');
-    lines.push(escHtml(devotional.body));
-  }
-
-  if (devotional.prayer) {
-    lines.push('');
-    lines.push(`\uD83D\uDE4F <b>PRAYER:</b>`);
-    lines.push(`<i>${escHtml(devotional.prayer)}</i>`);
-  }
-
-  if (devotional.dailyCapsule) {
-    lines.push('');
-    lines.push(`\uD83D\uDC8A <b>DAILY CAPSULE:</b>`);
-    lines.push(escHtml(devotional.dailyCapsule));
-  }
-
-  if (devotional.brothersKeeper) {
-    lines.push('');
-    lines.push(`\uD83E\uDD1D <b>BE YOUR BROTHER'S KEEPER:</b>`);
-    lines.push(escHtml(devotional.brothersKeeper));
-  }
-
-  if (devotional.dailyBibleReading) {
-    lines.push('');
-    lines.push(`\uD83D\uDCDA <b>DAILY BIBLE READING:</b>`);
-    lines.push(escHtml(devotional.dailyBibleReading));
-  }
-
-  if (devotional.otherInfo) {
-    lines.push('');
-    lines.push(`\u2139\uFE0F ${escHtml(devotional.otherInfo)}`);
-  }
-
-  const text = lines.join('\n');
-
-  try {
-    const res = await fetch(
-      `https://api.telegram.org/bot${env.telegramBotToken}/sendMessage`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: env.telegramChannelId,
-          text,
-          parse_mode: 'HTML',
-        }),
-      }
-    );
-    if (!res.ok) {
-      const body = await res.text();
-      console.error('[telegramNotify] sendMessage failed:', res.status, body);
-    }
-  } catch (err) {
-    console.error('[telegramNotify] fetch error:', err);
-  }
+  return true;
 }

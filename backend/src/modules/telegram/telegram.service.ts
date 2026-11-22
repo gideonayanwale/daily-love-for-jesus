@@ -1,13 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../../database/database.service';
 import * as schema from '@db/schema';
-import { eq, desc, sql } from 'drizzle-orm';
+import { and, eq, desc, sql } from 'drizzle-orm';
 
 @Injectable()
 export class TelegramService {
   private readonly logger = new Logger(TelegramService.name);
 
-  constructor(private readonly dbService: DatabaseService) {}
+  constructor(
+    private readonly dbService: DatabaseService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async handleWebhookUpdate(update: any) {
     const message = update.message ?? update.channel_post ?? update.channelPost;
@@ -52,10 +56,26 @@ export class TelegramService {
         processed: false,
         receivedAt: messageDate,
       })
-      .$returningId();
+      .onConflictDoNothing({
+        target: [schema.telegramMessages.messageId, schema.telegramMessages.chatId],
+      })
+      .returning({ id: schema.telegramMessages.id });
 
-    const storedId = inserted[0]?.id;
+    if (!inserted[0]) {
+      const duplicate = await db
+        .select({ id: schema.telegramMessages.id })
+        .from(schema.telegramMessages)
+        .where(and(
+          eq(schema.telegramMessages.messageId, messageId),
+          eq(schema.telegramMessages.chatId, chatId),
+        ))
+        .limit(1);
+      return { status: 'duplicate', id: duplicate[0]?.id ?? null };
+    }
+
+    const storedId = inserted[0].id;
     const devotionalId = await this.tryCreateDevotionalFromText(db, storedId, text);
+    if (devotionalId) await this.broadcastDevotionalChanged(devotionalId, 'import');
 
     return {
       status: 'processed',
@@ -79,7 +99,8 @@ export class TelegramService {
 
     const countResult = await db
       .select({ count: sql<number>`count(*)` })
-      .from(schema.telegramMessages);
+      .from(schema.telegramMessages)
+      .where(processed !== undefined ? eq(schema.telegramMessages.processed, processed) : undefined);
 
     return {
       items,
@@ -105,7 +126,37 @@ export class TelegramService {
     }
 
     const devotionalId = await this.tryCreateDevotionalFromText(db, message.id, message.text);
+    if (devotionalId) await this.broadcastDevotionalChanged(devotionalId, 'import');
     return { status: 'processed', devotionalId };
+  }
+
+  private async broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+    const supabaseUrl = this.configService.get<string>('supabase.url') || process.env.SUPABASE_URL;
+    const serviceRoleKey = this.configService.get<string>('supabase.serviceRoleKey') || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !serviceRoleKey) return;
+
+    try {
+      const response = await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+        body: JSON.stringify({
+          messages: [{
+            topic: 'devotionals',
+            event: 'devotional_changed',
+            payload: { id, action },
+          }],
+        }),
+      });
+      if (!response.ok) {
+        this.logger.error(`Supabase Realtime broadcast failed: ${response.status} ${await response.text()}`);
+      }
+    } catch (error: unknown) {
+      this.logger.error('Supabase Realtime broadcast failed', error instanceof Error ? error.stack : undefined);
+    }
   }
 
   private async tryCreateDevotionalFromText(
@@ -160,7 +211,7 @@ export class TelegramService {
         body = bodyText.substring(0, 2000);
       }
 
-      const result = await db
+      const inserted = await db
         .insert(schema.devotionals)
         .values({
           title,
@@ -171,11 +222,21 @@ export class TelegramService {
           source: 'telegram',
           telegramMessageId,
           devotionalDate: new Date(),
-          isPublished: true,
+          isPublished: false,
         })
-        .$returningId();
+        .onConflictDoNothing({ target: schema.devotionals.telegramMessageId })
+        .returning({ id: schema.devotionals.id });
 
-      const devotionalId = result[0]?.id;
+      let devotionalId = inserted[0]?.id;
+      if (!devotionalId) {
+        const existing = await db
+          .select({ id: schema.devotionals.id })
+          .from(schema.devotionals)
+          .where(eq(schema.devotionals.telegramMessageId, telegramMessageId))
+          .limit(1);
+        devotionalId = existing[0]?.id;
+      }
+      if (!devotionalId) return null;
 
       await db
         .update(schema.telegramMessages)

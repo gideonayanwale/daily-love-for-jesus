@@ -16,20 +16,34 @@ import {
 const stripHtml = (s: string): string => s.replace(/(<([^>]+)>)/gi, '').trim();
 
 // Fire-and-forget realtime broadcast after mutations
-async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+export async function broadcastDevotionalChanged(id: number, action: string): Promise<void> {
+  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return;
   try {
-    await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast`, {
+    const response = await fetch(`${env.supabaseUrl}/realtime/v1/api/broadcast?private=true`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        apikey: env.supabaseServiceRoleKey,
         Authorization: `Bearer ${env.supabaseServiceRoleKey}`,
       },
       body: JSON.stringify({
-        topic: "devotionals",
-        event: "devotional_changed",
-        payload: { id, action },
+        messages: [
+          {
+            topic: "devotionals",
+            event: "devotional_changed",
+            payload: { id, action },
+          },
+          {
+            topic: "admin:devotionals",
+            event: "devotional_changed",
+            payload: { id, action },
+          },
+        ],
       }),
     });
+    if (!response.ok) {
+      console.error("[devotionalRouter] Supabase Realtime rejected broadcast:", response.status, await response.text());
+    }
   } catch (err) {
     console.error("[devotionalRouter] broadcast error:", err);
   }
@@ -81,9 +95,10 @@ export const devotionalRouter = createRouter({
   }),
 
   byId: publicQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
-      return getDevotionalById(input.id);
+      const devotional = await getDevotionalById(input.id);
+      return devotional?.isPublished ? devotional : null;
     }),
 
   list: publicQuery
@@ -92,7 +107,6 @@ export const devotionalRouter = createRouter({
         .object({
           limit: z.number().min(1).max(100).default(20),
           offset: z.number().min(0).default(0),
-          publishedOnly: z.boolean().default(true),
         })
         .optional()
     )
@@ -100,9 +114,13 @@ export const devotionalRouter = createRouter({
       return listDevotionals({
         limit: input?.limit ?? 20,
         offset: input?.offset ?? 0,
-        publishedOnly: input?.publishedOnly ?? true,
+        publishedOnly: true,
       });
     }),
+
+  adminList: elevatedAdminQuery
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20), offset: z.number().int().min(0).default(0) }).optional())
+    .query(async ({ input }) => listDevotionals({ limit: input?.limit ?? 20, offset: input?.offset ?? 0, publishedOnly: false })),
 
   create: elevatedAdminQuery
     .input(devotionalCreateInput)
@@ -149,16 +167,15 @@ export const devotionalRouter = createRouter({
     }),
 
   publish: elevatedAdminQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive(), isPublished: z.boolean().default(true) }))
     .mutation(async ({ input }) => {
       const existing = await getDevotionalById(input.id);
       if (!existing) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
       }
-      const devotional = await publishDevotional(input.id);
+      const devotional = await publishDevotional(input.id, input.isPublished);
       if (devotional) {
         broadcastDevotionalChanged(devotional.id, "publish").catch(() => void 0);
-        sendDevotionalToTelegram(devotional).catch(() => void 0);
       }
       return devotional;
     }),
@@ -170,7 +187,13 @@ export const devotionalRouter = createRouter({
       if (!existing) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Devotional not found" });
       }
-      await sendDevotionalToTelegram(existing);
+      if (!existing.isPublished) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Publish the devotional before sending it to Telegram." });
+      }
+      const sent = await sendDevotionalToTelegram(existing);
+      if (!sent) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Telegram delivery is not configured. Set the bot token and channel ID." });
+      }
       return { success: true };
     }),
 });

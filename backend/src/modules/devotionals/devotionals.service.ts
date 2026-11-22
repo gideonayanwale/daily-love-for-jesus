@@ -54,7 +54,7 @@ export class DevotionalsService {
     const rows = await db
       .select()
       .from(schema.devotionals)
-      .where(eq(schema.devotionals.id, id))
+      .where(and(eq(schema.devotionals.id, id), eq(schema.devotionals.isPublished, true)))
       .limit(1);
     return rows[0] ?? null;
   }

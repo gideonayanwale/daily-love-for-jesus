@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as schema from '@db/schema';
 import * as relations from '@db/relations';
@@ -14,7 +14,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private neonDb: any = null;
   private supabaseClient: any = null;
   private supabaseDb: any = null;
-  private devStubDb: any = null;
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -79,11 +78,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   getDb(): any {
     if (this.neonDb) return this.neonDb;
     if (this.supabaseDb) return this.supabaseDb;
-    if (!this.devStubDb) {
-      this.logger.warn('⚠️ No database connected — using dev stub proxy');
-      this.devStubDb = this.createDevStub();
-    }
-    return this.devStubDb;
+    throw new ServiceUnavailableException('Application database is not configured or unavailable.');
   }
 
   getNeonDb(): any {
@@ -130,35 +125,4 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return result;
   }
 
-  private createDevStub(): any {
-    const chainable = () => {
-      const handler: any = {
-        get(_target: any, prop: string) {
-          if (prop === 'then') {
-            return (resolve: any) => resolve([]);
-          }
-          if (prop === 'catch') {
-            return () => Promise.resolve([]);
-          }
-          return (..._args: any[]) => new Proxy(() => {}, handler);
-        },
-        apply() {
-          return new Proxy(() => {}, handler);
-        },
-      };
-      return new Proxy(() => {}, handler);
-    };
-
-    return new Proxy(
-      {},
-      {
-        get(_, prop) {
-          if (prop === 'query') {
-            return new Proxy({}, { get: () => () => Promise.resolve([]) });
-          }
-          return chainable();
-        },
-      },
-    );
-  }
 }

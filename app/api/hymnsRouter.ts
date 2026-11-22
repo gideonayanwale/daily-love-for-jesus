@@ -9,8 +9,8 @@ export const hymnsRouter = createRouter({
     .input(
       z
         .object({
-          search: z.string().optional(),
-          category: z.string().optional(),
+          search: z.string().trim().max(100).optional(),
+          category: z.string().trim().max(100).optional(),
         })
         .optional()
     )
@@ -44,7 +44,7 @@ export const hymnsRouter = createRouter({
     }),
 
   byId: publicQuery
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
       return db.query.hymns.findFirst({
@@ -53,7 +53,7 @@ export const hymnsRouter = createRouter({
     }),
 
   byNumber: publicQuery
-    .input(z.object({ hymnNumber: z.number() }))
+    .input(z.object({ hymnNumber: z.number().int().positive() }))
     .query(async ({ input }) => {
       const db = await getDb();
       return db.query.hymns.findFirst({

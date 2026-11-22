@@ -2,6 +2,9 @@
 // Daily Love For Jesus - Supabase Client (Web)
 // ==============================================================================
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : "Network error";
+
 // ── Realtime channel (lightweight broadcast subscriber using WebSocket) ────────
 type BroadcastHandler = (payload: unknown) => void;
 
@@ -44,7 +47,7 @@ class RealtimeChannel {
       this.ws = ws;
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ topic: `realtime:${this.name}`, event: 'phx_join', payload: { access_token: token, config: { broadcast: { self: true } } }, ref: '1' }));
+        ws.send(JSON.stringify({ topic: `realtime:${this.name}`, event: 'phx_join', payload: { access_token: token, config: { broadcast: { self: true }, private: true } }, ref: '1' }));
         this.heartbeatTimer = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: null }));
@@ -90,7 +93,7 @@ export interface SupabaseUser {
     name?: string;
     full_name?: string;
     avatar_url?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
   role?: string;
   created_at?: string;
@@ -173,7 +176,7 @@ class SupabaseClient {
     }: {
       email: string;
       password: string;
-      options?: { data?: Record<string, any> };
+      options?: { data?: Record<string, unknown> };
     }): Promise<AuthResponse> => {
       if (!this.url || !this.anonKey) {
         return {
@@ -214,8 +217,8 @@ class SupabaseClient {
           },
           error: null,
         };
-      } catch (err: any) {
-        return { data: { user: null, session: null }, error: { message: err.message || "Network error" } };
+      } catch (err: unknown) {
+        return { data: { user: null, session: null }, error: { message: getErrorMessage(err) } };
       }
     },
 
@@ -262,8 +265,8 @@ class SupabaseClient {
           },
           error: null,
         };
-      } catch (err: any) {
-        return { data: { user: null, session: null }, error: { message: err.message || "Network error" } };
+      } catch (err: unknown) {
+        return { data: { user: null, session: null }, error: { message: getErrorMessage(err) } };
       }
     },
 
@@ -294,7 +297,7 @@ class SupabaseClient {
       return { data: { session }, error: null };
     },
 
-    getUser: async (): Promise<{ data: { user: SupabaseUser | null }; error: any }> => {
+    getUser: async (): Promise<{ data: { user: SupabaseUser | null }; error: { message: string; status?: number } | null }> => {
       const session = this.getStoredSession();
       if (!session) {
         return { data: { user: null }, error: null };
@@ -339,8 +342,8 @@ class SupabaseClient {
           return { error: { message: data.msg || "Password reset failed" } };
         }
         return { error: null };
-      } catch (err: any) {
-        return { error: { message: err.message || "Network error" } };
+      } catch (err: unknown) {
+        return { error: { message: getErrorMessage(err) } };
       }
     },
   };

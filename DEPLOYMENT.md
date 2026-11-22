@@ -61,8 +61,6 @@ Per project security standards, here is the exact inventory of every configurati
 | `DATABASE_URL` | Backend | **SECRET** | Supabase Postgres connection string (port 6543 pooler). | [Supabase Dashboard](https://supabase.com/dashboard) &rarr; Settings &rarr; Database &rarr; Connection String. |
 | `APP_SECRET` | Backend | **SECRET** | Cryptographic random secret for session signing & admin API. | Generate via `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. |
 | `APP_ID` | Backend | Server | Unique SaaS identifier (e.g. `daily-love-app`). | Custom identifier string. |
-| `ADMIN_USER_ID` | Backend | Server | Supabase Auth UUID to grant Admin privileges automatically. | [Supabase Dashboard](https://supabase.com/dashboard) &rarr; Authentication &rarr; Users &rarr; User UID. |
-| `ADMIN_EMAIL` | Backend | Server | Admin email address automatically granted admin role. | Your ministry administrator email. |
 | `API_BIBLE_KEY` | Backend | Optional | American Bible Society API Key for custom translations. | [scripture.api.bible](https://scripture.api.bible/signup) (Default uses free Bolls Life API). |
 | `TELEGRAM_BOT_TOKEN` | Backend | Optional | Telegram Bot token for devotional auto-ingestion. | Message [@BotFather](https://t.me/botfather) &rarr; `/newbot`. |
 | `TELEGRAM_CHANNEL_ID` | Backend | Optional | Telegram Channel identifier to synchronize messages. | Channel username or forward message to `@userinfobot`. |

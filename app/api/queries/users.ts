@@ -2,7 +2,6 @@ import { eq } from "drizzle-orm";
 import * as schema from "@db/schema";
 import type { InsertUser, User } from "@db/schema";
 import { getDb, getNeonDb, getSupabaseDb } from "./connection";
-import { env } from "../lib/env";
 
 export async function findUserById(id: string): Promise<User | undefined> {
   const rows = await (await getDb())
@@ -27,18 +26,10 @@ export async function upsertUser(data: InsertUser): Promise<User | undefined> {
   const updateSet: Partial<InsertUser> = {
     lastSignInAt: new Date(),
     updatedAt: new Date(),
-    ...data,
+    email: data.email,
+    name: data.name,
+    avatar: data.avatar,
   };
-
-  // Determine admin privileges
-  const isAdmin =
-    (values.id && values.id === env.adminUserId) ||
-    (values.email && values.email.toLowerCase() === env.adminEmail.toLowerCase());
-
-  if (isAdmin) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
 
   // ─── Primary DB write ──────────────────────────────────────────────────────
   let result: User | undefined;

@@ -17,7 +17,7 @@ services:
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
       - APP_ID=${APP_ID:-daily-love-app}
-      - APP_SECRET=${APP_SECRET:-daily-love-jwt-secret-key}
+      - APP_SECRET=${APP_SECRET:?Set APP_SECRET to a cryptographically random secret before starting the stack}
       - ADMIN_USER_ID=${ADMIN_USER_ID:-}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}

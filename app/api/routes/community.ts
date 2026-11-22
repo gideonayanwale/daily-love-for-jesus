@@ -15,6 +15,7 @@ import { eq, and, sql, desc, inArray, asc } from "drizzle-orm";
 import {
   authenticateRequestUser,
   assertGroupRole,
+  assertGroupMember,
   AuthorizationError,
 } from "../lib/rbac";
 import { sendTargetedPushNotification } from "../lib/pushNotifications";
@@ -33,7 +34,7 @@ const joinGroupSchema = z.object({
 });
 
 const readingLogItemSchema = z.object({
-  contentId: z.string().min(1), // e.g. "bible:40:5" or "devotional:12"
+  contentId: z.string().min(1).max(500), // e.g. "bible:40:5" or "devotional:12"
   contentType: z.enum(["bible_chapter", "devotional", "reading_assignment"]).default("bible_chapter"),
   bookNumber: z.number().int().optional(),
   chapter: z.number().int().optional(),
@@ -51,7 +52,7 @@ const syncTrackingSchema = z.object({
 const announcementCreateSchema = z.object({
   groupId: z.number().int().positive(),
   title: z.string().trim().min(1).max(255),
-  body: z.string().trim().min(1),
+  body: z.string().trim().min(1).max(10000),
   priority: z.enum(["normal", "high", "urgent"]).default("normal"),
   announcementType: z.enum(["general", "assignment", "event", "reminder"]).default("general"),
 });
@@ -59,9 +60,11 @@ const announcementCreateSchema = z.object({
 // Helper: Generate unique 6-digit alphanumeric code (e.g. "LF8421" or "592814")
 function generateInviteCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const randomValues = new Uint32Array(6);
+  crypto.getRandomValues(randomValues);
   let result = "";
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(randomValues[i] % chars.length);
   }
   return result;
 }
@@ -237,6 +240,10 @@ communityRestRouter.post("/tracking/sync", async (c) => {
 
     // Process logs with idempotency on clientLogId
     for (const log of logs) {
+      if (log.groupId !== undefined) {
+        await assertGroupMember(user.id, log.groupId);
+      }
+
       // Check if already synced using unique clientLogId
       const existing = await db.query.readingLogs.findFirst({
         where: eq(readingLogs.clientLogId, log.clientLogId),
@@ -322,7 +329,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
       })
       .from(groupMembers)
       .innerJoin(users, eq(groupMembers.userId, users.id))
-      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "active")))
+      .where(and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "active"), eq(groupMembers.role, "student")))
       .orderBy(asc(users.name));
 
     if (studentMemberships.length === 0) {
@@ -344,7 +351,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
         lastCompletedAt: sql<string>`max(${readingLogs.completedAt})`,
       })
       .from(readingLogs)
-      .where(inArray(readingLogs.userId, studentUserIds))
+      .where(and(inArray(readingLogs.userId, studentUserIds), eq(readingLogs.groupId, groupId)))
       .groupBy(readingLogs.userId);
 
     const aggMap = new Map<string, any>(readingAggregations.map((a: any) => [a.userId, a]));
@@ -360,6 +367,7 @@ communityRestRouter.get("/dashboard/roster", async (c) => {
       .where(
         and(
           inArray(readingLogs.userId, studentUserIds),
+          eq(readingLogs.groupId, groupId),
           sql`${readingLogs.completedAt} >= now() - interval '60 days'`
         )
       )
@@ -577,6 +585,20 @@ communityRestRouter.post("/attendance/record", async (c) => {
 
     await assertGroupRole(user.id, session.groupId, ["teacher", "assistant_teacher"]);
 
+    const targetStudentIds = [...new Set(records.map((record) => record.userId))];
+    const validStudents = await db
+      .select({ userId: groupMembers.userId })
+      .from(groupMembers)
+      .where(and(
+        eq(groupMembers.groupId, session.groupId),
+        eq(groupMembers.status, "active"),
+        eq(groupMembers.role, "student"),
+        inArray(groupMembers.userId, targetStudentIds),
+      ));
+    if (validStudents.length !== targetStudentIds.length) {
+      throw new AuthorizationError("Attendance can only be recorded for active students in this group", 403);
+    }
+
     let recordedCount = 0;
     for (const rec of records) {
       await db
@@ -647,7 +669,7 @@ communityRestRouter.get("/dashboard/reports/weekly", async (c) => {
         timeSpent: sql<number>`coalesce(sum(${readingLogs.timeSpent}), 0)::int`,
       })
       .from(readingLogs)
-      .where(and(inArray(readingLogs.userId, studentIds), sql`${readingLogs.completedAt} >= now() - interval '7 days'`))
+      .where(and(inArray(readingLogs.userId, studentIds), eq(readingLogs.groupId, groupId), sql`${readingLogs.completedAt} >= now() - interval '7 days'`))
       .groupBy(readingLogs.userId) : [];
 
     // Previous week readings (7 to 14 days ago)
@@ -656,7 +678,7 @@ communityRestRouter.get("/dashboard/reports/weekly", async (c) => {
         chaptersCount: sql<number>`count(distinct ${readingLogs.contentId})::int`,
       })
       .from(readingLogs)
-      .where(and(inArray(readingLogs.userId, studentIds), sql`${readingLogs.completedAt} >= now() - interval '14 days' AND ${readingLogs.completedAt} < now() - interval '7 days'`)) : [];
+      .where(and(inArray(readingLogs.userId, studentIds), eq(readingLogs.groupId, groupId), sql`${readingLogs.completedAt} >= now() - interval '14 days' AND ${readingLogs.completedAt} < now() - interval '7 days'`)) : [];
 
     const currentWeekTotalChapters = currentWeekLogs.reduce((acc, row) => acc + row.chaptersCount, 0);
     const prevWeekTotalChapters = previousWeekLogs[0]?.chaptersCount ?? 0;
@@ -722,7 +744,7 @@ communityRestRouter.post("/teacher/followup", async (c) => {
       groupId: z.number().int().positive(),
       studentId: z.string().uuid(),
       actionType: z.enum(["reminder_sent", "note_added"]),
-      message: z.string().trim().optional(),
+      message: z.string().trim().max(500).optional(),
     });
     const data = schema.parse(body);
 
@@ -730,6 +752,18 @@ communityRestRouter.post("/teacher/followup", async (c) => {
 
     const db = await getDb();
     const group = await db.query.groups.findFirst({ where: eq(groups.id, data.groupId) });
+    if (!group) return c.json({ error: "Group not found" }, 404);
+    const studentMembership = await db.query.groupMembers.findFirst({
+      where: and(
+        eq(groupMembers.groupId, data.groupId),
+        eq(groupMembers.userId, data.studentId),
+        eq(groupMembers.status, "active"),
+        eq(groupMembers.role, "student"),
+      ),
+    });
+    if (!studentMembership) {
+      throw new AuthorizationError("Follow-up target must be an active student in this group", 403);
+    }
 
     if (data.actionType === "reminder_sent") {
       const reminderText = data.message || `Gentle reminder from your ${group?.name ?? "Sunday School"} teacher: Don't forget this week's Bible reading!`;

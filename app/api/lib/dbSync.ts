@@ -3,7 +3,7 @@
 // Bidirectional Supabase ↔ Neon PostgreSQL Sync
 // ==============================================================================
 
-import { eq, sql } from "drizzle-orm";
+import { getTableColumns, sql } from "drizzle-orm";
 import { getSupabaseDb, getNeonDb } from "./db";
 import * as schema from "@db/schema";
 
@@ -27,7 +27,7 @@ const SYNC_TABLES: TableSyncConfig[] = [
     name: "users",
     direction: "supabase→neon", // Auth truth lives in Supabase
     conflictColumn: "id",
-    updatedAtColumn: "updated_at",
+    updatedAtColumn: "updatedAt",
   },
   {
     table: schema.devotionals,
@@ -79,11 +79,7 @@ export async function syncUserToAllDbs(authUser: SupabaseAuthUser): Promise<void
   const userData: schema.InsertUser = {
     id: authUser.id,
     email: authUser.email ?? null,
-    name:
-      authUser.user_metadata?.full_name ??
-      authUser.user_metadata?.name ??
-      authUser.email?.split("@")[0] ??
-      "User",
+    name: authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? authUser.email?.split("@")[0] ?? "User",
     avatar: authUser.user_metadata?.avatar_url ?? null,
     role: "user",
     lastSignInAt: new Date(),
@@ -91,35 +87,33 @@ export async function syncUserToAllDbs(authUser: SupabaseAuthUser): Promise<void
     createdAt: new Date(),
   };
 
-  const targets = [
-    { db: getNeonDb(), name: "Neon" },
-    { db: getSupabaseDb(), name: "Supabase" },
-  ];
+  const neonDb = await getNeonDb();
+  const supabaseDb = await getSupabaseDb();
+  const primaryDb = neonDb ?? supabaseDb;
+  if (!primaryDb) throw new Error("Cannot provision user profile: no application database is available.");
 
-  await Promise.allSettled(
-    targets
-      .filter(({ db }) => db !== null)
-      .map(async ({ db, name }) => {
-        try {
-          await db
-            .insert(schema.users)
-            .values(userData)
-            .onConflictDoUpdate({
-              target: schema.users.id,
-              set: {
-                email: userData.email,
-                name: userData.name,
-                avatar: userData.avatar,
-                lastSignInAt: userData.lastSignInAt,
-                updatedAt: new Date(),
-              },
-            });
-          console.log(`[sync] ✅ User ${authUser.id} synced to ${name}`);
-        } catch (err: any) {
-          console.error(`[sync] ❌ Failed to sync user to ${name}:`, err.message);
-        }
-      })
-  );
+  const upsertProfile = async (db: any, label: string) => {
+    await db.insert(schema.users).values(userData).onConflictDoUpdate({
+      target: schema.users.id,
+      set: {
+        email: userData.email,
+        name: userData.name,
+        avatar: userData.avatar,
+        lastSignInAt: userData.lastSignInAt,
+        updatedAt: new Date(),
+      },
+    });
+    console.log("[sync] User " + authUser.id + " synced to " + label);
+  };
+
+  await upsertProfile(primaryDb, neonDb ? "Neon" : "Supabase");
+  if (neonDb && supabaseDb) {
+    try {
+      await upsertProfile(supabaseDb, "Supabase mirror");
+    } catch (err: any) {
+      console.error("[sync] Supabase profile mirror failed:", err.message);
+    }
+  }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -166,10 +160,32 @@ async function syncTable(
     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
       const chunk = rows.slice(i, i + CHUNK_SIZE);
       try {
-        await destDb
-          .insert(config.table)
-          .values(chunk)
-          .onConflictDoNothing();
+        const safeChunk = config.name === "users"
+          ? chunk.map((row: any) => ({ ...row, role: "user" }))
+          : chunk;
+        const insert = destDb.insert(config.table).values(safeChunk);
+        if (config.name === "users") {
+          // Supabase Auth identity/profile sync may create missing profiles, but
+          // must never overwrite the Neon-controlled application role.
+          await insert.onConflictDoNothing();
+        } else {
+          const columns = getTableColumns(config.table) as Record<string, { name: string }>;
+          const conflictTarget = columns[config.conflictColumn];
+          if (!conflictTarget) throw new Error(`Unknown conflict column: ${config.conflictColumn}`);
+          const updateSet = Object.fromEntries(
+            Object.entries(columns)
+              .filter(([key]) => key !== config.conflictColumn)
+              .map(([key, column]) => [key, sql.raw(`excluded."${column.name}"`)]),
+          );
+          const updatedAt = config.updatedAtColumn ? columns[config.updatedAtColumn] : undefined;
+          await insert.onConflictDoUpdate({
+            target: conflictTarget as any,
+            set: updateSet,
+            ...(updatedAt
+              ? { setWhere: sql` ${updatedAt as any} < ${sql.raw(`excluded."${updatedAt.name}"`)} ` }
+              : {}),
+          });
+        }
         result.rowsSynced += chunk.length;
       } catch (err: any) {
         result.errors.push(
@@ -203,12 +219,10 @@ async function syncTable(
 export async function runFullSync(
   direction: "supabase→neon" | "neon→supabase" | "all" = "all"
 ): Promise<SyncResult[]> {
-  const supabaseDb = getSupabaseDb();
-  const neonDb = getNeonDb();
+  const [supabaseDb, neonDb] = await Promise.all([getSupabaseDb(), getNeonDb()]);
 
-  if (!supabaseDb && !neonDb) {
-    console.warn("[sync] No databases available — skipping sync");
-    return [];
+  if (!supabaseDb || !neonDb) {
+    throw new Error("Both Neon and Supabase databases must be configured before running a full sync.");
   }
 
   const results: SyncResult[] = [];
@@ -252,7 +266,7 @@ export async function checkDbHealth(): Promise<DbHealthStatus> {
   };
 
   // Check Neon
-  const neonDb = getNeonDb();
+  const neonDb = await getNeonDb();
   if (neonDb) {
     const t = Date.now();
     try {
@@ -266,7 +280,7 @@ export async function checkDbHealth(): Promise<DbHealthStatus> {
   }
 
   // Check Supabase
-  const supabaseDb = getSupabaseDb();
+  const supabaseDb = await getSupabaseDb();
   if (supabaseDb) {
     const t = Date.now();
     try {

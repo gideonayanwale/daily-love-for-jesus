@@ -35,7 +35,7 @@ export class RolesGuard implements CanActivate {
     }
 
     // Global admin has all privileges
-    if (user.role === 'admin') {
+    if (user.role === 'admin' || user.role === 'superadmin') {
       return true;
     }
 

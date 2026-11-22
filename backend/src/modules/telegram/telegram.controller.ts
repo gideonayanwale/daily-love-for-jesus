@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   UseGuards,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -33,14 +34,42 @@ export class TelegramController {
     @Body() update: any,
     @Headers('x-telegram-bot-api-secret-token') secretToken?: string,
   ) {
-    const expected = this.configService.get<string>('integrations.telegramBotSecret') || process.env.TELEGRAM_BOT_SECRET || '';
+    const expected = this.configService.get<string>('integrations.telegramWebhookSecret') || process.env.TELEGRAM_WEBHOOK_SECRET || '';
     if (!expected) {
       throw new UnauthorizedException(
-        'Telegram webhook is not configured. Set TELEGRAM_BOT_SECRET to enable webhook ingestion.',
+        'Telegram webhook is not configured. Set TELEGRAM_WEBHOOK_SECRET to enable webhook ingestion.',
       );
     }
     if (!secretToken || !this.timingSafeEqual(secretToken, expected)) {
       throw new UnauthorizedException('Invalid Telegram webhook secret token');
+    }
+
+    const configuredChannel = this.configService.get<string>('integrations.telegramChannelId') ||
+      process.env.TELEGRAM_CHANNEL_ID || '';
+    const message = update?.message ?? update?.channel_post ?? update?.channelPost;
+    if (!message) return { status: 'ignored', reason: 'no_message' };
+    if (
+      !Number.isSafeInteger(message.message_id) ||
+      !Number.isSafeInteger(message.chat?.id)
+    ) {
+      throw new BadRequestException('Telegram message ID and chat ID must be valid integers.');
+    }
+    const messageText = message.text ?? message.caption ?? '';
+    if (typeof messageText !== 'string' || messageText.length > 10000) {
+      throw new BadRequestException('Telegram message text is invalid or exceeds 10,000 characters.');
+    }
+    if (!configuredChannel && process.env.NODE_ENV === 'production') {
+      throw new UnauthorizedException('Telegram channel is not configured');
+    }
+    if (configuredChannel) {
+      const incomingId = String(message.chat?.id ?? '');
+      const incomingUsername = message.chat?.username ? `@${message.chat.username}` : '';
+      if (
+        configuredChannel !== incomingId &&
+        configuredChannel.toLowerCase() !== incomingUsername.toLowerCase()
+      ) {
+        throw new UnauthorizedException('Telegram update is not from the configured channel');
+      }
     }
     return this.telegramService.handleWebhookUpdate(update);
   }
@@ -59,7 +88,7 @@ export class TelegramController {
   @Get('messages')
   @ApiBearerAuth()
   @UseGuards(SupabaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'elevated_admin')
   @ApiOperation({ summary: 'List received Telegram messages (Admin only)' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
@@ -69,8 +98,10 @@ export class TelegramController {
     @Query('offset') offset?: string,
     @Query('processed') processed?: string,
   ) {
-    const l = limit ? parseInt(limit, 10) : 20;
-    const o = offset ? parseInt(offset, 10) : 0;
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : 20;
+    const parsedOffset = offset ? Number.parseInt(offset, 10) : 0;
+    const l = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 20;
+    const o = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
     const p = processed !== undefined ? processed === 'true' : undefined;
     return this.telegramService.listMessages(l, o, p);
   }
@@ -78,7 +109,7 @@ export class TelegramController {
   @Post('messages/:id/process')
   @ApiBearerAuth()
   @UseGuards(SupabaseAuthGuard, RolesGuard)
-  @Roles('admin')
+  @Roles('admin', 'elevated_admin')
   @ApiOperation({ summary: 'Manually trigger devotional extraction for a message' })
   async processMessage(@Param('id', ParseIntPipe) id: number) {
     return this.telegramService.processMessage(id);

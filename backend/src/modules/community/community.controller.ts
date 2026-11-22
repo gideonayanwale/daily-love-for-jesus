@@ -307,8 +307,8 @@ export class CommunityController {
 
   @Post('chat/cleanup-expired')
   @ApiOperation({ summary: 'Purge messages older than 7 days from active community chats' })
-  async cleanupExpiredChatMessages() {
-    return this.communityService.cleanupExpiredChatMessages();
+  async cleanupExpiredChatMessages(@CurrentUser('id') userId: string) {
+    return this.communityService.cleanupExpiredChatMessages(userId);
   }
 
   // ─── 14. Dedicated Secondary Supabase Bulk Cold Storage Archives ─────────────
@@ -318,6 +318,7 @@ export class CommunityController {
     @CurrentUser('id') userId: string,
     @Body() body: { communityId?: string; groupId?: number; channelType?: string; snapshotAll?: boolean },
   ) {
+    await this.communityService.assertPlatformRole(userId, ['superadmin']);
     if (body.snapshotAll) {
       return this.archiveService.snapshotAllActiveCommunities();
     }
@@ -331,9 +332,11 @@ export class CommunityController {
   @Get('chat/archives')
   @ApiOperation({ summary: 'List available cloud archive snapshots from Secondary Supabase storage' })
   async listChatArchives(
+    @CurrentUser('id') userId: string,
     @Query('communityId') communityId?: string,
     @Query('groupId') groupId?: string,
   ) {
+    await this.communityService.assertPlatformRole(userId, ['superadmin']);
     const parsedGroupId = groupId ? parseInt(groupId, 10) : undefined;
     return this.archiveService.listAvailableSnapshots({
       communityId,
@@ -344,8 +347,10 @@ export class CommunityController {
   @Get('chat/archives/:id/download')
   @ApiOperation({ summary: 'Download and restore chat messages from cloud archive snapshot' })
   async downloadChatArchive(
+    @CurrentUser('id') userId: string,
     @Param('id', ParseIntPipe) snapshotId: number,
   ) {
+    await this.communityService.assertPlatformRole(userId, ['superadmin']);
     return this.archiveService.downloadSnapshot(snapshotId);
   }
 }
