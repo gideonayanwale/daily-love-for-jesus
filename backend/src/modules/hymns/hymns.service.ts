@@ -78,7 +78,7 @@ export class HymnsService {
       .from(schema.hymns)
       .where(eq(schema.hymns.hymnNumber, hymnNumber))
       .limit(1);
-    return rows[0] ?? null;
+    return rows[0] ? this.normalizeHymn(rows[0]) : null;
   }
 
   async getRandom() {
@@ -88,7 +88,7 @@ export class HymnsService {
       .from(schema.hymns)
       .orderBy(sql`RANDOM()`)
       .limit(1);
-    return rows[0] ?? null;
+    return rows[0] ? this.normalizeHymn(rows[0]) : null;
   }
 
   async getCategories(): Promise<string[]> {
