@@ -45,6 +45,7 @@ export class TrpcService {
       this.telegramService,
       this.favoritesService,
       this.communityService,
+      this.dbService,
     );
 
     const url =
