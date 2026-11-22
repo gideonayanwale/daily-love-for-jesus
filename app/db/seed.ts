@@ -1,5 +1,6 @@
 import { getDb } from "../api/queries/connection";
 import { bibleBooks, bibleVerses, hymns } from "./schema";
+import { eq } from "drizzle-orm";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -84,20 +85,31 @@ async function seedHymns() {
   let inserted = 0;
 
   for (let i = 0; i < rawData.length; i += batchSize) {
-    const batch = rawData.slice(i, i + batchSize).map((h: any) => ({
-      hymnNumber: h.hymn_number,
-      title: h.title,
-      author: h.author,
-      composer: h.composer,
-      meter: h.meter,
-      key: h.key,
-      stanzas: JSON.stringify(h.stanzas),
-      chorus: h.chorus,
-      category: h.category,
-    }));
-
-    await db.insert(hymns).values(batch).onConflictDoNothing();
-    inserted += batch.length;
+    const batch = rawData.slice(i, i + batchSize);
+    for (const h of batch) {
+      const values = {
+        hymnNumber: h.hymn_number,
+        title: h.title,
+        author: h.author,
+        composer: h.composer,
+        meter: h.meter,
+        key: h.key,
+        stanzas: h.stanzas,
+        chorus: h.chorus,
+        category: h.category,
+      };
+      const existing = await db
+        .select({ id: hymns.id })
+        .from(hymns)
+        .where(eq(hymns.hymnNumber, h.hymn_number))
+        .limit(1);
+      if (existing.length > 0) {
+        await db.update(hymns).set(values).where(eq(hymns.hymnNumber, h.hymn_number));
+      } else {
+        await db.insert(hymns).values(values);
+      }
+      inserted++;
+    }
   }
 
   console.log(`Seeded ${inserted} hymns`);
