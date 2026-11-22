@@ -134,7 +134,7 @@ export default function AppLayout() {
                 </button>
               );
             })}
-            {(user?.role === 'admin' || user?.role === 'elevated_admin') && (
+            {(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin') && (
               <button
                 onClick={() => navigate('/admin/devotionals')}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
@@ -195,12 +195,12 @@ export default function AppLayout() {
       </main>
 
       {/* Mobile Bottom Navigation Bar (md:hidden) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0c0c0f]/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 z-40 safe-area-bottom">
-        <div className="flex items-center justify-around py-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 overflow-x-auto bg-white/95 dark:bg-[#0c0c0f]/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 z-40 safe-area-bottom">
+        <div className="flex min-w-max items-center justify-start gap-1 px-2 py-2">
           {user && (
             <button
               onClick={() => navigate('/dashboard')}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all duration-150 ${
+              className={`flex min-w-[58px] flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all duration-150 ${
                 location.pathname === '/dashboard'
                   ? 'text-amber-600 dark:text-amber-400 font-semibold'
                   : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
