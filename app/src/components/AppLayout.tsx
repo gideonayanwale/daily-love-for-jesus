@@ -18,6 +18,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
 import ExplorePanel from './ExplorePanel';
 import AnalyticsConsentBanner from './AnalyticsConsentBanner';
+import { trpc } from '@/providers/trpc';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
@@ -33,6 +34,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { refetch: trackGuestPageView } = trpc.ping.useQuery(undefined, { enabled: false, retry: false });
   const visibleNavItems = user ? navItems : navItems.filter((item) => item.path !== '/settings');
 
   // Dark mode state synced with DOM and localStorage
@@ -57,6 +59,16 @@ export default function AppLayout() {
   }, [isDark]);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
+
+  // Explicit page-view ping lets static public pages (such as Community overview)
+  // participate in consented anonymous analytics without exposing private data.
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      void trackGuestPageView().catch(() => {
+        // Analytics must never block public reading or navigation.
+      });
+    }
+  }, [location.pathname, authLoading, isAuthenticated, trackGuestPageView]);
 
   // Hide chrome on login page
   if (location.pathname === '/login') {
