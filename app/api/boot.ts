@@ -84,7 +84,11 @@ app.use('*', async (c, next) => {
       cookies['sb-access-token'] ||
       cookies['daily_love_token'];
 
-    if (!hasToken) {
+    const hasAnalyticsConsent = c.req.header('x-analytics-consent') === 'granted';
+    const rawSessionId = c.req.header('x-anonymous-session') || '';
+    const sessionId = /^[0-9a-f-]{36}$/i.test(rawSessionId) ? rawSessionId : null;
+
+    if (!hasToken && hasAnalyticsConsent && sessionId) {
       const ip =
         c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
         c.req.header('x-real-ip') ||
@@ -105,7 +109,7 @@ app.use('*', async (c, next) => {
 
       // Fire-and-forget — wrapped so errors from getDb() are caught,
       // not turned into an unhandled rejection that could crash the process.
-      const cacheKey = `${ip ?? 'unknown'}:${path}`;
+      const cacheKey = `${sessionId}:${path}`;
       const lastLogged = anonLogCache.get(cacheKey) ?? 0;
       if (Date.now() - lastLogged < 60_000) return next();
       anonLogCache.set(cacheKey, Date.now());
@@ -119,7 +123,7 @@ app.use('*', async (c, next) => {
           actorId: null,
           ipAddress: visitorHash,
           userAgent: ua,
-          metadata: { method: 'GET', timestamp: new Date().toISOString() },
+          metadata: { method: 'GET', timestamp: new Date().toISOString(), sessionId, consentVersion: 'v1' },
         });
       })().catch((err: unknown) => {
         console.error('[anonymous-tracking] Failed to log visit:', err);
