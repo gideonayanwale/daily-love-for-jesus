@@ -32,6 +32,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const { user } = useAuth();
+  const visibleNavItems = user ? navItems : navItems.filter((item) => item.path !== '/community' && item.path !== '/settings');
 
   // Dark mode state synced with DOM and localStorage
   const [isDark, setIsDark] = useState(() => {
@@ -112,7 +113,7 @@ export default function AppLayout() {
                 <span>Dashboard</span>
               </button>
             )}
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive =
                 item.path === '/'
                   ? location.pathname === '/'
@@ -214,7 +215,7 @@ export default function AppLayout() {
               <span className="text-[10px] tracking-tight">Dashboard</span>
             </button>
           )}
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive =
               item.path === '/'
                 ? location.pathname === '/'
