@@ -84,7 +84,7 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret', 'Accept', 'x-requested-with', 'x-client-path'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret', 'Accept', 'x-requested-with', 'x-client-path', 'x-analytics-consent', 'x-anonymous-session'],
     maxAge: 86400,
   });
 
