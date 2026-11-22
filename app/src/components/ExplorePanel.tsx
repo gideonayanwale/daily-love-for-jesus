@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { openAnalyticsConsentChoices } from '@/lib/analytics';
 import {
   BookOpen, CalendarHeart, Check, ChevronRight, Compass, Heart,
   LayoutDashboard, LogIn, Music, X,
@@ -130,7 +131,8 @@ export default function ExplorePanel({ userId }: Props) {
                 </button>;
               })}
             </nav>
-            <footer className="border-t border-zinc-200 p-3 dark:border-zinc-800">
+            <footer className="space-y-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
+              <button type="button" onClick={() => { openAnalyticsConsentChoices(); setExpanded(false); }} className="w-full rounded-xl px-3 py-2 text-xs font-semibold text-zinc-500 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-900">Privacy choices</button>
               <button type="button" onClick={() => { setStep(0); setTourOpen(true); setExpanded(false); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-amber-300 px-3 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-50 dark:border-amber-900 dark:text-amber-300 dark:hover:bg-amber-950/30"><Compass className="h-4 w-4" /> Take the getting-started tour</button>
             </footer>
           </section>
