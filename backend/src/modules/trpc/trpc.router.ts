@@ -2,6 +2,8 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import { z } from 'zod';
 import { desc, eq, sql } from 'drizzle-orm';
+import * as schema from '@db/schema';
+import { DatabaseService } from '../../database/database.service';
 import { AuthService } from '../auth/auth.service';
 import { BibleService } from '../bible/bible.service';
 import { HymnsService } from '../hymns/hymns.service';
@@ -68,6 +70,7 @@ export function buildAppRouter(
   telegramService: TelegramService,
   favoritesService: FavoritesService,
   communityService: CommunityService,
+  databaseService: DatabaseService,
 ) {
   return createRouter({
     anonymousLog: createRouter({
@@ -77,11 +80,31 @@ export function buildAppRouter(
           offset: z.number().min(0).default(0),
         }).optional())
         .query(async ({ input }) => {
-          const db = (await import('../../database/database.service')).DatabaseService;
-          void db;
-          const database = (globalThis as typeof globalThis & { __unused?: never });
-          void database;
-          return { items: [], total: 0 };
+          const db = databaseService.getDb();
+          const limit = input?.limit ?? 50;
+          const offset = input?.offset ?? 0;
+          const [items, countResult] = await Promise.all([
+            db.select()
+              .from(schema.auditLogs)
+              .where(eq(schema.auditLogs.action, 'anonymous_visit'))
+              .orderBy(desc(schema.auditLogs.occurredAt))
+              .limit(limit)
+              .offset(offset),
+            db.select({ count: sql<number>`cast(count(*) as int)` })
+              .from(schema.auditLogs)
+              .where(eq(schema.auditLogs.action, 'anonymous_visit')),
+          ]);
+          return {
+            items: items.map((row: typeof items[number]) => ({
+              id: row.id,
+              ipAddress: row.ipAddress,
+              resourceId: row.resourceId,
+              userAgent: row.userAgent,
+              metadata: row.metadata,
+              occurredAt: row.occurredAt,
+            })),
+            total: countResult[0]?.count ?? 0,
+          };
         }),
     }),
     ping: publicProcedure.query(() => ({ ok: true, ts: Date.now() })),
