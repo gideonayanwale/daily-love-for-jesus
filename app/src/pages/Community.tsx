@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router'
+import { useAuth } from '@/hooks/useAuth'
 import { trpc } from '@/providers/trpc'
 import {
   Users,
@@ -36,6 +37,7 @@ function getAuthHeader(): Record<string, string> {
 
 export default function Community() {
   const navigate = useNavigate()
+  const { isAuthenticated, isLoading: authLoading } = useAuth()
   const [inviteCode, setInviteCode] = useState('')
   const [userWhatsApp, setUserWhatsApp] = useState(() => {
     try {
@@ -67,7 +69,7 @@ export default function Community() {
 
   // tRPC queries
   const { data: myGroups, refetch: refetchGroups, isLoading: groupsLoading } =
-    trpc.community.myGroups.useQuery()
+    trpc.community.myGroups.useQuery(undefined, { enabled: isAuthenticated })
 
   // Auto-select first group
   const activeGroupId = selectedGroupId ?? myGroups?.[0]?.id ?? null
@@ -320,6 +322,53 @@ export default function Community() {
     link.click()
     document.body.removeChild(link)
     toast.success('CSV report downloaded!')
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center text-sm text-zinc-500">
+        Loading community access…
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6">
+        <section className="rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6 shadow-sm dark:border-amber-950/60 dark:from-zinc-900 dark:via-zinc-950 dark:to-amber-950/20 sm:p-10">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500 text-zinc-950">
+            <Users className="h-6 w-6" />
+          </div>
+          <p className="mt-5 text-xs font-bold uppercase tracking-[0.18em] text-amber-700 dark:text-amber-400">Community & Fellowship</p>
+          <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white sm:text-4xl">Grow together in faith.</h1>
+          <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-600 dark:text-zinc-300">
+            Discover how Daily Love For Jesus supports Sunday School classes, small groups, Bible-reading accountability, fellowship announcements and teacher-led encouragement.
+          </p>
+          <div className="mt-7 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-amber-100 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/70">
+              <BookOpen className="h-5 w-5 text-amber-600" />
+              <h2 className="mt-3 text-sm font-bold text-zinc-900 dark:text-white">Study Scripture</h2>
+              <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Follow shared reading plans and build consistent Bible-reading habits.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/70">
+              <Users className="h-5 w-5 text-amber-600" />
+              <h2 className="mt-3 text-sm font-bold text-zinc-900 dark:text-white">Join a group</h2>
+              <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Connect to your Sunday School class or fellowship using an invitation code.</p>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-white/80 p-4 dark:border-zinc-800 dark:bg-zinc-900/70">
+              <Megaphone className="h-5 w-5 text-amber-600" />
+              <h2 className="mt-3 text-sm font-bold text-zinc-900 dark:text-white">Stay connected</h2>
+              <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">Receive group announcements and encouragement from your leaders.</p>
+            </div>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <button type="button" onClick={() => navigate('/login')} className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-zinc-950 hover:bg-amber-600">Sign in or create an account</button>
+            <button type="button" onClick={() => navigate('/')} className="rounded-xl border border-zinc-300 px-5 py-3 text-sm font-semibold text-zinc-700 hover:bg-white dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900">Continue exploring publicly</button>
+          </div>
+          <p className="mt-4 text-xs text-zinc-500 dark:text-zinc-400">You can read the Bible, devotionals and hymns without registering. An account is only needed for personal and group participation.</p>
+        </section>
+      </div>
+    )
   }
 
   return (
