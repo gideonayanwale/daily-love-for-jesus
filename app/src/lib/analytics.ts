@@ -43,3 +43,9 @@ export function getAnonymousAnalyticsHeaders(): Record<string, string> {
     ? { 'x-analytics-consent': 'granted', 'x-anonymous-session': sessionId }
     : {};
 }
+
+export function openAnalyticsConsentChoices(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('dlfj:open-analytics-consent'));
+  }
+}
