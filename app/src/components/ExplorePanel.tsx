@@ -104,7 +104,7 @@ export default function ExplorePanel({ userId }: Props) {
     <>
       <div className="fixed z-[65]" style={position ? { left: position.x, top: position.y } : { right: 'max(1rem, env(safe-area-inset-right))', bottom: 'max(5.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))' }}>
         {expanded && (
-          <section className={`absolute bottom-16 ${position && position.x < window.innerWidth / 2 ? "left-0" : "right-0"} flex max-h-[min(72vh,34rem)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-[#111116]" aria-label="Explore and navigation guide">
+          <section className={`absolute bottom-16 ${position && position.x < window.innerWidth / 2 ? "left-0" : "right-0"} flex max-h-[min(72vh,34rem)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl dark:border-zinc-700 dark:bg-[#111116]`} aria-label="Explore and navigation guide">
             <header className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-amber-600">Daily Love For Jesus</p>
