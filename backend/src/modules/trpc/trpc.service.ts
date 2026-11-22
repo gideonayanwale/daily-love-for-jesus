@@ -15,6 +15,9 @@ import * as cookie from 'cookie';
 import * as schema from '@db/schema';
 import { eq } from 'drizzle-orm';
 import { Request, Response } from 'express';
+import { createHmac } from 'node:crypto';
+
+const anonymousVisitCache = new Map<string, number>();
 
 @Injectable()
 export class TrpcService {
@@ -114,8 +117,17 @@ export class TrpcService {
                 avatar: authUser.user_metadata?.avatar_url ?? null,
                 role: 'user',
               })
+              .onConflictDoNothing({ target: schema.users.id })
               .returning();
             user = inserted[0];
+            if (!user) {
+              const concurrentProfile = await db
+                .select()
+                .from(schema.users)
+                .where(eq(schema.users.id, authUser.id))
+                .limit(1);
+              user = concurrentProfile[0];
+            }
           }
         }
       } catch (err: any) {
@@ -124,7 +136,53 @@ export class TrpcService {
       }
     }
 
+    if (!user && req.method === 'GET') {
+      this.trackAnonymousVisit(req);
+    }
+
     return { req, res, user, authError };
+  }
+
+  private trackAnonymousVisit(req: Request): void {
+    const rawClientPath = req.headers['x-client-path'];
+    const candidate = typeof rawClientPath === 'string' ? rawClientPath.split('?')[0] : '';
+    const pagePath = /^\/[a-zA-Z0-9/_-]{0,99}$/.test(candidate) ? candidate : '';
+    if (!pagePath || pagePath.startsWith('/api/') || pagePath.startsWith('/assets/')) return;
+
+    const ip = req.ip || req.socket.remoteAddress;
+    if (!ip) return;
+
+    const now = Date.now();
+    const cacheKey = `${ip}:${pagePath}`;
+    const lastLogged = anonymousVisitCache.get(cacheKey) ?? 0;
+    if (now - lastLogged < 60_000) return;
+    anonymousVisitCache.set(cacheKey, now);
+    if (anonymousVisitCache.size > 5000) {
+      for (const [key, timestamp] of anonymousVisitCache) {
+        if (now - timestamp > 60_000) anonymousVisitCache.delete(key);
+      }
+    }
+
+    const appSecret = this.configService?.get<string>('security.appSecret');
+    const visitorHash = appSecret
+      ? createHmac('sha256', appSecret).update(ip).digest('hex').slice(0, 40)
+      : null;
+    const userAgent = req.headers['user-agent']?.slice(0, 512) ?? null;
+
+    void this.dbService.getDb()
+      .insert(schema.auditLogs)
+      .values({
+        action: 'anonymous_visit',
+        resourceType: 'page',
+        resourceId: pagePath,
+        actorId: null,
+        ipAddress: visitorHash,
+        userAgent,
+        metadata: { method: 'GET', timestamp: new Date(now).toISOString() },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(`Anonymous visitor tracking failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      });
   }
 
   getExpressMiddleware() {
