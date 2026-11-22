@@ -118,6 +118,7 @@ export default function ExplorePanel({ userId }: Props) {
                 { label: 'Bible', detail: 'Read books, chapters and verses', path: '/bible', icon: BookOpen },
                 { label: 'Devotionals', detail: 'Read published daily devotionals', path: '/devotionals', icon: CalendarHeart },
                 { label: 'Hymnal', detail: 'Browse hymns and categories', path: '/hymns', icon: Music },
+                { label: 'Community', detail: 'Public fellowship overview', path: '/community', icon: Compass },
                 ...(userId ? [{ label: 'My dashboard', detail: 'Your account and personal activity', path: '/dashboard', icon: LayoutDashboard }] : [{ label: 'Sign in or register', detail: 'Create an account for personal features', path: '/login', icon: LogIn }]),
               ].map(item => {
                 const ItemIcon = item.icon;
