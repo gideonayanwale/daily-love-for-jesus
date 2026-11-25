@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/providers/trpc-client";
 import { ShieldCheck, Loader2, UserPlus } from "lucide-react";
 
 export default function SuperAdminDashboard() {
