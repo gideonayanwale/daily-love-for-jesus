@@ -14,7 +14,7 @@ import {
   users,
   auditLogs,
 } from "@db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { assertGroupRole } from "./lib/rbac";
 import { TRPCError } from "@trpc/server";
 
@@ -67,6 +67,33 @@ export const communityRouter = createRouter({
     return rows;
   }),
 
+
+
+  ownedCommunityGroups: authedQuery
+    .input(z.object({ communityId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, input.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      }
+      return db.select({
+        id: groups.id,
+        name: groups.name,
+        slug: groups.slug,
+        category: groups.category,
+        status: groups.status,
+      }).from(groups)
+        .where(eq(groups.communityId, input.communityId))
+        .orderBy(asc(groups.name));
+    }),
 
   // Community-owner operations are scoped to an active owner membership.
   updateOwnedCommunity: authedQuery
