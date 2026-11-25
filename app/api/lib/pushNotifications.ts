@@ -61,6 +61,15 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
   }
 
   // 3. Dispatch to Expo Push API in provider-sized batches.
+  const messages = tokens.map((token) => ({
+    to: token.token,
+    sound: "default",
+    title: options.title,
+    body: options.body,
+    data: options.data || {},
+    badge: 1,
+  }));
+
   let sent = 0;
   const failures: string[] = [];
   for (let offset = 0; offset < messages.length; offset += 100) {
