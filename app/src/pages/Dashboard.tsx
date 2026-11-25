@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
 import { Loader2, Calendar, Bookmark, BookOpen, Music, CalendarHeart, Users, Settings, ShieldCheck, ArrowRight, Share2, Heart, GraduationCap } from 'lucide-react';
