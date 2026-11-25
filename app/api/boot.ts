@@ -385,7 +385,7 @@ async function pollTelegramMessages(): Promise<void> {
             }
           }
         }
-      } catch (err) {
+      } catch {
         console.error("[scheduler] Failed to process a Telegram update.");
       }
     }
@@ -393,7 +393,7 @@ async function pollTelegramMessages(): Promise<void> {
     if (data.result.length > 0) {
       updateOffset = data.result[data.result.length - 1].update_id + 1;
     }
-  } catch (err) {
+  } catch {
     console.error("[scheduler] Telegram polling failed before completion.");
   }
 }
