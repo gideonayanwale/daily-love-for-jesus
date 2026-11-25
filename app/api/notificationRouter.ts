@@ -15,7 +15,7 @@ export const notificationRouter = createRouter({
       const recipients = await db.select({ id: users.id }).from(users);
       const userIds = recipients.map((recipient) => recipient.id);
       if (userIds.length === 0) {
-        return { recipientCount: 0, devicesSent: 0 };
+        return { recipientCount: 0, devicesSent: 0, failedDevices: 0 };
       }
 
       const result = await sendTargetedPushNotification({
