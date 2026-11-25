@@ -34,6 +34,7 @@ export const notificationRouter = createRouter({
           title: input.title,
           recipientCount: result.recipientCount,
           devicesSent: result.sent,
+          failedDevices: result.failedDevices,
         },
         occurredAt: new Date(),
       });
@@ -41,6 +42,7 @@ export const notificationRouter = createRouter({
       return {
         recipientCount: result.recipientCount,
         devicesSent: result.sent,
+        failedDevices: result.failedDevices,
       };
     }),
 });
