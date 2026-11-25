@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
 import { createRouter, elevatedAdminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { auditLogs, users } from "@db/schema";
