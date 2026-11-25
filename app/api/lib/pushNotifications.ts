@@ -7,7 +7,7 @@ interface SendPushOptions {
   groupId?: number;
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, string | number | boolean | null>;
   category?: string;
 }
 
