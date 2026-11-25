@@ -18,7 +18,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
 import ExplorePanel from './ExplorePanel';
 import AnalyticsConsentBanner from './AnalyticsConsentBanner';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
