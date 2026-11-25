@@ -29,7 +29,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
   }
 
   if (recipientIds.length === 0) {
-    return { sent: 0, recipientCount: 0 };
+    return { sent: 0, recipientCount: 0, failedDevices: 0 };
   }
 
   // 1. Create in-app notifications for each recipient
@@ -55,7 +55,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     .where(inArray(pushTokens.userId, recipientIds));
 
   if (tokens.length === 0) {
-    return { sent: 0, recipientCount: recipientIds.length };
+    return { sent: 0, recipientCount: recipientIds.length, failedDevices: 0 };
   }
 
   // 3. Dispatch to Expo Push API in provider-sized batches.
@@ -70,6 +70,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
 
   let sent = 0;
   const failures: string[] = [];
+  let failedDevices = 0;
   for (let offset = 0; offset < messages.length; offset += 100) {
     const batch = messages.slice(offset, offset + 100);
     try {
@@ -84,6 +85,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
       });
       if (!response.ok) {
         failures.push(`HTTP ${response.status}`);
+        failedDevices += batch.length;
         continue;
       }
       const payload: {
@@ -92,13 +94,17 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
       const tickets = Array.isArray(payload.data) ? payload.data : [];
       sent += tickets.filter((ticket) => ticket.status === "ok").length;
       const rejected = tickets.filter((ticket) => ticket.status !== "ok");
+      failedDevices += rejected.length;
       for (const ticket of rejected) {
         failures.push(ticket.details?.error ?? ticket.message ?? "Expo rejected a push notification");
       }
       if (tickets.length !== batch.length) {
+        const missingTickets = Math.max(0, batch.length - tickets.length);
+        failedDevices += missingTickets;
         failures.push(`Expo returned ${tickets.length} tickets for ${batch.length} messages`);
       }
     } catch (error) {
+      failedDevices += batch.length;
       failures.push(error instanceof Error ? error.message : "Unknown Expo delivery error");
     }
   }
@@ -106,6 +112,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
   return {
     sent,
     recipientCount: recipientIds.length,
+    failedDevices,
     ...(failures.length > 0 ? { error: failures.join("; ") } : {}),
   };
 }
