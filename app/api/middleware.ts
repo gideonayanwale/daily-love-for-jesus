@@ -33,7 +33,7 @@ const requireAuth = t.middleware(async (opts) => {
   return next({ ctx: { ...ctx, user: ctx.user } });
 });
 
-function requireRoles(roles: string[]) {
+function requireRoles(roles: readonly string[]) {
   return t.middleware(async (opts) => {
     const { ctx, next } = opts;
 
@@ -50,13 +50,21 @@ function requireRoles(roles: string[]) {
 
 export const authedQuery = t.procedure.use(requireAuth);
 
-// Allows both admins and elevated_admins (most admin procedures)
-export const adminQuery = authedQuery.use(requireRoles(["admin", "elevated_admin", "superadmin"]));
-
-// Elevated-admin and above (alias kept for clarity in devotional/telegram routers)
-export const elevatedAdminQuery = authedQuery.use(
-  requireRoles(["admin", "elevated_admin", "superadmin"])
+// Legacy platform administrator access. Keep explicit while permissions are migrated.
+export const adminQuery = authedQuery.use(
+  requireRoles(["admin", "elevated_admin", "superadmin"]),
 );
 
-// Platform-owner tier: global admin or superadmin (e.g. visitor logs and role elevation).
-export const strictAdminQuery = authedQuery.use(requireRoles(["admin", "superadmin"]));
+// Existing platform operations use this broader role set; individual mutations
+// must still enforce their own resource scope.
+export const elevatedAdminQuery = authedQuery.use(
+  requireRoles(["admin", "elevated_admin", "superadmin"]),
+);
+
+// Legacy strict administrator gate, retained for existing admin-only tools.
+export const strictAdminQuery = authedQuery.use(
+  requireRoles(["admin", "superadmin"]),
+);
+
+// Only the highest platform authority may appoint or revoke elevated admins.
+export const superadminQuery = authedQuery.use(requireRoles(["superadmin"]));
