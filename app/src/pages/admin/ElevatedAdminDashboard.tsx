@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/providers/trpc-client";
 import { BookOpen, Send, Users, ShieldCheck, ArrowUpRight, Loader2, Megaphone, Crown } from "lucide-react";
 
 const tools = [
