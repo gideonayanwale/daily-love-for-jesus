@@ -823,7 +823,7 @@ export default function Community() {
 
               {roster.length > 0 ? (
                 <div className="divide-y divide-gray-100">
-                  {roster.map((student: any) => {
+                  {roster.map((student) => {
                     const status = attendanceRecordsState[student.userId] || 'present'
                     return (
                       <div key={student.userId} className="py-2.5 flex items-center justify-between">
