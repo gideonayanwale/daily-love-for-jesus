@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { trpc } from '@/providers/trpc';
-import { Search, BookOpen, ChevronRight, Sparkles } from 'lucide-react';
+import { Search, BookOpen, ChevronRight } from 'lucide-react';
 
 export default function Bible() {
   const navigate = useNavigate();
