@@ -3,6 +3,7 @@ import { lazy, Suspense } from 'react'
 import AppLayout from './components/AppLayout'
 import AdminRoute from './components/AdminRoute'
 import PrivateRoute from './components/PrivateRoute'
+import SuperAdminRoute from './components/SuperAdminRoute'
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 
 const Home = lazy(() => import('./pages/Home'))
@@ -15,25 +16,24 @@ const Devotionals = lazy(() => import('./pages/Devotionals'))
 const DevotionalDetail = lazy(() => import('./pages/DevotionalDetail'))
 const Settings = lazy(() => import('./pages/Settings'))
 const Community = lazy(() => import('./pages/Community'))
+const CommunityOwnerDashboard = lazy(() => import('./pages/CommunityOwnerDashboard'))
+const SundaySchoolDashboard = lazy(() => import('./pages/SundaySchoolDashboard'))
 const Login = lazy(() => import('./pages/Login'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const DevotionalAdmin = lazy(() => import('./pages/admin/DevotionalAdmin'))
+const ElevatedAdminDashboard = lazy(() => import('./pages/admin/ElevatedAdminDashboard'))
+const SuperAdminDashboard = lazy(() => import('./pages/admin/SuperAdminDashboard'))
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Suspense fallback={<Loading />}><Home /></Suspense>} />
-        <Route
-          path="dashboard"
-          element={
-            <PrivateRoute>
-              <Suspense fallback={<Loading />}>
-                <Dashboard />
-              </Suspense>
-            </PrivateRoute>
-          }
-        />
+        <Route path="dashboard" element={<PrivateRoute><Suspense fallback={<Loading />}><Dashboard /></Suspense></PrivateRoute>} />
+        <Route path="dashboard/teacher" element={<PrivateRoute><Suspense fallback={<Loading />}><SundaySchoolDashboard /></Suspense></PrivateRoute>} />
+        <Route path="dashboard/community-owner" element={<PrivateRoute><Suspense fallback={<Loading />}><CommunityOwnerDashboard /></Suspense></PrivateRoute>} />
+        <Route path="dashboard/elevated-admin" element={<AdminRoute><Suspense fallback={<Loading />}><ElevatedAdminDashboard /></Suspense></AdminRoute>} />
+        <Route path="dashboard/superadmin" element={<SuperAdminRoute><Suspense fallback={<Loading />}><SuperAdminDashboard /></Suspense></SuperAdminRoute>} />
         <Route path="bible" element={<Suspense fallback={<Loading />}><Bible /></Suspense>} />
         <Route path="bible/:bookNumber" element={<Suspense fallback={<Loading />}><BibleChapter /></Suspense>} />
         <Route path="bible/:bookNumber/:chapter" element={<Suspense fallback={<Loading />}><BibleReader /></Suspense>} />
@@ -43,16 +43,7 @@ function App() {
         <Route path="devotionals/:id" element={<Suspense fallback={<Loading />}><DevotionalDetail /></Suspense>} />
         <Route path="community" element={<Suspense fallback={<Loading />}><Community /></Suspense>} />
         <Route path="settings" element={<PrivateRoute><Suspense fallback={<Loading />}><Settings /></Suspense></PrivateRoute>} />
-        <Route
-          path="admin/devotionals"
-          element={
-            <AdminRoute>
-              <Suspense fallback={<Loading />}>
-                <DevotionalAdmin />
-              </Suspense>
-            </AdminRoute>
-          }
-        />
+        <Route path="admin/devotionals" element={<AdminRoute><Suspense fallback={<Loading />}><DevotionalAdmin /></Suspense></AdminRoute>} />
       </Route>
       <Route path="/login" element={<Suspense fallback={<Loading />}><Login /></Suspense>} />
       <Route path="*" element={<Suspense fallback={<Loading />}><NotFound /></Suspense>} />
