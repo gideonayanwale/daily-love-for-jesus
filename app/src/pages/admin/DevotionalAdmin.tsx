@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { useAuth } from '@/hooks/useAuth';
 import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
 import type { Devotional } from '@db/schema';
