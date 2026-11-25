@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRouter, elevatedAdminQuery } from "./middleware";
+import { createRouter, elevatedAdminQuery, superadminQuery } from "./middleware";
 import type { TrpcContext } from "./context";
 import type { User } from "@db/schema";
 
@@ -28,5 +28,15 @@ describe("elevated-admin notification gate", () => {
   it("rejects standard members", async () => {
     const router = createRouter({ send: elevatedAdminQuery.query(() => "sent") });
     await expect(router.createCaller(context("user")).send()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+describe("superadmin-only platform role appointment gate", () => {
+  it("allows only superadmins to enter the elevated-admin appointment procedure", async () => {
+    const router = createRouter({ promote: superadminQuery.query(({ ctx }) => ctx.user.role) });
+    await expect(router.createCaller(context("superadmin")).promote()).resolves.toBe("superadmin");
+    for (const role of ["user", "admin", "elevated_admin"]) {
+      await expect(router.createCaller(context(role)).promote()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
   });
 });

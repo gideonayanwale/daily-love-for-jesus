@@ -74,12 +74,21 @@ Create separate test accounts; do not change existing real users' roles for test
 - Review and publish a test devotional.
 - Appoint an active member as Community Owner.
 - Send an application-wide notification only after verifying the preview database contains test accounts exclusively.
-- Verify in-app notification records and Expo delivery receipts.
+- Verify in-app notification records and inspect Expo push tickets. A successful Expo ticket means the provider accepted the message; separately query delivery receipts before claiming that a device received it.
 
 ### Superadmin
 - Promote a standard test account to elevated_admin.
 - Confirm the operation is audit-logged.
 - Confirm the newly elevated account cannot appoint another elevated administrator.
+
+## Dependency audit baseline
+
+The latest recorded CI audit snapshot found:
+- App: 20 advisories (3 high, 17 moderate, 0 critical).
+- Backend: 12 advisories (8 high, 4 moderate, 0 critical).
+- Mobile: 21 advisories (1 critical, 5 high, 15 moderate).
+
+These counts are a snapshot, not a statement that every advisory is exploitable. Review the package-level audit output and upgrade compatibility before changing dependencies. External beta access requires the critical mobile advisory to be resolved and high-severity findings to be fixed or explicitly risk-accepted.
 
 ## Release gates
 
