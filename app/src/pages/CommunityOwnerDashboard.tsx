@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/providers/trpc-client";
 import { Loader2, Users, ArrowUpRight, ShieldCheck, Plus, Save } from "lucide-react";
 
 type CommunitySummary = {
