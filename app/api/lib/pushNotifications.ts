@@ -39,7 +39,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     title: options.title,
     body: options.body,
     category: options.category ?? "announcement",
-    resourceType: options.data?.resourceType ?? "group",
+    resourceType: options.data?.resourceType ?? (options.groupId ? "group" : "platform"),
     resourceId: options.data?.resourceId ? String(options.data.resourceId) : null,
     isRead: false,
   }));
