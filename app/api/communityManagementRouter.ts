@@ -45,6 +45,12 @@ export const communityManagementRouter = createRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      const community = await db.query.communities.findFirst({
+        where: and(eq(communities.id, input.communityId), eq(communities.status, "active")),
+      });
+      if (!community) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Active community not found." });
+      }
       const membership = await db.query.communityMembers.findFirst({
         where: and(
           eq(communityMembers.communityId, input.communityId),
