@@ -13,6 +13,36 @@ type CommunitySummary = {
   contactPhone?: string | null;
 };
 
+
+function GroupTeacherAssignment({ groupId }: { groupId: number }) {
+  const [teacherId, setTeacherId] = useState("");
+  const [role, setRole] = useState<"teacher" | "assistant_teacher">("teacher");
+  const candidates = trpc.community.listOwnedGroupTeacherCandidates.useQuery({ groupId });
+  const utils = trpc.useUtils();
+  const assign = trpc.community.assignOwnedGroupTeacher.useMutation({
+    onSuccess: () => {
+      toast.success(role === "teacher" ? "Teacher assigned." : "Assistant teacher assigned.");
+      setTeacherId("");
+      void utils.community.myGroups.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  return (
+    <form onSubmit={(event) => { event.preventDefault(); if (teacherId) assign.mutate({ groupId, userId: teacherId, role }); }} className="mt-3 grid gap-2 sm:grid-cols-[1fr_150px_auto]">
+      <select aria-label="Select teacher" value={teacherId} onChange={(event) => setTeacherId(event.target.value)} disabled={candidates.isLoading} className="min-w-0 rounded-lg border border-zinc-300 bg-transparent px-2 py-2 text-xs dark:border-zinc-700">
+        <option value="">Select active member</option>
+        {candidates.data?.map((candidate) => <option key={candidate.userId} value={candidate.userId}>{candidate.name || candidate.email || candidate.userId}</option>)}
+      </select>
+      <select aria-label="Teacher role" value={role} onChange={(event) => setRole(event.target.value as "teacher" | "assistant_teacher")} className="rounded-lg border border-zinc-300 bg-transparent px-2 py-2 text-xs dark:border-zinc-700">
+        <option value="teacher">Teacher</option>
+        <option value="assistant_teacher">Assistant teacher</option>
+      </select>
+      <button type="submit" disabled={!teacherId || assign.isPending} className="rounded-lg bg-zinc-900 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900">{assign.isPending ? "Assigning…" : "Assign"}</button>
+    </form>
+  );
+}
+
 function OwnedCommunityCard({ community }: { community: CommunitySummary }) {
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description ?? "");
@@ -79,7 +109,7 @@ function OwnedCommunityCard({ community }: { community: CommunitySummary }) {
         <h3 className="mb-3 text-sm font-semibold">Sunday School groups</h3>
         {groups.isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : groups.error ? <p className="text-xs text-red-600">Could not load groups: {groups.error.message}</p> : (
           <ul className="mb-4 space-y-2">
-            {groups.data?.length ? groups.data.map((group) => <li key={group.id} className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-900"><span>{group.name} <span className="text-xs text-zinc-500">· {group.category}</span></span><span className="text-xs text-zinc-500">{group.status}</span></li>) : <li className="text-xs text-zinc-500">No groups have been created for this community.</li>}
+            {groups.data?.length ? groups.data.map((group) => <li key={group.id} className="flex items-center justify-between rounded-lg bg-zinc-50 px-3 py-2 text-sm dark:bg-zinc-900"><span>{group.name} <span className="text-xs text-zinc-500">· {group.category}</span></span><span className="text-xs text-zinc-500">{group.status}</span><div className="mt-2 w-full"><GroupTeacherAssignment groupId={group.id} /></div></li>) : <li className="text-xs text-zinc-500">No groups have been created for this community.</li>}
           </ul>
         )}
         <form onSubmit={addGroup} className="flex flex-col gap-2 sm:flex-row">
