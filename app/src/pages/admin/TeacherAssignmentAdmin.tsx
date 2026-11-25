@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { Button } from '@/components/ui/button';
 import { Loader2, UserPlus, UserMinus } from 'lucide-react';
 
