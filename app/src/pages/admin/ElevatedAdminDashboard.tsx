@@ -5,9 +5,9 @@ import { trpc } from "@/providers/trpc-client";
 import { BookOpen, Send, Users, ShieldCheck, ArrowUpRight, Loader2, Megaphone, Crown } from "lucide-react";
 
 const tools = [
-  { title: "Devotional publishing", description: "Create, review, publish, and manage devotional content.", href: "/admin/devotionals", icon: BookOpen },
-  { title: "Telegram ingestion", description: "Import Telegram devotional messages, review pending messages, and process them.", href: "/admin/devotionals", icon: Send },
-  { title: "Teacher assignments", description: "Assign Sunday School teachers to active groups using scoped group membership.", href: "/admin/devotionals", icon: Users },
+  { title: "Devotional publishing", description: "Create, review, publish, and manage devotional content.", href: "/admin/devotionals?tab=new", icon: BookOpen },
+  { title: "Telegram ingestion", description: "Import Telegram devotional messages, review pending messages, and process them.", href: "/admin/devotionals?tab=telegram", icon: Send },
+  { title: "Teacher assignments", description: "Assign Sunday School teachers to active groups using scoped group membership.", href: "/admin/devotionals?tab=teacher-assignment", icon: Users },
 ];
 
 export default function ElevatedAdminDashboard() {
