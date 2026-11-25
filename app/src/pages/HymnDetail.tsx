@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { ArrowLeft, Music, User, Share2, Check, Copy } from 'lucide-react';
 import { useState } from 'react';
 
