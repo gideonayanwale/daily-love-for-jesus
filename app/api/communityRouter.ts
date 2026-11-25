@@ -12,6 +12,7 @@ import {
   readingLogs,
   pushTokens,
   users,
+  auditLogs,
 } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { assertGroupRole } from "./lib/rbac";
@@ -65,6 +66,91 @@ export const communityRouter = createRouter({
 
     return rows;
   }),
+
+
+  // Community-owner operations are scoped to an active owner membership.
+  updateOwnedCommunity: authedQuery
+    .input(z.object({
+      communityId: z.string().uuid(),
+      name: z.string().trim().min(2).max(255).optional(),
+      description: z.string().trim().max(5000).nullable().optional(),
+      location: z.string().trim().max(255).nullable().optional(),
+      contactEmail: z.string().email().max(320).nullable().optional(),
+      contactPhone: z.string().trim().max(50).nullable().optional(),
+    }).refine((input) => Object.keys(input).some((key) => key !== "communityId" && input[key as keyof typeof input] !== undefined), {
+      message: "Provide at least one community field to update.",
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, input.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      }
+
+      const { communityId, ...changes } = input;
+      const [updated] = await db.update(communities)
+        .set({ ...changes, updatedAt: new Date() })
+        .where(eq(communities.id, communityId))
+        .returning({ id: communities.id, name: communities.name });
+
+      await db.insert(auditLogs).values({
+        actorId: ctx.user.id,
+        action: "update_owned_community",
+        resourceType: "community",
+        resourceId: communityId,
+        metadata: { fields: Object.keys(changes) },
+        occurredAt: new Date(),
+      });
+      return { success: true, community: updated };
+    }),
+
+  createOwnedGroup: authedQuery
+    .input(z.object({
+      communityId: z.string().uuid(),
+      name: z.string().trim().min(2).max(255),
+      description: z.string().trim().max(2000).optional(),
+      category: z.string().trim().min(2).max(100).default("Sunday School"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, input.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      }
+      const slugBase = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "group";
+      const [created] = await db.insert(groups).values({
+        communityId: input.communityId,
+        name: input.name,
+        description: input.description ?? null,
+        category: input.category,
+        slug: `${slugBase}-${crypto.randomUUID().slice(0, 8)}`,
+        createdBy: ctx.user.id,
+      }).returning({ id: groups.id, name: groups.name, slug: groups.slug });
+
+      await db.insert(auditLogs).values({
+        actorId: ctx.user.id,
+        action: "create_owned_group",
+        resourceType: "group",
+        resourceId: String(created.id),
+        metadata: { communityId: input.communityId, category: input.category },
+        occurredAt: new Date(),
+      });
+      return { success: true, group: created };
+    }),
 
   // ─── Get Group Details with Announcements & Active Reading Assignments ─────
   groupDetails: authedQuery
