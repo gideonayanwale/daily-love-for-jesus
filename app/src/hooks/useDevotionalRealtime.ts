@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { supabase } from '@/lib/supabase';
 
 export default function useDevotionalRealtime(): void {
