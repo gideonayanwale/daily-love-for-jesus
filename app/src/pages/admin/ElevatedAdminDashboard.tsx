@@ -34,7 +34,7 @@ export default function ElevatedAdminDashboard() {
 
   const broadcast = trpc.notification.broadcastToUsers.useMutation({
     onSuccess: (result) => {
-      toast.success(`Notification recorded for ${result.recipientCount} users; dispatched to ${result.devicesSent} devices.`);
+      toast.success(`Notification recorded for ${result.recipientCount} users; accepted by Expo for ${result.devicesSent} devices (${result.failedDevices} failed).`);
       setTitle("");
       setBody("");
     },
