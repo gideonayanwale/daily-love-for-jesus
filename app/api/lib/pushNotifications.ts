@@ -60,31 +60,35 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     return { sent: 0, recipientCount: recipientIds.length };
   }
 
-  // 3. Dispatch to Expo Push API
-  const messages = tokens.map((t) => ({
-    to: t.token,
-    sound: "default",
-    title: options.title,
-    body: options.body,
-    data: options.data || {},
-    badge: 1,
-  }));
-
-  try {
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(messages),
-    });
-
-    const result = await response.json();
-    return { sent: messages.length, recipientCount: recipientIds.length, result };
-  } catch (err) {
-    console.warn("[push] Expo push dispatch error (will still show in-app):", err);
-    return { sent: 0, recipientCount: recipientIds.length, error: String(err) };
+  // 3. Dispatch to Expo Push API in provider-sized batches.
+  let sent = 0;
+  const failures: string[] = [];
+  for (let offset = 0; offset < messages.length; offset += 100) {
+    const batch = messages.slice(offset, offset + 100);
+    try {
+      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Accept-Encoding": "gzip, deflate",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(batch),
+      });
+      if (!response.ok) {
+        failures.push(`HTTP ${response.status}`);
+        continue;
+      }
+      await response.json();
+      sent += batch.length;
+    } catch (error) {
+      failures.push(error instanceof Error ? error.message : "Unknown Expo delivery error");
+    }
   }
+
+  return {
+    sent,
+    recipientCount: recipientIds.length,
+    ...(failures.length > 0 ? { error: failures.join("; ") } : {}),
+  };
 }
