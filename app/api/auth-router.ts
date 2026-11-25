@@ -1,7 +1,7 @@
 import { z } from "zod";
 import * as cookie from "cookie";
 import { eq } from "drizzle-orm";
-import { createRouter, authedQuery, strictAdminQuery } from "./middleware";
+import { createRouter, authedQuery, superadminQuery } from "./middleware";
 import { upsertUser } from "./queries/users";
 import { getDb, getNeonDb, getSupabaseDb } from "./queries/connection";
 import * as schema from "@db/schema";
@@ -38,7 +38,9 @@ export const authRouter = createRouter({
     return { success: true };
   }),
 
-  promoteToElevatedAdmin: strictAdminQuery
+  // This operation is deliberately superadmin-only. Community ownership and
+  // Sunday School assignments are scoped memberships, not platform roles.
+  promoteToElevatedAdmin: superadminQuery
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.userId === ctx.user.id) {
@@ -55,8 +57,8 @@ export const authRouter = createRouter({
       if (!existing.length) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
       }
-      if (!["user", "elevated_admin"].includes(existing[0].role)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "This account's platform role cannot be changed through this operation." });
+      if (existing[0].role !== "user") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only a standard user can be appointed as an elevated administrator." });
       }
       const updated = await db
         .update(schema.users)
