@@ -15,12 +15,16 @@ import * as cookie from 'cookie';
 import * as schema from '@db/schema';
 import { eq } from 'drizzle-orm';
 import { Request, Response } from 'express';
+import { createHmac } from 'node:crypto';
+
+const anonymousVisitCache = new Map<string, number>();
 
 @Injectable()
 export class TrpcService {
   private readonly logger = new Logger(TrpcService.name);
   public appRouter: AppRouter;
   private supabaseAdmin: any;
+  private warnedMissingVisitorSecret = false;
 
   constructor(
     @Optional() @Inject(ConfigService) private configService: ConfigService,
@@ -45,6 +49,7 @@ export class TrpcService {
       this.telegramService,
       this.favoritesService,
       this.communityService,
+      this.dbService,
     );
 
     const url =
@@ -113,8 +118,17 @@ export class TrpcService {
                 avatar: authUser.user_metadata?.avatar_url ?? null,
                 role: 'user',
               })
+              .onConflictDoNothing({ target: schema.users.id })
               .returning();
             user = inserted[0];
+            if (!user) {
+              const concurrentProfile = await db
+                .select()
+                .from(schema.users)
+                .where(eq(schema.users.id, authUser.id))
+                .limit(1);
+              user = concurrentProfile[0];
+            }
           }
         }
       } catch (err: any) {
@@ -123,7 +137,64 @@ export class TrpcService {
       }
     }
 
+    if (!user && !authError && req.method === 'GET') {
+      this.trackAnonymousVisit(req);
+    }
+
     return { req, res, user, authError };
+  }
+
+  private trackAnonymousVisit(req: Request): void {
+    if (req.headers['x-analytics-consent'] !== 'granted') return;
+    const rawSessionId = req.headers['x-anonymous-session'];
+    const sessionId = typeof rawSessionId === 'string' && /^[0-9a-f-]{36}$/i.test(rawSessionId)
+      ? rawSessionId
+      : null;
+    if (!sessionId) return;
+
+    const rawClientPath = req.headers['x-client-path'];
+    const candidate = typeof rawClientPath === 'string' ? rawClientPath.split('?')[0] : '';
+    const pagePath = /^\/[a-zA-Z0-9/_-]{0,99}$/.test(candidate) ? candidate : '';
+    if (!pagePath || pagePath.startsWith('/api/') || pagePath.startsWith('/assets/')) return;
+
+    const ip = req.ip || req.socket.remoteAddress;
+    if (!ip) return;
+
+    const now = Date.now();
+    const cacheKey = `${sessionId}:${pagePath}`;
+    const lastLogged = anonymousVisitCache.get(cacheKey) ?? 0;
+    if (now - lastLogged < 60_000) return;
+    anonymousVisitCache.set(cacheKey, now);
+    if (anonymousVisitCache.size > 5000) {
+      for (const [key, timestamp] of anonymousVisitCache) {
+        if (now - timestamp > 60_000) anonymousVisitCache.delete(key);
+      }
+    }
+
+    const appSecret = this.configService?.get<string>('security.appSecret');
+    if (!appSecret && !this.warnedMissingVisitorSecret) {
+      this.warnedMissingVisitorSecret = true;
+      this.logger.warn('APP_SECRET is not configured; anonymous visits will be recorded without a pseudonymous IP identifier.');
+    }
+    const visitorHash = appSecret
+      ? createHmac('sha256', appSecret).update(ip).digest('hex').slice(0, 40)
+      : null;
+    const userAgent = req.headers['user-agent']?.slice(0, 512) ?? null;
+
+    void this.dbService.getDb()
+      .insert(schema.auditLogs)
+      .values({
+        action: 'anonymous_visit',
+        resourceType: 'page',
+        resourceId: pagePath,
+        actorId: null,
+        ipAddress: visitorHash,
+        userAgent,
+        metadata: { method: 'GET', timestamp: new Date(now).toISOString(), sessionId, consentVersion: 'v1' },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(`Anonymous visitor tracking failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+      });
   }
 
   getExpressMiddleware() {

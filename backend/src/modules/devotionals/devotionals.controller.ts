@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
-import { DevotionalsService, CreateDevotionalDto } from './devotionals.service';
+import { DevotionalsService, type CreateDevotionalDto } from './devotionals.service';
 import { SupabaseAuthGuard } from '../../common/guards/supabase-auth.guard';
 import { Roles, RolesGuard } from '../../common/guards/roles.guard';
 

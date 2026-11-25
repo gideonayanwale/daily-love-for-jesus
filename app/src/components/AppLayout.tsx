@@ -17,6 +17,8 @@ import {
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useAuth } from '@/hooks/useAuth';
 import ExplorePanel from './ExplorePanel';
+import AnalyticsConsentBanner from './AnalyticsConsentBanner';
+import { trpc } from '@/providers/trpc';
 
 const navItems = [
   { path: '/', label: 'Today', icon: Home },
@@ -31,7 +33,9 @@ export default function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { refetch: trackGuestPageView } = trpc.ping.useQuery(undefined, { enabled: false, retry: false });
+  const visibleNavItems = user ? navItems : navItems.filter((item) => item.path !== '/settings');
 
   // Dark mode state synced with DOM and localStorage
   const [isDark, setIsDark] = useState(() => {
@@ -55,6 +59,16 @@ export default function AppLayout() {
   }, [isDark]);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
+
+  // Explicit page-view ping lets static public pages (such as Community overview)
+  // participate in consented anonymous analytics without exposing private data.
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      void trackGuestPageView().catch(() => {
+        // Analytics must never block public reading or navigation.
+      });
+    }
+  }, [location.pathname, authLoading, isAuthenticated, trackGuestPageView]);
 
   // Hide chrome on login page
   if (location.pathname === '/login') {
@@ -112,7 +126,7 @@ export default function AppLayout() {
                 <span>Dashboard</span>
               </button>
             )}
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const isActive =
                 item.path === '/'
                   ? location.pathname === '/'
@@ -134,7 +148,7 @@ export default function AppLayout() {
                 </button>
               );
             })}
-            {(user?.role === 'admin' || user?.role === 'elevated_admin') && (
+            {(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin') && (
               <button
                 onClick={() => navigate('/admin/devotionals')}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-150 ${
@@ -151,7 +165,6 @@ export default function AppLayout() {
 
           {/* Right Header Actions: Explore navigation, theme and profile */}
           <div className="flex items-center gap-2">
-            <ExplorePanel userId={user?.id} userName={user?.name} userRole={user?.role} />
             {/* Theme Toggle Button */}
             <button
               onClick={toggleTheme}
@@ -190,18 +203,20 @@ export default function AppLayout() {
         </div>
       </header>
 
+      <AnalyticsConsentBanner visible={!authLoading && !isAuthenticated} />
+
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 py-6 pb-24 md:pb-12">
         <Outlet />
       </main>
 
       {/* Mobile Bottom Navigation Bar (md:hidden) */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0c0c0f]/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 z-40 safe-area-bottom">
-        <div className="flex items-center justify-around py-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 overflow-x-auto bg-white/95 dark:bg-[#0c0c0f]/95 backdrop-blur-md border-t border-zinc-200 dark:border-zinc-800 z-40 safe-area-bottom">
+        <div className="flex min-w-max items-center justify-start gap-1 px-2 py-2">
           {user && (
             <button
               onClick={() => navigate('/dashboard')}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all duration-150 ${
+              className={`flex min-w-[58px] flex-col items-center gap-0.5 px-2 py-1 rounded-xl transition-all duration-150 ${
                 location.pathname === '/dashboard'
                   ? 'text-amber-600 dark:text-amber-400 font-semibold'
                   : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200'
@@ -215,7 +230,7 @@ export default function AppLayout() {
               <span className="text-[10px] tracking-tight">Dashboard</span>
             </button>
           )}
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const isActive =
               item.path === '/'
                 ? location.pathname === '/'
@@ -241,7 +256,7 @@ export default function AppLayout() {
               </button>
             );
           })}
-          {(user?.role === 'admin' || user?.role === 'elevated_admin') && (
+          {(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin') && (
             <button
               onClick={() => navigate('/admin/devotionals')}
               className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-xl transition-all duration-150 ${
@@ -260,6 +275,7 @@ export default function AppLayout() {
           )}
         </div>
       </nav>
+      <ExplorePanel userId={user?.id} userName={user?.name} userRole={user?.role} />
     </div>
   );
 }

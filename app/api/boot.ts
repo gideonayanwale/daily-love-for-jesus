@@ -84,13 +84,19 @@ app.use('*', async (c, next) => {
       cookies['sb-access-token'] ||
       cookies['daily_love_token'];
 
-    if (!hasToken) {
+    const hasAnalyticsConsent = c.req.header('x-analytics-consent') === 'granted';
+    const rawSessionId = c.req.header('x-anonymous-session') || '';
+    const sessionId = /^[0-9a-f-]{36}$/i.test(rawSessionId) ? rawSessionId : null;
+
+    if (!hasToken && hasAnalyticsConsent && sessionId) {
       const ip =
         c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ||
         c.req.header('x-real-ip') ||
         null;
       const ua = c.req.header('user-agent') || null;
-      const path = new URL(c.req.url).pathname;
+      const requestPath = new URL(c.req.url).pathname;
+      const clientPath = c.req.header('x-client-path')?.split('?')[0] ?? '';
+      const path = /^\/[a-zA-Z0-9/_-]{0,99}$/.test(clientPath) ? clientPath : requestPath;
 
       // Skip static assets — only track meaningful API traffic
       const isStaticAsset =
@@ -103,7 +109,7 @@ app.use('*', async (c, next) => {
 
       // Fire-and-forget — wrapped so errors from getDb() are caught,
       // not turned into an unhandled rejection that could crash the process.
-      const cacheKey = ip ?? 'unknown';
+      const cacheKey = `${sessionId}:${path}`;
       const lastLogged = anonLogCache.get(cacheKey) ?? 0;
       if (Date.now() - lastLogged < 60_000) return next();
       anonLogCache.set(cacheKey, Date.now());
@@ -117,7 +123,7 @@ app.use('*', async (c, next) => {
           actorId: null,
           ipAddress: visitorHash,
           userAgent: ua,
-          metadata: { method: 'GET', timestamp: new Date().toISOString() },
+          metadata: { method: 'GET', timestamp: new Date().toISOString(), sessionId, consentVersion: 'v1' },
         });
       })().catch((err: unknown) => {
         console.error('[anonymous-tracking] Failed to log visit:', err);

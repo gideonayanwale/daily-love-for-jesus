@@ -6,6 +6,7 @@ import type { AppRouter } from "@/types/trpc-router";
 export type { AppRouter };
 import type { ReactNode } from "react";
 import { getSupabaseAccessToken } from "@/lib/supabase";
+import { getAnonymousAnalyticsHeaders } from "@/lib/analytics";
 
 export const trpc = createTRPCReact<AppRouter>();
 
@@ -19,9 +20,13 @@ const trpcClient = trpc.createClient({
       transformer: superjson,
       headers() {
         const token = getSupabaseAccessToken();
-        return token
-          ? { Authorization: `Bearer ${token}` }
-          : {};
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        if (typeof window !== "undefined") {
+          headers["x-client-path"] = window.location.pathname;
+          Object.assign(headers, getAnonymousAnalyticsHeaders());
+        }
+        return headers;
       },
       fetch(input, init) {
         return globalThis.fetch(input, {

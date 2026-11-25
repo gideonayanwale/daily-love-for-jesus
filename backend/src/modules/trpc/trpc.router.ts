@@ -1,6 +1,9 @@
 import { initTRPC, TRPCError } from '@trpc/server';
 import superjson from 'superjson';
 import { z } from 'zod';
+import { desc, eq, sql } from 'drizzle-orm';
+import * as schema from '@db/schema';
+import { DatabaseService } from '../../database/database.service';
 import { AuthService } from '../auth/auth.service';
 import { BibleService } from '../bible/bible.service';
 import { HymnsService } from '../hymns/hymns.service';
@@ -51,6 +54,14 @@ const requireAdminRole = t.middleware(async ({ ctx, next }) => {
 });
 const adminProcedure = protectedProcedure.use(requireAdminRole);
 
+const requireStrictAdminRole = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.user || !['admin', 'superadmin'].includes(ctx.user.role)) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Platform administrator access required' });
+  }
+  return next({ ctx: { ...ctx, user: ctx.user } });
+});
+const strictAdminProcedure = protectedProcedure.use(requireStrictAdminRole);
+
 export function buildAppRouter(
   authService: AuthService,
   bibleService: BibleService,
@@ -59,8 +70,43 @@ export function buildAppRouter(
   telegramService: TelegramService,
   favoritesService: FavoritesService,
   communityService: CommunityService,
+  databaseService: DatabaseService,
 ) {
   return createRouter({
+    anonymousLog: createRouter({
+      list: strictAdminProcedure
+        .input(z.object({
+          limit: z.number().min(1).max(200).default(50),
+          offset: z.number().min(0).default(0),
+        }).optional())
+        .query(async ({ input }) => {
+          const db = databaseService.getDb();
+          const limit = input?.limit ?? 50;
+          const offset = input?.offset ?? 0;
+          const [items, countResult] = await Promise.all([
+            db.select()
+              .from(schema.auditLogs)
+              .where(eq(schema.auditLogs.action, 'anonymous_visit'))
+              .orderBy(desc(schema.auditLogs.occurredAt))
+              .limit(limit)
+              .offset(offset),
+            db.select({ count: sql<number>`cast(count(*) as int)` })
+              .from(schema.auditLogs)
+              .where(eq(schema.auditLogs.action, 'anonymous_visit')),
+          ]);
+          return {
+            items: items.map((row: typeof items[number]) => ({
+              id: row.id,
+              ipAddress: row.ipAddress,
+              resourceId: row.resourceId,
+              userAgent: row.userAgent,
+              metadata: row.metadata,
+              occurredAt: row.occurredAt,
+            })),
+            total: countResult[0]?.count ?? 0,
+          };
+        }),
+    }),
     ping: publicProcedure.query(() => ({ ok: true, ts: Date.now() })),
 
     auth: createRouter({

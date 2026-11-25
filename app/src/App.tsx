@@ -42,7 +42,7 @@ function App() {
         <Route path="devotionals" element={<Suspense fallback={<Loading />}><Devotionals /></Suspense>} />
         <Route path="devotionals/:id" element={<Suspense fallback={<Loading />}><DevotionalDetail /></Suspense>} />
         <Route path="community" element={<Suspense fallback={<Loading />}><Community /></Suspense>} />
-        <Route path="settings" element={<Suspense fallback={<Loading />}><Settings /></Suspense>} />
+        <Route path="settings" element={<PrivateRoute><Suspense fallback={<Loading />}><Settings /></Suspense></PrivateRoute>} />
         <Route
           path="admin/devotionals"
           element={

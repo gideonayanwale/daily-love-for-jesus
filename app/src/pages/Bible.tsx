@@ -53,7 +53,7 @@ export default function Bible() {
       </div>
 
       {/* ── Testament Filter Tabs ───────────────────────────────────────────── */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setActiveTab('all')}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${

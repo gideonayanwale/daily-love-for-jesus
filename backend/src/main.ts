@@ -84,9 +84,11 @@ export async function createApp(): Promise<{ app: NestExpressApplication; expres
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret', 'Accept', 'x-requested-with'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-admin-secret', 'Accept', 'x-requested-with', 'x-client-path', 'x-analytics-consent', 'x-anonymous-session'],
     maxAge: 86400,
   });
+
+  if (isProduction) app.set('trust proxy', 1);
 
   // Swagger OpenAPI Documentation
   const swaggerConfig = new DocumentBuilder()

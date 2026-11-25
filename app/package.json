@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run check && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "start": "cross-env NODE_ENV=production node dist/boot.js",
@@ -26,7 +26,7 @@
     "db:push:neon": "cross-env NEON_DATABASE_URL=$NEON_DATABASE_URL drizzle-kit push",
     "db:push:supabase": "cross-env NEON_DATABASE_URL= drizzle-kit push",
     "db:seed": "tsx db/seed.ts",
-    "lint:ui": "eslint src/components/ExplorePanel.tsx src/components/AppLayout.tsx src/pages/admin/DevotionalAdmin.tsx src/hooks/useDevotionalRealtime.ts src/lib/supabase.ts"
+    "lint:ui": "eslint src/components/ExplorePanel.tsx src/components/AppLayout.tsx src/components/AnalyticsConsentBanner.tsx src/pages/Home.tsx src/pages/Bible.tsx src/pages/Dashboard.tsx src/pages/Community.tsx src/pages/admin/DevotionalAdmin.tsx src/providers/trpc.tsx src/lib/analytics.ts api/boot.ts api/hymnsRouter.ts api/middleware.ts db/seed.ts src/hooks/useDevotionalRealtime.ts src/lib/supabase.ts"
   },
   "scripts-windows-help": {
     "fix:windows": "powershell -ExecutionPolicy Bypass -NoProfile -File ./scripts/windows-fix.ps1"

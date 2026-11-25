@@ -6,7 +6,10 @@ import { Loader2, Calendar, Bookmark, BookOpen, Music, CalendarHeart, Users, Set
 
 function getRoleBadge(role?: string) {
   if (role === 'admin') {
-    return { label: 'Super Admin', className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' };
+    return { label: 'Administrator', className: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300' };
+  }
+  if (role === 'superadmin') {
+    return { label: 'Super Administrator', className: 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300' };
   }
   if (role === 'elevated_admin') {
     return { label: 'Elevated Admin', className: 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300' };
@@ -45,7 +48,7 @@ export default function Dashboard() {
     { label: 'Devotionals', path: '/devotionals', Icon: CalendarHeart, color: 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' },
     { label: 'Community', path: '/community', Icon: Users, color: 'bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400' },
     { label: 'Settings', path: '/settings', Icon: Settings, color: 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400' },
-    ...(user?.role === 'admin' || user?.role === 'elevated_admin'
+    ...(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin'
       ? [{ label: 'Admin Panel', path: '/admin/devotionals', Icon: ShieldCheck, color: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' }]
       : []),
   ];

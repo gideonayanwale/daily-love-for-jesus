@@ -2,7 +2,7 @@ name: CI/CD Pipeline & Deployment Verification
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'fix/**' ]
   pull_request:
     branches: [ main ]
     types: [ opened, synchronize, reopened, edited ]

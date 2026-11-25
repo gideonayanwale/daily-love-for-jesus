@@ -679,10 +679,10 @@ export default function DevotionalAdmin() {
           <TabsTrigger value="new">New Devotion</TabsTrigger>
           <TabsTrigger value="manage">Manage Devotions</TabsTrigger>
           <TabsTrigger value="telegram">Import from Telegram</TabsTrigger>
-          {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
+          {(user?.role === 'elevated_admin' || (user?.role === 'admin' || user?.role === 'superadmin')) && (
             <TabsTrigger value="teacher-assignment">Teacher Assignment</TabsTrigger>
           )}
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'superadmin') && (
             <TabsTrigger value="visitor-log">Visitor Log</TabsTrigger>
           )}
         </TabsList>
@@ -699,14 +699,14 @@ export default function DevotionalAdmin() {
           <TelegramMessagesTab />
         </TabsContent>
 
-        {(user?.role === 'elevated_admin' || user?.role === 'admin') && (
+        {(user?.role === 'elevated_admin' || (user?.role === 'admin' || user?.role === 'superadmin')) && (
           <TabsContent value="teacher-assignment">
             <Suspense fallback={<div className="py-8 text-center text-sm text-zinc-400">Loading...</div>}>
               <TeacherAssignmentAdmin />
             </Suspense>
           </TabsContent>
         )}
-        {user?.role === 'admin' && (
+        {(user?.role === 'admin' || user?.role === 'superadmin') && (
           <TabsContent value="visitor-log">
             <Suspense fallback={<div className="py-8 text-center text-sm text-zinc-400">Loading...</div>}>
               <AnonymousLogAdmin />
