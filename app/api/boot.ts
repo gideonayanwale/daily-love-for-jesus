@@ -14,9 +14,9 @@ import { syncRouter } from "./syncRouter";
 import { env } from "./lib/env";
 import { insertTelegramMessage } from "./queries/telegram";
 import { parseAndCreateDevotional } from "./lib/devotionalParser";
+import { AnonymousVisitRateLimiter } from "./lib/anonymous-analytics";
 
-
-const anonLogCache = new Map<string, number>();
+const anonymousVisitRateLimiter = new AnonymousVisitRateLimiter();
 
 async function timingSafeStringEqual(left: string, right: string): Promise<boolean> {
   if (left.length !== right.length) return false;
@@ -46,8 +46,6 @@ async function pseudonymizeVisitorIp(ip: string | null): Promise<string | null> 
     .join("")
     .slice(0, 40);
 }
-setInterval(() => anonLogCache.clear(), 10 * 60 * 1000).unref();
-
 const telegramMessageSchema = z.object({
   message_id: z.number().int().positive(),
   chat: z.object({
@@ -109,10 +107,9 @@ app.use('*', async (c, next) => {
 
       // Fire-and-forget — wrapped so errors from getDb() are caught,
       // not turned into an unhandled rejection that could crash the process.
-      const cacheKey = `${sessionId}:${path}`;
-      const lastLogged = anonLogCache.get(cacheKey) ?? 0;
-      if (Date.now() - lastLogged < 60_000) return next();
-      anonLogCache.set(cacheKey, Date.now());
+      // Rate-limit by network address + path, not the client-controlled session ID.
+      // The limiter also bounds its in-memory cache against high-cardinality requests.
+      if (!anonymousVisitRateLimiter.shouldLog(ip, path)) return next();
       (async () => {
         const db = await getDb();
         const visitorHash = await pseudonymizeVisitorIp(ip);
