@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createRouter } from "./middleware";
-import { elevatedAdminQuery } from "./middleware";
+import { createRouter, elevatedAdminQuery } from "./middleware";
 import type { TrpcContext } from "./context";
 import type { User } from "@db/schema";
 
