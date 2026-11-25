@@ -146,7 +146,28 @@ export const appRouter = t.router({
   community: t.router({
     myCommunities: t.procedure.query(async () => [] as any[]),
     myGroups: t.procedure.query(async () => [] as any[]),
-    groupDetails: t.procedure.input(z.any()).query(async () => ({} as any)),
+    groupDetails: t.procedure.input(z.any()).query(async () => ({
+      group: {} as any,
+      myRole: null as string | null,
+      announcements: [] as Array<{
+        id: number;
+        title: string;
+        body: string;
+        priority: string;
+        announcementType: string;
+        createdAt: Date;
+        authorName: string | null;
+        authorAvatar: string | null;
+      }>,
+      assignments: [] as Array<{
+        id: number;
+        title: string;
+        description: string | null;
+        dueDate: Date;
+        bookNumber: number;
+        chapter: number;
+      }>,
+    })),
     teacherOverview: t.procedure.input(z.any()).query(async () => ({} as any)),
     registerPushToken: t.procedure.input(z.any()).mutation(async () => ({ success: true })),
     listOwnedGroupTeacherCandidates: t.procedure
