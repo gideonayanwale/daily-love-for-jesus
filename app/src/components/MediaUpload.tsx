@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { Progress } from '@/components/ui/progress';
 import { Upload, AlertCircle, CheckCircle2 } from 'lucide-react';
 

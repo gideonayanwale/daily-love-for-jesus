@@ -1,7 +1,7 @@
 import { z } from "zod";
 import * as cookie from "cookie";
-import { eq } from "drizzle-orm";
-import { createRouter, authedQuery, strictAdminQuery } from "./middleware";
+import { and, eq } from "drizzle-orm";
+import { createRouter, authedQuery, superadminQuery } from "./middleware";
 import { upsertUser } from "./queries/users";
 import { getDb, getNeonDb, getSupabaseDb } from "./queries/connection";
 import * as schema from "@db/schema";
@@ -38,7 +38,9 @@ export const authRouter = createRouter({
     return { success: true };
   }),
 
-  promoteToElevatedAdmin: strictAdminQuery
+  // This operation is deliberately superadmin-only. Community ownership and
+  // Sunday School assignments are scoped memberships, not platform roles.
+  promoteToElevatedAdmin: superadminQuery
     .input(z.object({ userId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.userId === ctx.user.id) {
@@ -47,35 +49,46 @@ export const authRouter = createRouter({
       const db = await getDb();
       const [neonDb, supabaseDb] = await Promise.all([getNeonDb(), getSupabaseDb()]);
       const secondaryDb = db === neonDb ? supabaseDb : neonDb;
-      const existing = await db
-        .select({ role: schema.users.role })
-        .from(schema.users)
-        .where(eq(schema.users.id, input.userId))
-        .limit(1);
-      if (!existing.length) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
-      }
-      if (!["user", "elevated_admin"].includes(existing[0].role)) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "This account's platform role cannot be changed through this operation." });
-      }
-      const updated = await db
-        .update(schema.users)
-        .set({ role: "elevated_admin", updatedAt: new Date() })
-        .where(eq(schema.users.id, input.userId))
-        .returning({ id: schema.users.id, role: schema.users.role });
-      await db.insert(schema.auditLogs).values({
-        actorId: ctx.user.id,
-        action: "promote_elevated_admin",
-        resourceType: "user",
-        resourceId: input.userId,
-        metadata: { previousRole: existing[0].role, targetRole: "elevated_admin" },
-        occurredAt: new Date(),
+      const updated = await db.transaction(async (tx) => {
+        // Make the role transition conditional in the UPDATE itself. This
+        // prevents a concurrent role change from being overwritten after a
+        // separate read has already observed the standard-user role.
+        const promoted = await tx
+          .update(schema.users)
+          .set({ role: "elevated_admin", updatedAt: new Date() })
+          .where(and(eq(schema.users.id, input.userId), eq(schema.users.role, "user")))
+          .returning({ id: schema.users.id, role: schema.users.role });
+
+        if (!promoted.length) {
+          const [target] = await tx
+            .select({ role: schema.users.role })
+            .from(schema.users)
+            .where(eq(schema.users.id, input.userId))
+            .limit(1);
+          if (!target) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Target user not found." });
+          }
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only a standard user can be appointed as an elevated administrator.",
+          });
+        }
+
+        await tx.insert(schema.auditLogs).values({
+          actorId: ctx.user.id,
+          action: "promote_elevated_admin",
+          resourceType: "user",
+          resourceId: input.userId,
+          metadata: { previousRole: "user", targetRole: "elevated_admin" },
+          occurredAt: new Date(),
+        });
+        return promoted[0];
       });
       if (secondaryDb && secondaryDb !== db) {
         await secondaryDb
           .update(schema.users)
           .set({ role: "elevated_admin", updatedAt: new Date() })
-          .where(eq(schema.users.id, input.userId));
+          .where(and(eq(schema.users.id, input.userId), eq(schema.users.role, "user")));
       }
       return { success: true, user: updated[0] };
     }),

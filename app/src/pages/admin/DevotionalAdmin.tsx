@@ -1,6 +1,7 @@
 import { useState, lazy, Suspense } from 'react';
+import { useSearchParams } from 'react-router';
 import { toast } from 'sonner';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { useAuth } from '@/hooks/useAuth';
 import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
 import type { Devotional } from '@db/schema';
@@ -654,7 +655,17 @@ function TelegramMessagesTab() {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function DevotionalAdmin() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   useDevotionalRealtime();
+  const requestedTab = searchParams.get("tab");
+  const allowedTabs = new Set(["new", "manage", "telegram"]);
+  if (user?.role === "elevated_admin" || user?.role === "admin" || user?.role === "superadmin") {
+    allowedTabs.add("teacher-assignment");
+  }
+  if (user?.role === "admin" || user?.role === "superadmin") {
+    allowedTabs.add("visitor-log");
+  }
+  const defaultTab = requestedTab && allowedTabs.has(requestedTab) ? requestedTab : "new";
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -674,7 +685,7 @@ export default function DevotionalAdmin() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="new">
+      <Tabs defaultValue={defaultTab}>
         <TabsList className="w-full sm:w-auto mb-4">
           <TabsTrigger value="new">New Devotion</TabsTrigger>
           <TabsTrigger value="manage">Manage Devotions</TabsTrigger>

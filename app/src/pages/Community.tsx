@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '@/hooks/useAuth'
-import { trpc } from '@/providers/trpc'
+import { trpc } from '@/providers/trpc-client'
 import {
   Users,
   KeyRound,
@@ -22,15 +22,40 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { CommunityChat } from '@/components/CommunityChat'
 
+type AttendanceStatus = 'present' | 'absent' | 'excused' | 'late';
+type RosterStudent = {
+  userId: string;
+  name: string;
+  currentStreakDays: number;
+  totalChaptersRead: number;
+};
+type WeeklyReport = {
+  csvExport?: string;
+  metrics?: {
+    readingCompletionRate?: number;
+    totalChaptersCompleted?: number;
+    chaptersTrendPercent?: number;
+  };
+  students?: Array<{
+    userId: string;
+    name: string;
+    chaptersReadThisWeek: number;
+    timeSpentMinutes: number;
+  }>;
+};
+
 /** Reads the Supabase session access token from localStorage for REST API calls */
 function getAuthHeader(): Record<string, string> {
   try {
     const session = localStorage.getItem('daily_love_supabase_session')
     if (session) {
-      const token = JSON.parse(session)?.access_token
-      if (token) return { Authorization: `Bearer ${token}` }
+      const parsed = JSON.parse(session) as { access_token?: unknown };
+      const token = parsed.access_token;
+      if (typeof token === 'string' && token.length > 0) return { Authorization: `Bearer ${token}` };
     }
-  } catch {}
+  } catch {
+    return {};
+  }
   return {}
 }
 
@@ -57,14 +82,14 @@ export default function Community() {
   const [isPosting, setIsPosting] = useState(false)
 
   // Roster, Attendance, Guests & Report States
-  const [roster, setRoster] = useState<any[]>([])
+  const [roster, setRoster] = useState<RosterStudent[]>([])
   const [isRosterLoading, setIsRosterLoading] = useState(false)
-  const [attendanceRecordsState, setAttendanceRecordsState] = useState<Record<string, 'present' | 'absent' | 'excused' | 'late'>>({})
+  const [attendanceRecordsState, setAttendanceRecordsState] = useState<Record<string, AttendanceStatus>>({})
   const [guestList, setGuestList] = useState<Array<{ id: string; name: string; phone?: string; status: 'present' | 'absent' | 'excused' | 'late' }>>([])
   const [newGuestName, setNewGuestName] = useState('')
   const [newGuestPhone, setNewGuestPhone] = useState('')
   const [isSavingAttendance, setIsSavingAttendance] = useState(false)
-  const [weeklyReport, setWeeklyReport] = useState<any | null>(null)
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null)
   const [isReportLoading, setIsReportLoading] = useState(false)
 
   // tRPC queries
@@ -93,58 +118,58 @@ export default function Community() {
     groupDetails?.myRole === 'teacher' || groupDetails?.myRole === 'assistant_teacher'
 
   // Fetch Teacher Roster
-  const fetchRoster = async () => {
+  const fetchRoster = useCallback(async () => {
     if (!activeGroupId || !isTeacher) return
     setIsRosterLoading(true)
     try {
       const res = await fetch(`/api/dashboard/roster?groupId=${activeGroupId}`, {
         headers: { ...getAuthHeader() },
       })
-      const data = await res.json()
-      if (res.ok) {
-        setRoster(data.students || [])
-        // Initialize attendance defaults
-        const initialAttendance: Record<string, any> = {}
-        data.students?.forEach((s: any) => {
-          initialAttendance[s.userId] = 'present'
-        })
-        setAttendanceRecordsState(initialAttendance)
-      }
-    } catch {
-      // Ignored
+      const data = await res.json() as { students?: RosterStudent[]; error?: string };
+      if (!res.ok) throw new Error(data.error || 'Unable to load the class roster.');
+      const students = data.students ?? [];
+      setRoster(students);
+      const initialAttendance: Record<string, AttendanceStatus> = {};
+      students.forEach((student) => {
+        initialAttendance[student.userId] = 'present';
+      });
+      setAttendanceRecordsState(initialAttendance);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load the class roster.');
     } finally {
       setIsRosterLoading(false)
     }
-  }
+  }, [activeGroupId, isTeacher]);
 
   // Fetch Weekly Report
-  const fetchWeeklyReport = async () => {
+  const fetchWeeklyReport = useCallback(async () => {
     if (!activeGroupId || !isTeacher) return
     setIsReportLoading(true)
     try {
       const res = await fetch(`/api/dashboard/reports/weekly?groupId=${activeGroupId}`, {
         headers: { ...getAuthHeader() },
       })
-      const data = await res.json()
-      if (res.ok) {
-        setWeeklyReport(data)
-      }
-    } catch {
-      // Ignored
+      const data = await res.json() as WeeklyReport & { error?: string };
+      if (!res.ok) throw new Error(data.error || 'Unable to load the weekly report.');
+      setWeeklyReport(data);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load the weekly report.');
     } finally {
       setIsReportLoading(false)
     }
-  }
+  }, [activeGroupId, isTeacher]);
 
   useEffect(() => {
-    if (activeGroupId && isTeacher) {
+    if (!activeGroupId || !isTeacher) return;
+    const timer = window.setTimeout(() => {
       if (teacherTab === 'roster' || teacherTab === 'attendance') {
-        fetchRoster()
+        void fetchRoster();
       } else if (teacherTab === 'report') {
-        fetchWeeklyReport()
+        void fetchWeeklyReport();
       }
-    }
-  }, [activeGroupId, teacherTab, isTeacher])
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeGroupId, teacherTab, isTeacher, fetchRoster, fetchWeeklyReport]);
 
   // Join group using 6-digit code
   const handleJoin = async (e: React.FormEvent) => {
@@ -156,7 +181,9 @@ export default function Community() {
       if (userWhatsApp.trim()) {
         try {
           localStorage.setItem('user_whatsapp_number', userWhatsApp.trim())
-        } catch {}
+        } catch {
+          toast.error('Could not save your WhatsApp number on this device.');
+        }
       }
 
       const res = await fetch('/api/groups/join', {
@@ -177,8 +204,8 @@ export default function Community() {
       setInviteCode('')
       refetchGroups()
       setSelectedGroupId(data.groupId)
-    } catch (err: any) {
-      toast.error(err.message || 'Could not join class. Check the invite code.')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Could not join class. Check the invite code.')
     } finally {
       setIsJoining(false)
     }
@@ -211,8 +238,8 @@ export default function Community() {
       setAnnouncementTitle('')
       setAnnouncementBody('')
       refetchDetails()
-    } catch (err: any) {
-      toast.error(err.message || 'Error posting announcement.')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error posting announcement.')
     } finally {
       setIsPosting(false)
     }
@@ -232,8 +259,8 @@ export default function Community() {
       toast.success(`New invite code generated: ${data.inviteCode}`)
       refetchGroups()
       refetchDetails()
-    } catch (err: any) {
-      toast.error(err.message || 'Could not generate code')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Could not generate code')
     }
   }
 
@@ -252,7 +279,7 @@ export default function Community() {
       })
       if (!res.ok) throw new Error('Failed to send reminder')
       toast.success(`Gentle reading reminder sent to ${studentName}`)
-    } catch (err: any) {
+    } catch {
       toast.error('Could not send reminder')
     }
   }
@@ -303,8 +330,8 @@ export default function Community() {
       if (!recordRes.ok) throw new Error('Failed to save attendance marks')
 
       toast.success(`Attendance saved for ${records.length} attendees (${roster.length} students, ${guestList.length} visitors)!`)
-    } catch (err: any) {
-      toast.error(err.message || 'Error recording attendance')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : 'Error recording attendance')
     } finally {
       setIsSavingAttendance(false)
     }
@@ -577,7 +604,7 @@ export default function Community() {
 
                 {groupDetails.assignments && groupDetails.assignments.length > 0 ? (
                   <div className="space-y-2">
-                    {groupDetails.assignments.map((assignment: any) => (
+                    {groupDetails.assignments.map((assignment) => (
                       <div
                         key={assignment.id}
                         onClick={() =>
@@ -640,7 +667,7 @@ export default function Community() {
                     <div className="flex items-center justify-between pt-1">
                       <select
                         value={priority}
-                        onChange={(e: any) => setPriority(e.target.value)}
+                        onChange={(e) => setPriority(e.target.value as 'normal' | 'high' | 'urgent')}
                         className="px-2 py-1 text-xs border border-gray-200 rounded-lg text-gray-700 bg-white"
                       >
                         <option value="normal">Priority: Normal</option>
@@ -670,7 +697,7 @@ export default function Community() {
 
                 {groupDetails.announcements && groupDetails.announcements.length > 0 ? (
                   <div className="space-y-2.5">
-                    {groupDetails.announcements.map((ann: any) => (
+                    {groupDetails.announcements.map((ann) => (
                       <div
                         key={ann.id}
                         className="bg-white rounded-xl p-4 border border-gray-200/80 shadow-sm space-y-1.5"
@@ -730,7 +757,7 @@ export default function Community() {
                 <div className="py-12 text-center text-xs text-gray-400">Loading student roster...</div>
               ) : roster.length > 0 ? (
                 <div className="space-y-2">
-                  {roster.map((student: any) => (
+                  {roster.map((student) => (
                     <div
                       key={student.userId}
                       className="bg-white rounded-xl p-3 border border-gray-200 shadow-xs flex items-center justify-between"
@@ -796,7 +823,7 @@ export default function Community() {
 
               {roster.length > 0 ? (
                 <div className="divide-y divide-gray-100">
-                  {roster.map((student: any) => {
+                  {roster.map((student) => {
                     const status = attendanceRecordsState[student.userId] || 'present'
                     return (
                       <div key={student.userId} className="py-2.5 flex items-center justify-between">
@@ -993,7 +1020,7 @@ export default function Community() {
                       <span>Chapters Read (7d)</span>
                     </div>
                     <div className="divide-y divide-gray-100">
-                      {weeklyReport.students?.map((s: any) => (
+                      {weeklyReport.students?.map((s) => (
                         <div key={s.userId} className="px-3 py-2 flex items-center justify-between">
                           <span className="text-gray-800 font-medium">{s.name}</span>
                           <span className={`font-bold ${s.chaptersReadThisWeek > 0 ? 'text-emerald-600' : 'text-gray-400'}`}>

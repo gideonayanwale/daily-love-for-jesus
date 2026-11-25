@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { adminQuery, createRouter, publicQuery } from "./middleware";
+import {
+  adminQuery,
+  createRouter,
+  publicQuery,
+  superadminQuery,
+} from "./middleware";
 import type { TrpcContext } from "./context";
 import type { User } from "@db/schema";
 
@@ -32,7 +37,7 @@ describe("tRPC authorization middleware", () => {
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("allows an administrator and rejects an ordinary user", async () => {
+  it("allows legacy admin access and rejects an ordinary user", async () => {
     const router = createRouter({
       secret: adminQuery.query(({ ctx }) => ctx.user.role),
     });
@@ -42,5 +47,25 @@ describe("tRPC authorization middleware", () => {
     await expect(
       router.createCaller({ ...baseContext(), user: makeUser("user") }).secret(),
     ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("reserves superadmin-only operations for the superadmin role", async () => {
+    const router = createRouter({
+      appoint: superadminQuery.query(({ ctx }) => ctx.user.role),
+    });
+
+    await expect(
+      router.createCaller({ ...baseContext(), user: makeUser("superadmin") }).appoint(),
+    ).resolves.toBe("superadmin");
+
+    for (const role of ["user", "admin", "elevated_admin"]) {
+      await expect(
+        router.createCaller({ ...baseContext(), user: makeUser(role) }).appoint(),
+      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    }
+
+    await expect(
+      router.createCaller(baseContext()).appoint(),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 });

@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { useAuth } from '@/hooks/useAuth';
 import { format } from 'date-fns';
-import { Loader2, Calendar, Bookmark, BookOpen, Music, CalendarHeart, Users, Settings, ShieldCheck, ArrowRight, Share2, Heart } from 'lucide-react';
+import { Loader2, Calendar, Bookmark, BookOpen, Music, CalendarHeart, Users, Settings, ShieldCheck, ArrowRight, Share2, Heart, GraduationCap } from 'lucide-react';
 
 function getRoleBadge(role?: string) {
   if (role === 'admin') {
@@ -27,6 +27,9 @@ export default function Dashboard() {
 
   const { data: devotional, isLoading: devLoading } = trpc.devotional.today.useQuery();
 
+  const { data: myGroups } = trpc.community.myGroups.useQuery(undefined, { enabled: !!user });
+  const { data: myCommunities } = trpc.community.myCommunities.useQuery(undefined, { enabled: !!user });
+
   const { data: favorites } = trpc.favorite.list.useQuery(
     { userId: user?.id ?? '' },
     { enabled: !!user }
@@ -48,8 +51,17 @@ export default function Dashboard() {
     { label: 'Devotionals', path: '/devotionals', Icon: CalendarHeart, color: 'bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400' },
     { label: 'Community', path: '/community', Icon: Users, color: 'bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400' },
     { label: 'Settings', path: '/settings', Icon: Settings, color: 'bg-zinc-100 dark:bg-zinc-900 text-zinc-600 dark:text-zinc-400' },
-    ...(user?.role === 'admin' || user?.role === 'elevated_admin' || user?.role === 'superadmin'
-      ? [{ label: 'Admin Panel', path: '/admin/devotionals', Icon: ShieldCheck, color: 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' }]
+    ...(myGroups?.some((group) => group.role === 'teacher' || group.role === 'assistant_teacher')
+      ? [{ label: 'Sunday School', path: '/dashboard/teacher', Icon: GraduationCap, color: 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400' }]
+      : []),
+    ...(myCommunities?.some((community) => community.role === 'COMMUNITY_OWNER')
+      ? [{ label: 'My Communities', path: '/dashboard/community-owner', Icon: Users, color: 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400' }]
+      : []),
+    ...(user?.role === 'admin' || user?.role === 'elevated_admin'
+      ? [{ label: 'Platform Operations', path: '/dashboard/elevated-admin', Icon: ShieldCheck, color: 'bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400' }]
+      : []),
+    ...(user?.role === 'superadmin'
+      ? [{ label: 'Super Admin', path: '/dashboard/superadmin', Icon: ShieldCheck, color: 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400' }]
       : []),
   ];
 

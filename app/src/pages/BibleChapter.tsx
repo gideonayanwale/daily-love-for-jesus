@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { ArrowLeft, BookOpen } from 'lucide-react';
 
 export default function BibleChapter() {

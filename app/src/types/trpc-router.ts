@@ -146,9 +146,66 @@ export const appRouter = t.router({
   community: t.router({
     myCommunities: t.procedure.query(async () => [] as any[]),
     myGroups: t.procedure.query(async () => [] as any[]),
-    groupDetails: t.procedure.input(z.any()).query(async () => ({} as any)),
+    groupDetails: t.procedure.input(z.any()).query(async () => ({
+      group: {} as any,
+      myRole: null as string | null,
+      announcements: [] as Array<{
+        id: number;
+        title: string;
+        body: string;
+        priority: string;
+        announcementType: string;
+        createdAt: Date;
+        authorName: string | null;
+        authorAvatar: string | null;
+      }>,
+      assignments: [] as Array<{
+        id: number;
+        title: string;
+        description: string | null;
+        dueDate: Date;
+        bookNumber: number;
+        chapter: number;
+      }>,
+    })),
     teacherOverview: t.procedure.input(z.any()).query(async () => ({} as any)),
     registerPushToken: t.procedure.input(z.any()).mutation(async () => ({ success: true })),
+    listOwnedGroupTeacherCandidates: t.procedure
+      .input(z.object({ groupId: z.number() }))
+      .query(async () => [] as any[]),
+    assignOwnedGroupTeacher: t.procedure
+      .input(z.object({ groupId: z.number(), userId: z.string(), role: z.enum(["teacher", "assistant_teacher"]).optional() }))
+      .mutation(async () => ({ success: true })),
+    ownedCommunityGroups: t.procedure
+      .input(z.object({ communityId: z.string() }))
+      .query(async () => [] as any[]),
+    updateOwnedCommunity: t.procedure
+      .input(z.object({
+        communityId: z.string(),
+        name: z.string().optional(),
+        description: z.string().nullable().optional(),
+        location: z.string().nullable().optional(),
+        contactEmail: z.string().nullable().optional(),
+        contactPhone: z.string().nullable().optional(),
+      }))
+      .mutation(async () => ({ success: true, community: {} as any })),
+    createOwnedGroup: t.procedure
+      .input(z.object({ communityId: z.string(), name: z.string(), description: z.string().optional(), category: z.string().optional() }))
+      .mutation(async () => ({ success: true, group: {} as any })),
+  }),
+  communityManagement: t.router({
+    listActiveCommunities: t.procedure.query(async () => [] as any[]),
+    listActiveMembers: t.procedure
+      .input(z.object({ communityId: z.string() }))
+      .query(async () => [] as any[]),
+    appointOwner: t.procedure
+      .input(z.object({ communityId: z.string(), userId: z.string() }))
+      .mutation(async () => ({ success: true, unchanged: false })),
+  }),
+  notification: t.router({
+    broadcastToUsers: t.procedure
+      .input(z.object({ title: z.string(), body: z.string() }))
+      .mutation(async () => ({ recipientCount: 0, devicesSent: 0, failedDevices: 0 })),
   }),
   teacherAssignment: t.router({
     listGroups: t.procedure.query(async () => [] as any[]),

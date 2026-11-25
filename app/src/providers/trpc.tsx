@@ -1,14 +1,11 @@
-import { createTRPCReact } from "@trpc/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import superjson from "superjson";
-import type { AppRouter } from "@/types/trpc-router";
-export type { AppRouter };
 import type { ReactNode } from "react";
 import { getSupabaseAccessToken } from "@/lib/supabase";
 import { getAnonymousAnalyticsHeaders } from "@/lib/analytics";
 
-export const trpc = createTRPCReact<AppRouter>();
+import { trpc } from "./trpc-client";
 
 const queryClient = new QueryClient();
 const apiBase = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");

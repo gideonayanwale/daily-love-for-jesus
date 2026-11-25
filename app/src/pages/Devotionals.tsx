@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { Heart, CalendarHeart, ArrowRight, Search, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';

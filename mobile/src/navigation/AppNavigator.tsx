@@ -13,7 +13,7 @@ const Stack = createNativeStackNavigator()
 export function AppNavigator() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator id="root" screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="Home" component={HomeScreen} />
         <Stack.Screen name="Bible" component={BibleScreen} />

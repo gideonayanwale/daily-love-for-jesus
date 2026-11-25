@@ -53,6 +53,15 @@ jobs:
         id: install-mobile
         run: npm --prefix mobile install --legacy-peer-deps
 
+      - name: Report mobile dependency vulnerability audit
+        if: steps['install-mobile'].outcome == 'success'
+        continue-on-error: true
+        run: |
+          report="$(mktemp)"
+          npm --prefix mobile audit --json > "$report" || true
+          node -e 'const fs=require("node:fs"); try { const report=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log("[mobile] vulnerability totals:", report.metadata?.vulnerabilities ?? {}); for (const [name,item] of Object.entries(report.vulnerabilities ?? {})) console.log(`[mobile] ${name}: ${item.severity}; direct=${item.isDirect}; fix=${JSON.stringify(item.fixAvailable)}`); } catch { console.log("[mobile] npm audit did not return parseable JSON."); }' "$report"
+          rm -f "$report"
+
       - name: Mobile TypeScript Type-Check
         if: steps['install-mobile'].outcome == 'success'
         run: npm --prefix mobile run typecheck

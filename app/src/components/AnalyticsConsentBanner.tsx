@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { getAnalyticsConsent, setAnalyticsConsent, type AnalyticsConsent } from '@/lib/analytics';
 import { ShieldCheck } from 'lucide-react';
 

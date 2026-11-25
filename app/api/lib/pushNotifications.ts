@@ -7,7 +7,7 @@ interface SendPushOptions {
   groupId?: number;
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, string | number | boolean | null>;
   category?: string;
 }
 
@@ -29,7 +29,7 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
   }
 
   if (recipientIds.length === 0) {
-    return { sent: 0, recipientCount: 0 };
+    return { sent: 0, recipientCount: 0, failedDevices: 0 };
   }
 
   // 1. Create in-app notifications for each recipient
@@ -39,16 +39,14 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     title: options.title,
     body: options.body,
     category: options.category ?? "announcement",
-    resourceType: options.data?.resourceType ?? "group",
+    resourceType: options.data?.resourceType ?? (options.groupId ? "group" : "platform"),
     resourceId: options.data?.resourceId ? String(options.data.resourceId) : null,
     isRead: false,
   }));
 
-  try {
-    await db.insert(notifications).values(notificationRows);
-  } catch (err) {
-    console.error("[push] Failed to record in-app notifications:", err);
-  }
+  // Treat the in-app feed as part of the operation's success contract. Do not
+  // report a broadcast as successful if its durable notification records fail.
+  await db.insert(notifications).values(notificationRows);
 
   // 2. Fetch push tokens for recipient users
   const tokens = await db
@@ -57,12 +55,12 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     .where(inArray(pushTokens.userId, recipientIds));
 
   if (tokens.length === 0) {
-    return { sent: 0, recipientCount: recipientIds.length };
+    return { sent: 0, recipientCount: recipientIds.length, failedDevices: 0 };
   }
 
-  // 3. Dispatch to Expo Push API
-  const messages = tokens.map((t) => ({
-    to: t.token,
+  // 3. Dispatch to Expo Push API in provider-sized batches.
+  const messages = tokens.map((token) => ({
+    to: token.token,
     sound: "default",
     title: options.title,
     body: options.body,
@@ -70,21 +68,51 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     badge: 1,
   }));
 
-  try {
-    const response = await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Accept-Encoding": "gzip, deflate",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(messages),
-    });
-
-    const result = await response.json();
-    return { sent: messages.length, recipientCount: recipientIds.length, result };
-  } catch (err) {
-    console.warn("[push] Expo push dispatch error (will still show in-app):", err);
-    return { sent: 0, recipientCount: recipientIds.length, error: String(err) };
+  let sent = 0;
+  const failures: string[] = [];
+  let failedDevices = 0;
+  for (let offset = 0; offset < messages.length; offset += 100) {
+    const batch = messages.slice(offset, offset + 100);
+    try {
+      const response = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Accept-Encoding": "gzip, deflate",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(batch),
+      });
+      if (!response.ok) {
+        failures.push(`HTTP ${response.status}`);
+        failedDevices += batch.length;
+        continue;
+      }
+      const payload: {
+        data?: Array<{ status?: string; message?: string; details?: { error?: string } }>;
+      } = await response.json();
+      const tickets = Array.isArray(payload.data) ? payload.data : [];
+      sent += tickets.filter((ticket) => ticket.status === "ok").length;
+      const rejected = tickets.filter((ticket) => ticket.status !== "ok");
+      failedDevices += rejected.length;
+      for (const ticket of rejected) {
+        failures.push(ticket.details?.error ?? ticket.message ?? "Expo rejected a push notification");
+      }
+      if (tickets.length !== batch.length) {
+        const missingTickets = Math.max(0, batch.length - tickets.length);
+        failedDevices += missingTickets;
+        failures.push(`Expo returned ${tickets.length} tickets for ${batch.length} messages`);
+      }
+    } catch (error) {
+      failedDevices += batch.length;
+      failures.push(error instanceof Error ? error.message : "Unknown Expo delivery error");
+    }
   }
+
+  return {
+    sent,
+    recipientCount: recipientIds.length,
+    failedDevices,
+    ...(failures.length > 0 ? { error: failures.join("; ") } : {}),
+  };
 }

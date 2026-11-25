@@ -9,6 +9,8 @@ import { communityRouter } from "./communityRouter";
 import { mediaRouter } from "./mediaRouter";
 import { teacherAssignmentRouter } from "./teacherAssignmentRouter";
 import { anonymousLogRouter } from "./anonymousLogRouter";
+import { notificationRouter } from "./notificationRouter";
+import { communityManagementRouter } from "./communityManagementRouter";
 
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
@@ -22,6 +24,8 @@ export const appRouter = createRouter({
   media: mediaRouter,
   teacherAssignment: teacherAssignmentRouter,
   anonymousLog: anonymousLogRouter,
+  notification: notificationRouter,
+  communityManagement: communityManagementRouter,
 });
 
 export type AppRouter = typeof appRouter;

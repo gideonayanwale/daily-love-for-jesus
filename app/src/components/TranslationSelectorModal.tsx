@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/providers/trpc-client";
 import {
   Dialog,
   DialogContent,

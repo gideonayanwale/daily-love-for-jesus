@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { format } from 'date-fns';

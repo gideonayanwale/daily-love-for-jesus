@@ -13,9 +13,17 @@ async function seedBibleBooks() {
 
   const rawData = JSON.parse(
     fs.readFileSync(path.join(__dirname, "data/bible_books.json"), "utf-8")
-  );
+  ) as Array<{
+    book_number: number;
+    name: string;
+    short_name: string;
+    testament: string;
+    genre: string;
+    chapters: number;
+    order: number;
+  }>;
 
-  const booksData = rawData.map((b: any) => ({
+  const booksData = rawData.map((b) => ({
     bookNumber: b.book_number,
     name: b.name,
     shortName: b.short_name,

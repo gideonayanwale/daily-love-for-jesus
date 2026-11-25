@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { trpc } from '@/providers/trpc';
+import { trpc } from '@/providers/trpc-client';
 import useDevotionalRealtime from '@/hooks/useDevotionalRealtime';
 import {
   BookOpen,
@@ -9,9 +9,7 @@ import {
   Sparkles,
   ArrowRight,
   Flame,
-  CheckCircle2,
   Users,
-  Bookmark,
   Calendar,
   Copy,
   Check,

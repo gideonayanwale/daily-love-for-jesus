@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
-import { trpc } from "@/providers/trpc";
+import { trpc } from "@/providers/trpc-client";
 import {
   ArrowLeft,
   ChevronLeft,

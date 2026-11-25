@@ -12,8 +12,9 @@ import {
   readingLogs,
   pushTokens,
   users,
+  auditLogs,
 } from "@db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, asc } from "drizzle-orm";
 import { assertGroupRole } from "./lib/rbac";
 import { TRPCError } from "@trpc/server";
 
@@ -65,6 +66,198 @@ export const communityRouter = createRouter({
 
     return rows;
   }),
+
+
+
+
+  listOwnedGroupTeacherCandidates: authedQuery
+    .input(z.object({ groupId: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      const group = await db.query.groups.findFirst({ where: eq(groups.id, input.groupId) });
+      if (!group) throw new TRPCError({ code: "NOT_FOUND", message: "Group not found." });
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, group.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      return db.select({ userId: users.id, name: users.name, email: users.email })
+        .from(communityMembers)
+        .innerJoin(users, eq(communityMembers.userId, users.id))
+        .where(and(
+          eq(communityMembers.communityId, group.communityId),
+          eq(communityMembers.status, "active"),
+        ))
+        .orderBy(asc(users.name));
+    }),
+
+  assignOwnedGroupTeacher: authedQuery
+    .input(z.object({
+      groupId: z.number().int().positive(),
+      userId: z.string().uuid(),
+      role: z.enum(["teacher", "assistant_teacher"]).default("teacher"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const group = await db.query.groups.findFirst({ where: eq(groups.id, input.groupId) });
+      if (!group) throw new TRPCError({ code: "NOT_FOUND", message: "Group not found." });
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, group.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      const targetMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, group.communityId),
+          eq(communityMembers.userId, input.userId),
+          eq(communityMembers.status, "active"),
+        ),
+      });
+      if (!targetMembership) throw new TRPCError({ code: "FORBIDDEN", message: "The teacher must be an active member of this community." });
+
+      const existing = await db.query.groupMembers.findFirst({
+        where: and(eq(groupMembers.groupId, input.groupId), eq(groupMembers.userId, input.userId)),
+      });
+      if (existing) {
+        await db.update(groupMembers)
+          .set({ role: input.role, status: "active" })
+          .where(eq(groupMembers.id, existing.id));
+      } else {
+        await db.insert(groupMembers).values({
+          groupId: input.groupId,
+          userId: input.userId,
+          role: input.role,
+          status: "active",
+        });
+      }
+      await db.insert(auditLogs).values({
+        actorId: ctx.user.id,
+        action: "assign_owned_group_teacher",
+        resourceType: "group",
+        resourceId: String(input.groupId),
+        metadata: { communityId: group.communityId, userId: input.userId, role: input.role },
+        occurredAt: new Date(),
+      });
+      return { success: true };
+    }),
+
+  ownedCommunityGroups: authedQuery
+    .input(z.object({ communityId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, input.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      }
+      return db.select({
+        id: groups.id,
+        name: groups.name,
+        slug: groups.slug,
+        category: groups.category,
+        status: groups.status,
+      }).from(groups)
+        .where(eq(groups.communityId, input.communityId))
+        .orderBy(asc(groups.name));
+    }),
+
+  // Community-owner operations are scoped to an active owner membership.
+  updateOwnedCommunity: authedQuery
+    .input(z.object({
+      communityId: z.string().uuid(),
+      name: z.string().trim().min(2).max(255).optional(),
+      description: z.string().trim().max(5000).nullable().optional(),
+      location: z.string().trim().max(255).nullable().optional(),
+      contactEmail: z.string().email().max(320).nullable().optional(),
+      contactPhone: z.string().trim().max(50).nullable().optional(),
+    }).refine((input) => Object.keys(input).some((key) => key !== "communityId" && input[key as keyof typeof input] !== undefined), {
+      message: "Provide at least one community field to update.",
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, input.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      }
+
+      const { communityId, ...changes } = input;
+      const [updated] = await db.update(communities)
+        .set({ ...changes, updatedAt: new Date() })
+        .where(eq(communities.id, communityId))
+        .returning({ id: communities.id, name: communities.name });
+
+      await db.insert(auditLogs).values({
+        actorId: ctx.user.id,
+        action: "update_owned_community",
+        resourceType: "community",
+        resourceId: communityId,
+        metadata: { fields: Object.keys(changes) },
+        occurredAt: new Date(),
+      });
+      return { success: true, community: updated };
+    }),
+
+  createOwnedGroup: authedQuery
+    .input(z.object({
+      communityId: z.string().uuid(),
+      name: z.string().trim().min(2).max(255),
+      description: z.string().trim().max(2000).optional(),
+      category: z.string().trim().min(2).max(100).default("Sunday School"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const ownerMembership = await db.query.communityMembers.findFirst({
+        where: and(
+          eq(communityMembers.communityId, input.communityId),
+          eq(communityMembers.userId, ctx.user.id),
+          eq(communityMembers.status, "active"),
+          eq(communityMembers.role, "COMMUNITY_OWNER"),
+        ),
+      });
+      if (!ownerMembership) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "You do not own this community." });
+      }
+      const slugBase = input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80) || "group";
+      const [created] = await db.insert(groups).values({
+        communityId: input.communityId,
+        name: input.name,
+        description: input.description ?? null,
+        category: input.category,
+        slug: `${slugBase}-${crypto.randomUUID().slice(0, 8)}`,
+        createdBy: ctx.user.id,
+      }).returning({ id: groups.id, name: groups.name, slug: groups.slug });
+
+      await db.insert(auditLogs).values({
+        actorId: ctx.user.id,
+        action: "create_owned_group",
+        resourceType: "group",
+        resourceId: String(created.id),
+        metadata: { communityId: input.communityId, category: input.category },
+        occurredAt: new Date(),
+      });
+      return { success: true, group: created };
+    }),
 
   // ─── Get Group Details with Announcements & Active Reading Assignments ─────
   groupDetails: authedQuery
