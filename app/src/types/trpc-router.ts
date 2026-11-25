@@ -205,7 +205,7 @@ export const appRouter = t.router({
   notification: t.router({
     broadcastToUsers: t.procedure
       .input(z.object({ title: z.string(), body: z.string() }))
-      .mutation(async () => ({ recipientCount: 0, devicesSent: 0 })),
+      .mutation(async () => ({ recipientCount: 0, devicesSent: 0, failedDevices: 0 })),
   }),
   teacherAssignment: t.router({
     listGroups: t.procedure.query(async () => [] as any[]),
