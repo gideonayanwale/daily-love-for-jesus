@@ -44,11 +44,9 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
     isRead: false,
   }));
 
-  try {
-    await db.insert(notifications).values(notificationRows);
-  } catch (err) {
-    console.error("[push] Failed to record in-app notifications:", err);
-  }
+  // Treat the in-app feed as part of the operation's success contract. Do not
+  // report a broadcast as successful if its durable notification records fail.
+  await db.insert(notifications).values(notificationRows);
 
   // 2. Fetch push tokens for recipient users
   const tokens = await db
@@ -88,8 +86,18 @@ export async function sendTargetedPushNotification(options: SendPushOptions) {
         failures.push(`HTTP ${response.status}`);
         continue;
       }
-      await response.json();
-      sent += batch.length;
+      const payload: {
+        data?: Array<{ status?: string; message?: string; details?: { error?: string } }>;
+      } = await response.json();
+      const tickets = Array.isArray(payload.data) ? payload.data : [];
+      sent += tickets.filter((ticket) => ticket.status === "ok").length;
+      const rejected = tickets.filter((ticket) => ticket.status !== "ok");
+      for (const ticket of rejected) {
+        failures.push(ticket.details?.error ?? ticket.message ?? "Expo rejected a push notification");
+      }
+      if (tickets.length !== batch.length) {
+        failures.push(`Expo returned ${tickets.length} tickets for ${batch.length} messages`);
+      }
     } catch (error) {
       failures.push(error instanceof Error ? error.message : "Unknown Expo delivery error");
     }
